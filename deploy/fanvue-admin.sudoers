@@ -1,0 +1,6 @@
+# Erlaubt dem Dienst-Benutzer matze GENAU drei Aktionen ohne Passwort:
+# Bot-Dienst neu starten, Server rebooten, Update einspielen. Sonst nichts.
+# Die Argumente stehen einzeln da - ohne sie duerfte jedes beliebige Argument
+# an das Skript uebergeben werden.
+# Installation: nach /etc/sudoers.d/fanvue-admin kopieren (Rechte 0440).
+matze ALL=(root) NOPASSWD: /usr/local/bin/fanvue-admin restart-service, /usr/local/bin/fanvue-admin reboot, /usr/local/bin/fanvue-admin update

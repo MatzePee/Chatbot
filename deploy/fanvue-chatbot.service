@@ -1,0 +1,19 @@
+[Unit]
+Description=Fanvue Chatbot (FastAPI/uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=matze
+Group=matze
+WorkingDirectory=/srv/fanvue/Fanvue_Chatbot
+# SECRET_KEY (und optional FANVUE_*/OPENROUTER_*) kommen aus der .env
+EnvironmentFile=/srv/fanvue/Fanvue_Chatbot/.env
+# Nutzt die vom ersten ./run.sh angelegte virtuelle Umgebung
+ExecStart=/srv/fanvue/Fanvue_Chatbot/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

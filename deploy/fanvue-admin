@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Root-Helferskript fuer die System-Buttons im Dashboard.
+# Wird ausschliesslich per sudo mit genau EINEM der erlaubten Argumente aufgerufen.
+# systemd-run --no-block entkoppelt die Aktion vom Web-Prozess, damit der Dienst
+# sich selbst neu starten kann, ohne die laufende HTTP-Antwort abzuwuergen.
+set -euo pipefail
+
+# Pfad und Benutzer ggf. an die eigene Installation anpassen.
+REPO="/srv/fanvue/Fanvue_Chatbot"
+SVC_USER="matze"
+SERVICE="fanvue-chatbot"
+
+# Git und pip laufen bewusst als Dienst-Benutzer, nicht als root: sonst gehoerten
+# die Dateien danach root und der Dienst koennte sie nicht mehr schreiben.
+as_user() { runuser -u "$SVC_USER" -- "$@"; }
+
+do_update() {
+  cd "$REPO"
+
+  # 1. Datenbank sichern. Sie liegt in data/ und wird von git nicht angefasst,
+  #    aber ein Update kann Schema-Migrationen ausloesen - davor ein Stand zum
+  #    Zurueckgehen. Die letzten 10 Sicherungen bleiben liegen.
+  if [ -f "$REPO/data/bot.db" ]; then
+    as_user mkdir -p "$REPO/data/backups"
+    STAMP="$(date +%Y%m%d-%H%M%S)"
+    # sqlite3 .backup ist auch bei laufendem Zugriff sicher (WAL-Modus); ohne
+    # das Werkzeug faellt es auf ein einfaches cp zurueck.
+    if command -v sqlite3 >/dev/null 2>&1; then
+      as_user sqlite3 "$REPO/data/bot.db" ".backup '$REPO/data/backups/bot-$STAMP.db'"
+    else
+      as_user cp "$REPO/data/bot.db" "$REPO/data/backups/bot-$STAMP.db"
+    fi
+    echo "Datenbank gesichert: data/backups/bot-$STAMP.db"
+    # shellcheck disable=SC2012
+    ls -1t "$REPO/data/backups/"bot-*.db 2>/dev/null | tail -n +11 | while read -r old; do
+      as_user rm -f "$old"
+    done
+  fi
+
+  # 2. Neueste markierte Version holen
+  as_user git fetch --tags --prune --quiet
+  TAG="$(as_user git tag -l 'v*' --sort=-v:refname | head -n 1)"
+  if [ -z "$TAG" ]; then
+    echo "Kein Versions-Tag (vX.Y.Z) im Repository gefunden." >&2
+    exit 1
+  fi
+  echo "Wechsle auf $TAG"
+  # -f verwirft lokale Aenderungen am Programmcode. data/ und .env sind per
+  # .gitignore ausgenommen und bleiben unangetastet.
+  as_user git checkout -f "$TAG" --quiet
+
+  # 3. Abhaengigkeiten nachziehen (eine neue Version kann neue Pakete brauchen)
+  if [ -x "$REPO/.venv/bin/pip" ]; then
+    as_user "$REPO/.venv/bin/pip" install --quiet --upgrade -r "$REPO/requirements.txt"
+    echo "Abhaengigkeiten aktualisiert"
+  fi
+
+  # 4. Dienst neu starten - entkoppelt, sonst wuerde der Neustart diesen
+  #    Aufruf selbst abbrechen, bevor er sauber zurueckmelden kann.
+  systemd-run --no-block --collect --unit="fanvue-update-$$" \
+    systemctl restart "$SERVICE"
+  echo "Update auf $TAG abgeschlossen, Dienst startet neu."
+}
+
+case "${1:-}" in
+  restart-service)
+    exec systemd-run --no-block --collect --unit=fanvue-restart-$$ \
+      systemctl restart "$SERVICE"
+    ;;
+  reboot)
+    exec systemd-run --no-block --collect --unit=fanvue-reboot-$$ \
+      systemctl reboot
+    ;;
+  update)
+    do_update
+    ;;
+  *)
+    echo "usage: fanvue-admin {restart-service|reboot|update}" >&2
+    exit 1
+    ;;
+esac

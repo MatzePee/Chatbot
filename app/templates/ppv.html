@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>PPV-Ordner</h1>
+<p class="muted">Wähle die Vault-Ordner, die im Chat als PPV verkauft werden dürfen, lege den
+Preis fest und vergib Ordner-Tags. Bild-Tags pro Foto (inkl. LLM-Analyse) unter „Bilder verwalten".</p>
+<p><a class="btn" href="/ppv/import">⬆ PPV-Käufe per CSV importieren</a></p>
+
+{% if folders %}
+<div class="card ppv-filter">
+  <div class="row">
+    <label>Ordner
+      <select id="filter-name">
+        <option value="ppv">Nur PPV-Ordner</option>
+        <option value="all">Alle Ordner</option>
+      </select>
+    </label>
+    <label>Status
+      <select id="filter-status">
+        <option value="all">Alle</option>
+        <option value="1">Nur aktivierte PPVs</option>
+        <option value="0">Nur nicht aktivierte</option>
+      </select>
+    </label>
+    <label>Suche
+      <input id="filter-search" type="text" placeholder="Ordnername…">
+    </label>
+  </div>
+  <div class="filter-foot">
+    <span class="muted small" id="filter-count"></span>
+    <button type="button" class="btn" id="reload-thumbs">↻ Bilder neu laden</button>
+  </div>
+</div>
+{% endif %}
+
+{% if not connected %}
+<div class="card warn">Nicht mit Fanvue verbunden. Verbinde dich zuerst in den <a href="/settings">Einstellungen</a>.
+Für PPV wird der Scope <code>read:media</code> benötigt – falls die Ordner leer bleiben, bitte einmal neu verbinden.</div>
+{% elif error %}
+<div class="card warn">Ordner konnten nicht geladen werden: {{ error }}</div>
+{% elif not folders %}
+<div class="card muted">Keine Vault-Ordner gefunden.</div>
+{% endif %}
+
+{% for f in folders %}
+<div class="card ppv-card" data-name="{{ f['name'] | lower }}"
+     data-enabled="{{ 1 if f['enabled'] else 0 }}"
+     data-ppv="{{ 1 if f['name'].upper().startswith('PPV') else 0 }}">
+  <form method="post" action="/ppv/folder/save">
+    <input type="hidden" name="name" value="{{ f['name'] }}">
+    <div class="draft-head">
+      <strong>{{ f['name'] }}</strong>
+      <span class="muted">· {{ f['media_count'] }} Medien</span>
+      {% if f['enabled'] %}<span class="tag">PPV aktiv</span>{% endif %}
+    </div>
+    {% if f['media_count'] %}
+    <a class="ppv-thumbs" href="/ppv/folder/{{ f['name'] | urlencode }}" data-folder="{{ f['name'] }}" data-ver="{{ f['preview'] }}" title="Bilder & Tags verwalten"></a>
+    {% endif %}
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="enabled" {% if f['enabled'] %}checked{% endif %}> Als PPV verkaufen</label>
+      <label>Preis ($) <input name="price_dollars" type="number" step="0.01" min="3" value="{{ f['price_cents'] | dollars }}"></label>
+    </div>
+    <label class="chk"><input type="checkbox" name="request_only" {% if f['request_only'] %}checked{% endif %}> Nur auf explizite Anfrage anbieten</label>
+    <label>Ordner-Tags (kommagetrennt)
+      <input name="tags" value="{{ f['tags'] }}" placeholder="z.B. lingerie, outdoor, teaser"></label>
+    <div class="draft-actions">
+      <button class="btn-primary" type="submit">Speichern</button>
+      <a class="btn" href="/ppv/folder/{{ f['name'] | urlencode }}">🖼 Bilder &amp; Tags verwalten</a>
+    </div>
+  </form>
+</div>
+{% endfor %}
+
+<style>
+.ppv-filter select, .ppv-filter input { width: auto; }
+.ppv-filter .row > label { flex: 1; min-width: 160px; }
+.ppv-thumbs { display: flex; gap: 6px; margin: 4px 0 12px; min-height: 4px; }
+.ppv-thumbs img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--panel2); }
+.ppv-thumbs img.preview { border: 2px solid var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+.ppv-thumbs.empty { display: none; }
+.small { font-size: 13px; }
+.filter-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 12px; }
+</style>
+<script>
+(function () {
+  const cards = Array.from(document.querySelectorAll('.ppv-card'));
+  const fName = document.getElementById('filter-name');
+  const fStatus = document.getElementById('filter-status');
+  const fSearch = document.getElementById('filter-search');
+  const counter = document.getElementById('filter-count');
+  if (!cards.length) return;
+
+  function visibleCards() {
+    return cards.filter(c => c.style.display !== 'none');
+  }
+
+  function applyFilter() {
+    const nameMode = fName.value;      // 'ppv' | 'all'
+    const status = fStatus.value;      // 'all' | '1' | '0'
+    const q = (fSearch.value || '').trim().toLowerCase();
+    let shown = 0;
+    for (const c of cards) {
+      let ok = true;
+      if (nameMode === 'ppv' && c.dataset.ppv !== '1') ok = false;
+      if (status !== 'all' && c.dataset.enabled !== status) ok = false;
+      if (q && !c.dataset.name.includes(q)) ok = false;
+      c.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    }
+    counter.textContent = shown + ' von ' + cards.length + ' Ordnern';
+    loadThumbs();
+  }
+
+  // Thumbnails nur fuer sichtbare, noch nicht geladene Ordner sequenziell laden.
+  // --- Client-Cache (localStorage) ---
+  // Signierte Fanvue-Bild-URLs sind kurzlebig -> nur kurz cachen (4 Min).
+  const TTL = 240 * 1000;
+  const CKEY = f => 'ppvthumb4:' + f;
+  // ver = aktuelle Vorschaubild-Kennung; aendert sie sich, gilt der Cache als veraltet.
+  function cacheGet(folder, ver) {
+    try {
+      const v = JSON.parse(localStorage.getItem(CKEY(folder)));
+      if (v && (Date.now() - v.ts) < TTL && (v.ver || '') === (ver || '')) return v.thumbs;
+    } catch (e) {}
+    return null;
+  }
+  function cacheSet(folder, thumbs, ver) {
+    try { localStorage.setItem(CKEY(folder), JSON.stringify({ ts: Date.now(), ver: ver || '', thumbs })); } catch (e) {}
+  }
+  function render(el, thumbs) {
+    if (thumbs && thumbs.length) {
+      el.innerHTML = thumbs.map(t =>
+        '<img class="' + (t.preview ? 'preview' : '') + '" src="' + t.url + '" loading="lazy" alt="">'
+      ).join('');
+    } else {
+      el.classList.add('empty');
+    }
+  }
+
+  let loading = false, forceRefresh = false;
+  function nextStrip() {
+    for (const c of visibleCards()) {
+      const el = c.querySelector('.ppv-thumbs[data-folder]');
+      if (el && !el.dataset.loaded) return el;
+    }
+    return null;
+  }
+  async function loadThumbs() {
+    if (loading) return;
+    loading = true;
+    try {
+      let el;
+      while ((el = nextStrip())) {
+        el.dataset.loaded = '1';
+        const folder = el.getAttribute('data-folder');
+        const ver = el.getAttribute('data-ver') || '';
+        // 1) Client-Cache (sofort, kein Netz) – nur wenn die Vorschau-Kennung passt
+        if (!forceRefresh) {
+          const cached = cacheGet(folder, ver);
+          if (cached) { render(el, cached); continue; }
+        }
+        // 2) Server holen (nutzt serverseitigen Cache, ausser bei refresh)
+        try {
+          const url = '/ppv/folder/' + encodeURIComponent(folder) + '/thumbs?n=3'
+                    + (forceRefresh ? '&refresh=1' : '');
+          const res = await fetch(url);
+          const data = await res.json();
+          render(el, data.thumbs);
+          if (data.thumbs) cacheSet(folder, data.thumbs, ver);
+        } catch (e) { el.classList.add('empty'); }
+      }
+    } finally {
+      loading = false;
+    }
+  }
+
+  const reloadBtn = document.getElementById('reload-thumbs');
+  if (reloadBtn) reloadBtn.addEventListener('click', function () {
+    // localStorage-Cache leeren und alles frisch vom Server holen
+    for (const c of cards) {
+      try { localStorage.removeItem(CKEY(c.dataset.name)); } catch (e) {}
+      const el = c.querySelector('.ppv-thumbs[data-folder]');
+      if (el) { delete el.dataset.loaded; el.classList.remove('empty'); el.innerHTML = ''; }
+    }
+    forceRefresh = true;
+    loadThumbs().then(() => { forceRefresh = false; });
+  });
+
+  fName.addEventListener('change', applyFilter);
+  fStatus.addEventListener('change', applyFilter);
+  fSearch.addEventListener('input', applyFilter);
+  applyFilter();
+})();
+
+// Speichern der Ordner-Einstellungen ohne Seiten-Reload (kein Springen nach oben)
+(function () {
+  document.querySelectorAll('form[action="/ppv/folder/save"]').forEach(function (f) {
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = f.querySelector('button[type="submit"]');
+      var label = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Speichere…'; }
+      fetch(f.action, { method: 'POST', body: new FormData(f) })
+        .then(function () {
+          // Karte konsistent halten (Filter + Badge), ohne neu zu laden
+          var card = f.closest('.ppv-card');
+          var chk = f.querySelector('input[name="enabled"]');
+          var enabled = chk ? chk.checked : false;
+          if (card) {
+            card.dataset.enabled = enabled ? '1' : '0';
+            var head = card.querySelector('.draft-head');
+            var badge = head ? head.querySelector('.tag') : null;
+            if (enabled && !badge && head) {
+              var s = document.createElement('span');
+              s.className = 'tag'; s.textContent = 'PPV aktiv';
+              head.appendChild(s);
+            } else if (!enabled && badge) {
+              badge.remove();
+            }
+          }
+          if (btn) btn.textContent = '✓ Gespeichert';
+        })
+        .catch(function () { if (btn) btn.textContent = '⚠ Fehler'; })
+        .finally(function () {
+          setTimeout(function () { if (btn) { btn.textContent = label; btn.disabled = false; } }, 1400);
+        });
+    });
+  });
+})();
+</script>
+{% endblock %}

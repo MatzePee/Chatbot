@@ -1,0 +1,19 @@
+# --- Zugangsdaten und Daten: duerfen NIEMALS ins Repository ---
+.env
+data/
+
+# --- Laufzeit / Umgebung ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+exports/
+
+# --- macOS ---
+.DS_Store
+._*
+
+# --- Samba/SMB-Share: Platzhalter fuer geloeschte Dateien.
+# Ohne diesen Eintrag bricht `git add -A` mit "unable to index file" ab. ---
+.smbdelete*

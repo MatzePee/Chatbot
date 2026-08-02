@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Einstellungen</h1>
+
+<div class="card">
+  <h3>Fanvue-Verbindung</h3>
+  {% if connected %}
+    <p><span class="dot green"></span> Verbunden{% if tokens and tokens['account_handle'] %} als <strong>{{ tokens['account_handle'] }}</strong>{% endif %}.</p>
+    {% if tokens and tokens['scope'] %}
+    <p class="small muted">Gewährte Scopes: <code>{{ tokens['scope'] }}</code></p>
+    {% set granted = tokens['scope'] %}
+    {% set missing = [] %}
+    {% for need in ['read:fan','read:insights','read:media','read:chat','write:chat'] %}
+      {% if need not in granted %}{% set _ = missing.append(need) %}{% endif %}
+    {% endfor %}
+    {% if missing %}
+    <p class="small" style="color:#e0b050">⚠ Fehlende Scopes: <code>{{ missing | join(', ') }}</code>.
+    Hinweis: <code>read:fan</code> und <code>read:insights</code> gibt Fanvue nur für
+    <strong>Creator-/Agentur-Konten</strong> frei – bei anderen Kontotypen bleiben sie ungewährt
+    (Bot funktioniert trotzdem, nur ohne Fan-Insights und volle Mitgliederliste).</p>
+    {% endif %}
+    {% endif %}
+    <form method="post" action="/oauth/disconnect"><button class="btn-danger">Verbindung trennen</button></form>
+  {% else %}
+    <p><span class="dot red"></span> Nicht verbunden. Trage unten Client-ID, Secret und Redirect-URI ein, speichere, dann verbinde.</p>
+    <a class="btn-primary" href="/oauth/start">🔗 Mit Fanvue verbinden</a>
+  {% endif %}
+</div>
+
+<form method="post" action="/settings">
+  <div class="card">
+    <h3>Fanvue OAuth</h3>
+    <label>Client-ID <input name="fanvue_client_id" value="{{ s['fanvue_client_id'] }}"></label>
+    <label>Client-Secret <input name="fanvue_client_secret" type="password" value="{{ s['fanvue_client_secret'] }}"></label>
+    <label>Redirect-URI (exakt in Fanvue-App hinterlegen)
+      <input name="fanvue_redirect_uri" value="{{ s['fanvue_redirect_uri'] }}"></label>
+    <label>API-Version <input name="fanvue_api_version" value="{{ s['fanvue_api_version'] }}"></label>
+  </div>
+
+  <div class="card">
+    <h3>OpenRouter</h3>
+    <label>API-Key <input name="openrouter_api_key" type="password" value="{{ s['openrouter_api_key'] }}"></label>
+    <label>Chat-Modell (Antworten) <span class="info" tabindex="0" data-tip="Das Hauptmodell für die normalen Chat-Antworten. Hier gehört dein unzensiertes Modell hin.">ⓘ</span>
+      <input name="openrouter_model" value="{{ s['openrouter_model'] }}"
+      placeholder="z.B. cognitivecomputations/dolphin-mistral, sao10k/l3-euryale-70b"></label>
+    <label>Analyse-Modell (Intent/Vorlieben) <span class="info" tabindex="0" data-tip="Bewertet Fan-Nachrichten (Kaufinteresse, Vorlieben, Content-Anfrage) und muss zuverlässig JSON liefern. Hier ein intelligentes Modell wählen. Leer = Chat-Modell.">ⓘ</span>
+      <input name="classifier_model" value="{{ s['classifier_model'] }}"
+      placeholder="leer = Chat-Modell · z.B. openai/gpt-4o-mini, google/gemini-2.0-flash"></label>
+    <label>PPV-Caption-Modell (Bildunterschriften) <span class="info" tabindex="0" data-tip="Modell für die PPV-Bildunterschriften. Sollte explizite Captions schreiben können (unzensiert). Leer = Chat-Modell.">ⓘ</span>
+      <input name="ppv_caption_model" value="{{ s['ppv_caption_model'] }}"
+      placeholder="leer = Chat-Modell"></label>
+    <div class="row">
+      <label>Temperatur <span class="info" tabindex="0" data-tip="Kreativität/Zufall der Antworten (0–2). Niedrig = konsistenter/vorhersehbarer, höher = abwechslungsreicher/wilder. Empfohlen ~0.8–1.0.">ⓘ</span> <input name="temperature" type="number" step="0.1" min="0" max="2" value="{{ s['temperature'] }}"></label>
+      <label>Max Tokens <span class="info" tabindex="0" data-tip="Maximale Länge der generierten Antwort. Bei Reasoning-Modellen (z.B. gpt-5.x) zählt internes Denken mit – zu niedrig schneidet den Text ab. Empfohlen ≥ 800.">ⓘ</span> <input name="max_tokens" type="number" value="{{ s['max_tokens'] }}"></label>
+      <label>Verlauf (Nachrichten) <span class="info" tabindex="0" data-tip="Wie viele der letzten Chat-Nachrichten als Kontext in den Prompt gegeben werden. Mehr = besserer Bezug/Continuity, aber mehr Tokens/Kosten.">ⓘ</span> <input name="history_messages" type="number" value="{{ s['history_messages'] }}"></label>
+      <label>Neuversuche bei leerer Antwort <span class="info" tabindex="0" data-tip="Liefert das Modell eine leere Antwort (kommt bei Reasoning-Modellen vor), wird bis zu so oft neu generiert. Erst wenn alle Versuche leer bleiben, landet der Entwurf zur manuellen Freigabe. Standard 3.">ⓘ</span> <input name="generation_retries" type="number" min="1" max="10" value="{{ s['generation_retries'] }}"></label>
+      <label>Pause zwischen Neuversuchen (s) <span class="info" tabindex="0" data-tip="Wartezeit zwischen den Neuversuchen bei leerer Antwort. Gilt nur im automatischen Hintergrundbetrieb – beim manuellen „Neu generieren\" und im Test-Modus wird nicht gewartet. Standard 60.">ⓘ</span> <input name="generation_retry_delay" type="number" min="0" max="600" value="{{ s['generation_retry_delay'] }}"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Bildanalyse (separates Vision-LLM)</h3>
+    <p class="muted">Eigenes multimodales Modell für die PPV-Tag-Analyse. Der API-Key ist optional –
+    bleibt er leer, wird der OpenRouter-Key von oben verwendet.</p>
+    <label>Vision-Modell
+      <input name="vision_model" value="{{ s['vision_model'] }}"
+        placeholder="z.B. openai/gpt-4o, google/gemini-2.0-flash, anthropic/claude-3.5-sonnet"></label>
+    <label>Vision-API-Key (optional, eigener Key)
+      <input name="vision_api_key" type="password" value="{{ s['vision_api_key'] }}"
+        placeholder="leer = OpenRouter-Key von oben"></label>
+    <label>Analyse-Prompt (Tags aus Bild)
+      <textarea name="vision_prompt" rows="2">{{ s['vision_prompt'] }}</textarea></label>
+  </div>
+
+  <div class="card">
+    <h3>Eingehende Fan-Bilder</h3>
+    <p class="muted small">Ein <em>normales</em> Fan-Bild wird <strong>nicht</strong> als Kaufsignal gewertet
+    (kein automatisches PPV). Stattdessen analysiert das Vision-LLM das Bild und der Bot geht im Chat
+    natürlich darauf ein. <strong>Ausnahme 1:</strong> Ist eine (angezogene) Frau zu sehen, kann der Bot
+    nicht wissen, ob das die Creatorin selbst ist – dann antwortet er bewusst vorsichtig/ausweichend.
+    <strong>Ausnahme 2:</strong> Ein <strong>explizites</strong> Bild (nackte Frau oder Penis) gilt als
+    Kaufsignal und löst – wenn ein passendes Set verfügbar ist – ein PPV aus.</p>
+    <label class="chk"><input type="checkbox" name="incoming_image_enabled" {% if s['incoming_image_enabled'] %}checked{% endif %}> Fan-Bilder analysieren und darauf eingehen</label>
+    <label>Reaktions-Prompt (normales Bild) <span class="info" tabindex="0" data-tip="Wird an den System-Prompt angehängt, wenn der Fan ein Bild OHNE erkennbare Frau schickt. Der Platzhalter {beschreibung} wird durch die automatische Bildbeschreibung ersetzt.">ⓘ</span>
+      <textarea name="incoming_image_react_prompt" rows="3">{{ s['incoming_image_react_prompt'] }}</textarea></label>
+    <label>Vorsichts-Prompt (Frau im Bild) <span class="info" tabindex="0" data-tip="Wird angehängt, wenn eine Frau im Bild erkannt wird oder das Bild nicht analysiert werden konnte. Der Bot bestätigt/verneint dann NICHT, ob er das ist, und bleibt ausweichend.">ⓘ</span>
+      <textarea name="incoming_image_woman_prompt" rows="3">{{ s['incoming_image_woman_prompt'] }}</textarea></label>
+  </div>
+
+  <div class="card">
+    <h3>Trinkgeld-Dank</h3>
+    <label class="chk"><input type="checkbox" name="tip_thanks_enabled" {% if s['tip_thanks_enabled'] %}checked{% endif %}> Bei einem Trinkgeld automatisch bedanken <span class="info" tabindex="0" data-tip="Erkennt Trinkgelder (Fanvue-Nachrichten vom Typ TIP) und lässt den Bot sich dafür bedanken – ohne Verkauf oder Gegenfrage. Der Betrag wird, falls verfügbar, mit einbezogen.">ⓘ</span></label>
+    <label>Dank-Prompt (Stil der Trinkgeld-Antwort)
+      <textarea name="tip_thanks_prompt" rows="2">{{ s['tip_thanks_prompt'] }}</textarea></label>
+  </div>
+
+  <div class="card">
+    <h3>Persona / System-Prompt</h3>
+    <textarea name="system_prompt" rows="5">{{ s['system_prompt'] }}</textarea>
+  </div>
+
+  <div class="card">
+    <h3>Updates</h3>
+    <p class="muted">Prüft regelmäßig, ob im Repository eine neue Version (Git-Tag <code>vX.Y.Z</code>)
+    veröffentlicht wurde. Installiert wird nur auf Knopfdruck über das Dashboard – nie von selbst.</p>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="update_check_enabled"
+        {% if s['update_check_enabled'] %}checked{% endif %}> Automatisch nach Updates sehen</label>
+      <label class="chk"><input type="checkbox" name="update_notify_telegram"
+        {% if s['update_notify_telegram'] %}checked{% endif %}> Neue Version per Telegram melden</label>
+      <label>Prüfabstand (Stunden)
+        <input name="update_check_interval_hours" type="number" min="1" max="168"
+          value="{{ s['update_check_interval_hours'] }}"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Telegram-Benachrichtigung</h3>
+    <p class="muted">Meldet sofort, wenn ein Entwurf endgültig hängt – also alle automatischen
+    Neuversuche aufgebraucht sind und ohne dich nichts mehr passiert. Jeder Entwurf wird
+    genau einmal gemeldet.</p>
+    <details style="margin-bottom:10px">
+      <summary class="muted" style="cursor:pointer">Einrichtung in 3 Schritten</summary>
+      <ol class="muted" style="font-size:13px;line-height:1.7;margin:8px 0 0 0">
+        <li>In Telegram <code>@BotFather</code> anschreiben, <code>/newbot</code> senden,
+            Namen vergeben → du bekommst ein Token.</li>
+        <li>Token unten eintragen. Dann deinen <em>eigenen neuen Bot</em> in Telegram suchen
+            und ihm einmal kurz „hallo“ schreiben (vorher darf er dir nicht antworten).</li>
+        <li>Auf „Chat-ID ermitteln“ klicken, danach „Testnachricht senden“.</li>
+      </ol>
+    </details>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="telegram_enabled"
+        {% if s['telegram_enabled'] %}checked{% endif %}> Benachrichtigungen aktiv</label>
+      <label>Chat-ID <input name="telegram_chat_id" value="{{ s['telegram_chat_id'] }}"
+        placeholder="wird unten ermittelt"></label>
+    </div>
+    <label>Bot-Token (von @BotFather)
+      <input name="telegram_bot_token" type="password" value="{{ s['telegram_bot_token'] }}"
+        placeholder="123456789:ABCdef..."></label>
+    <label>Basis-URL dieser Oberfläche (für den Link in der Meldung)
+      <input name="app_base_url" value="{{ s['app_base_url'] }}"
+        placeholder="http://192.168.20.16:8000"></label>
+    <div class="draft-actions" style="margin-top:8px">
+      <button type="button" class="btn" id="tg-chatid">🔎 Chat-ID ermitteln</button>
+      <button type="button" class="btn" id="tg-test">📨 Testnachricht senden</button>
+    </div>
+    <p id="tg-out" class="muted" style="margin-top:8px"></p>
+  </div>
+
+  <script>
+  (function () {
+    var out = document.getElementById('tg-out');
+    if (!out) return;
+    function post(url, extra) {
+      var body = new URLSearchParams(Object.assign({
+        token: document.querySelector('[name=telegram_bot_token]').value
+      }, extra || {}));
+      out.textContent = 'Verbinde mit Telegram…';
+      return fetch(url, {method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+        .then(function (r) { return r.json(); })
+        .catch(function (e) { return {ok: false, msg: 'Fehler: ' + e}; });
+    }
+    document.getElementById('tg-chatid').addEventListener('click', function () {
+      post('/settings/telegram-chatid').then(function (d) {
+        if (d.ok && d.chat_id) {
+          document.querySelector('[name=telegram_chat_id]').value = d.chat_id;
+          out.textContent = '✅ ' + d.msg + ' – Chat-ID eingetragen. Nicht vergessen zu speichern.';
+        } else { out.textContent = '⚠ ' + d.msg; }
+      });
+    });
+    document.getElementById('tg-test').addEventListener('click', function () {
+      post('/settings/telegram-test',
+           {chat_id: document.querySelector('[name=telegram_chat_id]').value})
+        .then(function (d) { out.textContent = (d.ok ? '✅ ' : '⚠ ') + d.msg; });
+    });
+  })();
+  </script>
+
+  <div class="card">
+    <h3>Freigabe-Queue: Selbstheilung</h3>
+    <p class="muted">Prüft wartende Entwürfe regelmäßig und direkt vor dem Senden: Hat der Fan
+    inzwischen weitergeschrieben, wird der Entwurf mit dem vollständigen neuen Verlauf neu
+    erzeugt. Entwürfe ohne Text, mit fremden Schriftzeichen oder mit einer Modell-Weigerung
+    werden ebenfalls automatisch wiederholt. <strong>Manuell bearbeitete Entwürfe werden nie
+    überschrieben</strong> – dort erscheint nur ein Hinweis.</p>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="draft_recheck_enabled"
+        {% if s['draft_recheck_enabled'] %}checked{% endif %}> Prüfung aktiv</label>
+      <label class="chk"><input type="checkbox" name="draft_regen_on_stale"
+        {% if s['draft_regen_on_stale'] %}checked{% endif %}> Veraltete automatisch neu erzeugen</label>
+      <label>Prüfabstand (s)
+        <input name="draft_recheck_interval_seconds" type="number" min="30"
+          value="{{ s['draft_recheck_interval_seconds'] }}"></label>
+      <label>Max. Neuversuche
+        <input name="draft_max_regen" type="number" min="0" max="50"
+          value="{{ s['draft_max_regen'] }}"></label>
+    </div>
+    <p class="muted">Der Prüfabstand wird pro Entwurf gezählt, nicht global – der Poll-Intervall
+    muss also kleiner sein, damit er greift. Eskalations-Stichwörter lösen bewusst nie eine
+    automatische Neugenerierung aus.</p>
+  </div>
+
+  <div class="card">
+    <h3>Zeit &amp; Tagesrhythmus</h3>
+    <p class="muted">Ohne diesen Block bekommt das Modell keinerlei Zeitinformation und
+    rät die Tageszeit – daher „ich geh ins Bett“ um 10 Uhr morgens. Der Tagesrhythmus wird
+    im Code ausgewertet; das Modell bekommt die aktuelle Tätigkeit als fertigen Fakt.</p>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="time_context_enabled"
+        {% if s['time_context_enabled'] %}checked{% endif %}> Zeitkontext in den Prompt</label>
+      <label class="chk"><input type="checkbox" name="timestamps_in_history"
+        {% if s['timestamps_in_history'] %}checked{% endif %}> Zeitmarken im Verlauf</label>
+      <label class="chk"><input type="checkbox" name="time_guard_enabled"
+        {% if s['time_guard_enabled'] %}checked{% endif %}> Guardrail: Zeit-Widersprüche</label>
+      <label>Zeitzone der Persona
+        <input name="persona_timezone" value="{{ s['persona_timezone'] }}"
+          placeholder="z.B. Europe/Berlin, America/Los_Angeles"></label>
+    </div>
+    <label>Tagesrhythmus (eine Regel pro Zeile: <code>&lt;Tage&gt; &lt;von&gt;-&lt;bis&gt; &lt;Tätigkeit&gt;</code>)
+      <textarea name="persona_schedule" rows="14" spellcheck="false"
+        style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px">{{ s['persona_schedule'] }}</textarea></label>
+    <p class="muted">Tage: <code>Mo</code>, <code>Mo-Fr</code>, <code>Mo,Mi,Fr</code>, <code>taeglich</code> ·
+    Zeiten: <code>9</code> oder <code>09:30</code> · Fenster über Mitternacht (<code>21:00-01:00</code>) sind erlaubt ·
+    Zeilen mit <code>#</code> sind Kommentare. Bei mehreren Treffern gewinnt die spezifischste Regel
+    (wenigste Tage, dann kürzestes Fenster) – so schlägt <code>Sa 21-03</code> das <code>taeglich 01-08</code>.</p>
+
+    <h4 style="margin-bottom:6px">Vorschau</h4>
+    <p class="muted">Zeigt genau den Text, der aktuell an den System-Prompt gehängt wird.
+    Zum Testen anderer Zeitpunkte Wochentag/Uhrzeit setzen.</p>
+    <div class="row">
+      <label>Wochentag
+        <select id="tc-weekday">
+          <option value="">— jetzt —</option>
+          {% for d in ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'] %}
+          <option value="{{ loop.index0 }}">{{ d }}</option>
+          {% endfor %}
+        </select></label>
+      <label>Uhrzeit <input id="tc-time" type="time" step="900"></label>
+      <label>&nbsp;<button type="button" class="btn" id="tc-btn">Vorschau aktualisieren</button></label>
+    </div>
+    <pre id="tc-out" class="muted" style="white-space:pre-wrap;background:rgba(127,127,127,.10);
+      padding:10px;border-radius:6px;font-size:12.5px;margin-top:6px">Noch nicht geladen.</pre>
+  </div>
+
+  <script>
+  (function () {
+    var out = document.getElementById('tc-out');
+    if (!out) return;
+    function load() {
+      // Vorschau nutzt den GESPEICHERTEN Stand -> ungespeicherte Änderungen
+      // im Textfeld werden mitgeschickt, damit man vor dem Speichern testen kann.
+      var body = new URLSearchParams({
+        schedule: document.querySelector('[name=persona_schedule]').value,
+        timezone: document.querySelector('[name=persona_timezone]').value,
+        weekday: document.getElementById('tc-weekday').value,
+        time: document.getElementById('tc-time').value
+      });
+      out.textContent = 'Lade…';
+      fetch('/settings/time-preview', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body
+      }).then(function (r) { return r.json(); })
+        .then(function (d) { out.textContent = d.block || d.error || '(leer)'; })
+        .catch(function (e) { out.textContent = 'Fehler: ' + e; });
+    }
+    document.getElementById('tc-btn').addEventListener('click', load);
+    load();
+  })();
+  </script>
+
+  <div class="card">
+    <h3>Betrieb (allgemein)</h3>
+    <div class="row">
+      <label>Standard-Modus
+        <select name="mode">
+          <option value="approval" {% if s['mode']=='approval' %}selected{% endif %}>Freigabe (manuell)</option>
+          <option value="auto" {% if s['mode']=='auto' %}selected{% endif %}>Auto (automatisch senden)</option>
+        </select>
+      </label>
+      <label>Chat-Gruppe (welche Chats bearbeitet der Bot)
+        <select name="chat_filter">
+          <optgroup label="Aktivität">
+            <option value="unread" {% if s['chat_filter']=='unread' %}selected{% endif %}>Ungelesen</option>
+            <option value="not_answered" {% if s['chat_filter']=='not_answered' %}selected{% endif %}>Unbeantwortet</option>
+            <option value="online" {% if s['chat_filter']=='online' %}selected{% endif %}>Gerade online</option>
+            <option value="not_muted" {% if s['chat_filter']=='not_muted' %}selected{% endif %}>Nicht stummgeschaltet</option>
+          </optgroup>
+          <optgroup label="Abo-Status">
+            <option value="subscribers" {% if s['chat_filter']=='subscribers' %}selected{% endif %}>Abonnenten</option>
+            <option value="recent_subscribers" {% if s['chat_filter']=='recent_subscribers' %}selected{% endif %}>Kürzlich abonniert</option>
+            <option value="followers" {% if s['chat_filter']=='followers' %}selected{% endif %}>Follower</option>
+            <option value="on_free_trial" {% if s['chat_filter']=='on_free_trial' %}selected{% endif %}>In Gratis-Testphase</option>
+          </optgroup>
+          <optgroup label="Umsatz">
+            <option value="spenders" {% if s['chat_filter']=='spenders' %}selected{% endif %}>Zahlende Fans (alle)</option>
+            <option value="spent_more_than_50" {% if s['chat_filter']=='spent_more_than_50' %}selected{% endif %}>High-Spender (&gt; $50)</option>
+            <option value="has_tipped" {% if s['chat_filter']=='has_tipped' %}selected{% endif %}>Haben schon getippt</option>
+          </optgroup>
+          <option value="" {% if not s['chat_filter'] %}selected{% endif %}>Alle Chats (kein Filter)</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>Poll-Intervall (s) <span class="info" tabindex="0" data-tip="Wie oft (in Sekunden) der Bot nach neuen Nachrichten sucht. Kleiner = schnellere Antworten, aber mehr API-Abrufe. Standard 60.">ⓘ</span> <input name="poll_interval_seconds" type="number" value="{{ s['poll_interval_seconds'] }}"></label>
+      <label>Max Chats/Zyklus <span class="info" tabindex="0" data-tip="Wie viele Chats pro Poll-Durchlauf maximal bearbeitet werden. Begrenzt die Last pro Zyklus.">ⓘ</span> <input name="max_chats_per_cycle" type="number" value="{{ s['max_chats_per_cycle'] }}"></label>
+      <label>Antwort-Cooldown (s) <span class="info" tabindex="0" data-tip="Mindestabstand zwischen zwei Antworten an denselben Fan. Verhindert, dass der Bot zu schnell mehrfach hintereinander schreibt.">ⓘ</span> <input name="reply_cooldown_seconds" type="number" value="{{ s['reply_cooldown_seconds'] }}"></label>
+      <label>Kontext in Freigabe-Queue <span class="info" tabindex="0" data-tip="Wie viele vorherige Nachrichten in der Freigabe-Queue über der aktuellen Fan-Nachricht angezeigt werden. 0 = aus. Standard 2.">ⓘ</span> <input name="queue_context_messages" type="number" min="0" max="20" value="{{ s['queue_context_messages'] }}"></label>
+    </div>
+    <div class="row">
+      <label>Sende-Delay min (s) <span class="info" tabindex="0" data-tip="Untere Grenze der zufälligen Verzögerung vor dem Senden (Auto-Modus). Wirkt menschlicher, statt sofort zu antworten.">ⓘ</span> <input name="send_delay_min_seconds" type="number" value="{{ s['send_delay_min_seconds'] }}"></label>
+      <label>Sende-Delay max (s) <span class="info" tabindex="0" data-tip="Obere Grenze der zufälligen Sende-Verzögerung. Der Bot wartet je Nachricht eine zufällige Zeit zwischen min und max.">ⓘ</span> <input name="send_delay_max_seconds" type="number" value="{{ s['send_delay_max_seconds'] }}"></label>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="active_hours_enabled" {% if s['active_hours_enabled'] %}checked{% endif %}> Aktive Zeiten begrenzen</label>
+      <label>Start (Std) <input name="active_hour_start" type="number" min="0" max="23" value="{{ s['active_hour_start'] }}"></label>
+      <label>Ende (Std) <input name="active_hour_end" type="number" min="0" max="23" value="{{ s['active_hour_end'] }}"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Prio 1 – aktive Fans (schnell)</h3>
+    <p class="muted small">Diese Gruppe wird im normalen Poll-Intervall (oben) bearbeitet – für aktive Käufer, die schnelle Antworten bekommen sollen.</p>
+    <div class="row">
+      <label>Prio-1-Gruppe – Fanvue-Liste <span class="info" tabindex="0" data-tip="Diese Fans werden schnell/häufig bearbeitet (Poll-Intervall in „Betrieb (allgemein)"). Für aktive Käufer.">ⓘ</span>
+        <select name="chat_custom_list_id">
+          <option value="" {% if not s['chat_custom_list_id'] %}selected{% endif %}>— keine (nur Gruppe oben) —</option>
+          {% for lst in custom_lists %}
+          <option value="{{ lst['uuid'] }}" {% if s['chat_custom_list_id']==lst['uuid'] %}selected{% endif %}>{{ lst['name'] }} ({{ lst['membersCount'] }})</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    {% if not connected %}
+    <p class="muted">Verbinde zuerst Fanvue, dann erscheinen hier deine selbst angelegten Listen.</p>
+    {% elif custom_lists_error %}
+    <p class="muted">Listen konnten nicht geladen werden: {{ custom_lists_error }}</p>
+    {% elif not custom_lists %}
+    <p class="muted">Keine eigenen Listen in Fanvue gefunden.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>Prio 2 – Nur-Chatter (spart Tokens)</h3>
+    <p class="muted small">Diese Gruppe wird seltener bearbeitet (eigenes Intervall + Zufalls-Delay). Wer in Prio 1 UND Prio 2 ist, wird als Prio 1 behandelt.</p>
+    <div class="row">
+      <label>Prio-2-Gruppe – Fanvue-Liste <span class="info" tabindex="0" data-tip="Diese Fans werden seltener bearbeitet (Intervall + Zufalls-Delay unten). Für Nur-Chatter, um Tokens zu sparen. Wer in Prio 1 UND Prio 2 ist, wird als Prio 1 behandelt.">ⓘ</span>
+        <select name="prio2_custom_list_id">
+          <option value="" {% if not s['prio2_custom_list_id'] %}selected{% endif %}>— keine —</option>
+          {% for lst in custom_lists %}
+          <option value="{{ lst['uuid'] }}" {% if s['prio2_custom_list_id']==lst['uuid'] %}selected{% endif %}>{{ lst['name'] }} ({{ lst['membersCount'] }})</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>Prio-2-Intervall (Min) <span class="info" tabindex="0" data-tip="Wie oft die Prio-2-Gruppe bearbeitet wird. Standard 30 Minuten.">ⓘ</span> <input name="prio2_interval_minutes" type="number" min="1" value="{{ s['prio2_interval_minutes'] }}"></label>
+      <label>Prio-2 Zusatz-Delay bis (Min) <span class="info" tabindex="0" data-tip="Zusätzlicher Zufalls-Delay von 1 bis X Minuten nach jedem Prio-2-Lauf. Wirkt menschlicher und streut die Last. Standard 30.">ⓘ</span> <input name="prio2_jitter_minutes" type="number" min="1" value="{{ s['prio2_jitter_minutes'] }}"></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Guardrails</h3>
+    <label>Max. Zeichen pro Antwort <input name="max_reply_chars" type="number" value="{{ s['max_reply_chars'] }}"></label>
+    <label>Verbotene Wörter (kommagetrennt, blockt Auto-Send)
+      <input name="banned_words" value="{{ s['banned_words'] }}"></label>
+    <label>Eskalations-Stichworte (kommagetrennt; Fan-Nachricht → nur Freigabe, kein Auto)
+      <input name="escalation_keywords" value="{{ s['escalation_keywords'] }}"></label>
+  </div>
+
+  <div class="card">
+    <h3>PPV Auto-Selling</h3>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="ppv_enabled" {% if s['ppv_enabled'] %}checked{% endif %}> PPV-Engine aktiv (bietet automatisch Sets an)</label>
+      <label class="chk"><input type="checkbox" name="ppv_use_llm_classifier" {% if s['ppv_use_llm_classifier'] %}checked{% endif %}> Intent per LLM bewerten</label>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="ppv_caption_use_vision" {% if s['ppv_caption_use_vision'] %}checked{% endif %}> PPV-Bildunterschriften über das Vision-LLM generieren <span class="info" tabindex="0" data-tip="Standardmäßig schreibt das Chat-Modell die PPV-Caption. Ist es zu restriktiv (verweigert explizite Bildunterschriften), kann hier stattdessen das Vision-Modell + Vision-Key (Einstellungen → Bildanalyse) genutzt werden. Der normale Textchat bleibt beim Standard-Modell.">ⓘ</span></label>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="ppv_block_on_distress" {% if s['ppv_block_on_distress'] %}checked{% endif %}> Kein PPV bei emotionaler Ausnahmesituation <span class="info" tabindex="0" data-tip="Erkennt der Klassifikator, dass der Fan gerade seelisch verletzlich ist (Traurigkeit, Krise, Trennung, Verlust, Selbstzweifel …), wird KEIN PPV angeboten – egal welche anderen Signale vorliegen. Der Bot antwortet dann nur zugewandt. Dringend empfohlen.">ⓘ</span></label>
+    </div>
+    <div class="row">
+      <label>Intent-Schwelle (≥ sendet) <input name="ppv_intent_threshold" type="number" min="1" max="5" value="{{ s['ppv_intent_threshold'] }}"></label>
+      <label>Aufwärmphase: min. Fan-Nachrichten vor PPV <input name="ppv_min_fan_messages" type="number" min="0" value="{{ s['ppv_min_fan_messages'] }}"></label>
+      <label>Sexuelle Nachrichten in Folge → Trigger <input name="ppv_sexual_streak_trigger" type="number" value="{{ s['ppv_sexual_streak_trigger'] }}"></label>
+      <label>Max. Medien pro Set <input name="ppv_max_media_per_set" type="number" value="{{ s['ppv_max_media_per_set'] }}"></label>
+      <label>Vorschaubild-Cache (Std) <input name="ppv_thumb_cache_hours" type="number" value="{{ s['ppv_thumb_cache_hours'] }}"></label>
+    </div>
+    <div class="row">
+      <label>Cooldown (Min) <input name="ppv_cooldown_minutes" type="number" value="{{ s['ppv_cooldown_minutes'] }}"></label>
+      <label>+ min. Outbound-Nachrichten <input name="ppv_cooldown_outbound" type="number" value="{{ s['ppv_cooldown_outbound'] }}"></label>
+      <label>Langer Cooldown (Min) <input name="ppv_cooldown_long_minutes" type="number" value="{{ s['ppv_cooldown_long_minutes'] }}"></label>
+      <label>Ungekaufte PPV → langer Cooldown <input name="ppv_unpurchased_threshold" type="number" value="{{ s['ppv_unpurchased_threshold'] }}"></label>
+    </div>
+    <label>Keywords: sofort senden (Layer 1, kommagetrennt)
+      <input name="ppv_keywords" value="{{ s['ppv_keywords'] }}"></label>
+    <label>Keywords: Körperteile (Priority-Trigger)
+      <input name="ppv_bodyparts_keywords" value="{{ s['ppv_bodyparts_keywords'] }}"></label>
+    <label>Keywords: Bildanfragen (Priority-Trigger)
+      <input name="ppv_pic_request_keywords" value="{{ s['ppv_pic_request_keywords'] }}"></label>
+    <label>Keywords: Gratis-Content (→ freundlich umleiten)
+      <input name="ppv_freecontent_keywords" value="{{ s['ppv_freecontent_keywords'] }}"></label>
+    <label>Verkaufston (System-Prompt für PPV-Nachricht)
+      <textarea name="ppv_sales_prompt" rows="4">{{ s['ppv_sales_prompt'] }}</textarea></label>
+    <label>Gratis-Umleitung (System-Prompt)
+      <textarea name="ppv_freecontent_prompt" rows="3">{{ s['ppv_freecontent_prompt'] }}</textarea></label>
+  </div>
+
+  <div class="card">
+    <h3>Anti-AI (natürlichere Antworten)</h3>
+    <label class="chk"><input type="checkbox" name="anti_ai_enabled" {% if s['anti_ai_enabled'] %}checked{% endif %}> Aktiv – verhindert Wiederholung von Kosenamen/Namen &amp; wirkt menschlicher</label>
+    <label>Kosenamen / Namen, die nicht wiederholt werden sollen (kommagetrennt)
+      <input name="anti_ai_petnames" value="{{ s['anti_ai_petnames'] }}"></label>
+    <label>Verhaltens-Regeln (an den System-Prompt angehängt)
+      <textarea name="anti_ai_rules" rows="3">{{ s['anti_ai_rules'] }}</textarea></label>
+  </div>
+
+  <div class="card">
+    <h3>Proaktive Reaktivierung stiller Fans</h3>
+    <label class="chk"><input type="checkbox" name="reactivation_enabled" {% if s['reactivation_enabled'] %}checked{% endif %}> Aktiv – schreibt inaktive Fans automatisch wieder an</label>
+    <div class="row">
+      <label>Inaktiv ab (Stunden) <span class="info" tabindex="0" data-tip="Ab wie vielen Stunden ohne Fan-Nachricht eine Reaktivierung ausgelöst wird. Standard 14.">ⓘ</span> <input name="reactivation_inactive_hours" type="number" min="1" value="{{ s['reactivation_inactive_hours'] }}"></label>
+      <label>Cooldown pro Fan (Tage) <span class="info" tabindex="0" data-tip="Mindestabstand zwischen zwei Reaktivierungen desselben Fans.">ⓘ</span> <input name="reactivation_cooldown_days" type="number" min="1" value="{{ s['reactivation_cooldown_days'] }}"></label>
+      <label>Max. pro Durchlauf <input name="reactivation_max_per_cycle" type="number" min="1" value="{{ s['reactivation_max_per_cycle'] }}"></label>
+    </div>
+    <div class="row">
+      <label>Sende-Delay min (Min) <span class="info" tabindex="0" data-tip="Untergrenze der zufälligen Wartezeit vor dem Senden der Reaktivierung (nur Auto-Modus). Wirkt menschlicher, statt exakt zur Stundengrenze zu schreiben. Standard 15.">ⓘ</span> <input name="reactivation_delay_min_minutes" type="number" min="0" value="{{ s['reactivation_delay_min_minutes'] }}"></label>
+      <label>Sende-Delay max (Min) <span class="info" tabindex="0" data-tip="Obergrenze der zufälligen Wartezeit vor dem Senden (nur Auto-Modus). Der Bot wartet eine zufällige Zeit zwischen min und max. Standard 45.">ⓘ</span> <input name="reactivation_delay_max_minutes" type="number" min="0" value="{{ s['reactivation_delay_max_minutes'] }}"></label>
+    </div>
+    <label>Vault-Ordner mit Selfies (optional – leer = nur Text)
+      <input name="reactivation_folder" value="{{ s['reactivation_folder'] }}" placeholder="z.B. Reaktivierung_Selfies"></label>
+    <label>Reaktivierungs-Prompt
+      <textarea name="reactivation_prompt" rows="3">{{ s['reactivation_prompt'] }}</textarea></label>
+    <p class="muted small">Reaktivierungen knüpfen an euer letztes Chat-Thema an (persönlich), laufen im gewählten Modus (Freigabe/Auto) und respektieren die aktiven Zeiten. Im Auto-Modus wird zufällig 15–45 Min (einstellbar) gewartet; bei „Freigabe" landen sie sofort in der Queue.</p>
+  </div>
+
+  <button class="btn-primary big">Alle Einstellungen speichern</button>
+</form>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Reports</h1>
+
+<div class="card">
+  <h3>Umsatz-Kennzahlen (gesamt)</h3>
+  <div class="kpi-grid">
+    <div><span class="muted small">Umsatz gesamt</span><br><strong>${{ kpi['revenue_cents'] | dollars }}</strong></div>
+    <div><span class="muted small">Käufer</span><br><strong>{{ kpi['buyers'] }}</strong></div>
+    <div><span class="muted small">Ø pro Käufer</span><br><strong>${{ kpi['avg_per_buyer_cents'] | dollars }}</strong></div>
+    <div><span class="muted small">Ø PPV-Preis</span><br><strong>${{ kpi['avg_price_cents'] | dollars }}</strong></div>
+    <div><span class="muted small">Käufe / Angebote</span><br><strong>{{ kpi['purchases'] }} / {{ kpi['offers'] }}</strong></div>
+    <div><span class="muted small">Conversion gesamt</span><br><strong>{{ '%.0f' | format(kpi['conversion']) }}%</strong></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>7-Tage-Trend</h3>
+  <table class="logs">
+    <thead><tr><th>Tag</th><th>Nachr.</th><th>Angeb.</th><th>Gekauft</th><th>Umsatz</th><th></th></tr></thead>
+    <tbody>
+      {% for t in trend %}
+      <tr>
+        <td class="nowrap">{{ t['date'] }}</td>
+        <td>{{ t['messages'] }}</td><td>{{ t['offers'] }}</td>
+        <td class="green-t">{{ t['purchases'] }}</td>
+        <td class="nowrap">${{ t['revenue_cents'] | dollars }}</td>
+        <td style="width:40%"><div class="bar" style="width:{{ (100 * t['revenue_cents'] / trend_max_rev) | round(0, 'floor') }}%"></div></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>Top-Sets nach Umsatz</h3>
+    <table class="logs">
+      <thead><tr><th>Set</th><th>Gekauft</th><th>Umsatz</th></tr></thead>
+      <tbody>
+        {% for c in by_revenue %}
+        <tr><td class="set">{{ c['folder'] }}</td><td class="green-t">{{ c['purchased'] }}</td><td class="nowrap">${{ c['revenue_cents'] | dollars }}</td></tr>
+        {% else %}<tr><td colspan="3" class="muted">Keine Daten.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Beste Conversion (≥ 3 Angebote)</h3>
+    <table class="logs">
+      <thead><tr><th>Set</th><th>Angeb.</th><th>Gekauft</th><th>Conv.</th></tr></thead>
+      <tbody>
+        {% for c in by_conversion %}
+        <tr><td class="set">{{ c['folder'] }}</td><td>{{ c['offered'] }}</td><td class="green-t">{{ c['purchased'] }}</td><td>{{ '%.0f' | format(c['conversion']) }}%</td></tr>
+        {% else %}<tr><td colspan="4" class="muted">Keine Daten.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>Nie gekaufte Sets</h3>
+    <p class="muted small">Angeboten, aber nie gekauft – Kandidaten zum Überarbeiten/Aussortieren.</p>
+    <table class="logs">
+      <thead><tr><th>Set</th><th>Angeboten</th></tr></thead>
+      <tbody>
+        {% for c in never_bought %}
+        <tr><td class="set">{{ c['folder'] }}</td><td>{{ c['offered'] }}</td></tr>
+        {% else %}<tr><td colspan="2" class="muted">Keine.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Nicht-Käufer (≥ 3 Angebote, 0 Käufe)</h3>
+    <table class="logs">
+      <thead><tr><th>Subscriber</th><th>Angeboten</th></tr></thead>
+      <tbody>
+        {% for s in non_buyers %}
+        <tr><td><a href="/chats?q={{ (s['handle'] or s['display_name']) | urlencode }}">{{ s['display_name'] }}</a></td><td>{{ s['offered'] }}</td></tr>
+        {% else %}<tr><td colspan="2" class="muted">Keine.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Inaktive Zahler (Käufer, seit {{ inactive_days }}+ Tagen still)</h3>
+  <p class="muted small">Frühere Käufer, die länger nichts geschrieben haben – ideal für gezielte Reaktivierung.</p>
+  <table class="logs">
+    <thead><tr><th>Subscriber</th><th>Umsatz</th><th>Käufe</th><th>Letzte Nachricht</th></tr></thead>
+    <tbody>
+      {% for s in inactive_payers %}
+      <tr>
+        <td><a href="/chats?q={{ (s['handle'] or s['display_name']) | urlencode }}">{{ s['display_name'] }}</a></td>
+        <td class="nowrap">${{ s['revenue_cents'] | dollars }}</td>
+        <td>{{ s['purchases'] }}</td>
+        <td class="muted nowrap">{{ s['last_inbound_at'] | ts }}</td>
+      </tr>
+      {% else %}<tr><td colspan="4" class="muted">Keine.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<style>
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px 18px; }
+.kpi-grid > div { font-size: 16px; }
+.bar { height: 10px; background: var(--primary); border-radius: 5px; min-width: 2px; }
+.logs .set { font-weight: 500; }
+</style>
+{% endblock %}

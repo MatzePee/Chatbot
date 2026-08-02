@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Fanvue Chatbot{% endblock %}</title>
+  {# ?v=<mtime> erzwingt nach jeder Aenderung frische statische Dateien #}
+  <link rel="stylesheet" href="/static/style.css?v={{ css_v | default('0') }}">
+  <link rel="icon" type="image/svg+xml" href="/static/fanvue-logo.svg?v={{ css_v | default('0') }}">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img class="brand-logo" src="/static/fanvue-logo.svg?v={{ css_v | default('0') }}" alt="" width="26" height="26">
+    <span>Fanvue&nbsp;Chatbot</span>
+  </div>
+  {# Auf dem Handy einklappbar: 9 Links wuerden sonst den halben Bildschirm
+     fuellen. Checkbox statt <details> oder JavaScript - das Auf-/Zuklappen
+     haengt damit allein an eigenem CSS und nicht am Browser-Standardstil.
+     Die Checkbox bleibt fokussierbar (nur optisch versteckt), das Label ist
+     also auch per Tastatur bedienbar. Ab 761px wird sie komplett ignoriert. #}
+  <input type="checkbox" id="navtoggle" class="navtoggle-cb">
+  <label for="navtoggle" class="navtoggle">☰ Menü</label>
+  <nav>
+    <a href="/">Dashboard</a>
+    <a href="/queue">Freigabe {% if pending_count %}<span class="badge">{{ pending_count }}</span>{% endif %}</a>
+    <a href="/chats">Subs</a>
+    <a href="/ppv">PPV</a>
+    <a href="/reports">Reports</a>
+    <a href="/test">Test</a>
+    <a href="/settings">Einstellungen</a>
+    <a href="/logs">Logs</a>
+    <a href="/doku">Doku</a>
+  </nav>
+  <div class="status">
+    {% if connected %}<span class="dot green"></span>Verbunden{% else %}<span class="dot red"></span>Getrennt{% endif %}
+    <span class="sep">|</span>
+    {% if running %}<span class="dot green"></span>Läuft ({{ mode }}){% else %}<span class="dot gray"></span>Pausiert{% endif %}
+  </div>
+</header>
+<main>
+  {% block content %}{% endblock %}
+</main>
+<footer>Daten in <code>data/bot.db</code></footer>
+</body>
+</html>

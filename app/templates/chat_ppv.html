@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>PPV-Status: {{ chat['display_name'] or chat['handle'] or user_uuid if chat else user_uuid }}</h1>
+<p><a href="/chats">← zurück zu Chats</a></p>
+
+{% if sync_err %}
+<div class="card warn">⚠ Kauf-Sync fehlgeschlagen: {{ sync_err }}</div>
+{% elif sync_synced %}
+<div class="card ok">✓ Kauf-Sync: {{ sync_synced }} Käufe in Fanvue gefunden, {{ sync_matched }} PPV-Sets zugeordnet und markiert.</div>
+{% elif exported %}
+<div class="card ok">✓ Chatverlauf exportiert ({{ exported }} Nachrichten) nach <code>exports/</code>.</div>
+{% endif %}
+
+{% if insight %}
+<div class="card">
+  <h3>Fanvue Insights</h3>
+  <div class="ins-grid">
+    <div><span class="muted small">Status</span><br>
+      {% if insight['status']=='subscriber' %}<strong class="green-t">Abonnent</strong>
+      {% elif insight['status']=='follower' %}<strong>Follower</strong>
+      {% elif insight['status']=='expired' %}<strong>abgelaufen</strong>
+      {% else %}<strong>{{ insight['status'] }}</strong>{% endif %}
+    </div>
+    <div><span class="muted small">Insgesamt ausgegeben</span><br><strong>${{ insight['total_cents'] | dollars }}</strong></div>
+    <div><span class="muted small">Größter Kauf</span><br><strong>${{ insight['max_cents'] | dollars }}</strong></div>
+    <div><span class="muted small">Letzter Kauf</span><br><strong>{{ insight['last_purchase'] | fdate }}</strong></div>
+    <div><span class="muted small">Abo verlängert am</span><br><strong>{{ insight['renews_at'] | fdate }}</strong></div>
+    <div><span class="muted small">Auto-Verlängerung</span><br>
+      {% if insight['auto_renew'] %}<strong class="green-t">An</strong>{% else %}<strong>Aus</strong>{% endif %}</div>
+  </div>
+  {% if insight['sources'] %}
+  <div class="small muted" style="margin-top:8px">Quellen:
+    {% for src, cents in insight['sources'].items() %}{{ src }} ${{ cents | dollars }}{% if not loop.last %} · {% endif %}{% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="ppv-summary">
+    <span>Angeboten <strong>{{ stats['offered'] }}</strong></span>
+    <span>Gekauft <strong class="green-t">{{ stats['purchased'] }}</strong></span>
+    <span>Conversion <strong>{{ '%.0f' | format(stats['conversion']) }}%</strong></span>
+    <span>Umsatz <strong>${{ stats['revenue_cents'] | dollars }}</strong></span>
+    <form method="post" action="/chats/{{ user_uuid }}/ppv/sync-purchases" class="inline">
+      <button class="btn-primary">🔄 Käufe aus Fanvue prüfen</button>
+    </form>
+    <form method="post" action="/chats/{{ user_uuid }}/export" class="inline">
+      <button class="btn">⬇ Chatverlauf exportieren</button>
+    </form>
+    <form method="post" action="/ppv/subscriber/{{ user_uuid }}/reset-offered" class="inline">
+      <button class="btn">↻ Angebote zurücksetzen</button>
+    </form>
+  </div>
+  <p class="muted small" style="margin-top:8px">„Käufe prüfen" liest die Kaufhistorie dieses Fans aus Fanvue
+  und markiert automatisch alle gekauften PPV-Sets (Zuordnung über die Medien der Sets).</p>
+</div>
+
+<div class="card">
+  {% if not table %}
+  <div class="muted">Keine PPV-Sets vorhanden. Aktiviere Sets unter <a href="/ppv">PPV</a>.</div>
+  {% else %}
+  <table class="ppv-table">
+    <thead>
+      <tr><th>PPV-Set</th><th>Preis</th><th>Status</th><th>Angeboten / Gekauft am</th><th>Setzen</th></tr>
+    </thead>
+    <tbody>
+      {% for t in table %}
+      <tr>
+        <td class="set">{{ t['name'] }}</td>
+        <td>${{ t['price_cents'] | dollars }}</td>
+        <td>
+          {% if t['status'] == 'gekauft' %}<span class="pill bought">✓ gekauft</span>
+          {% elif t['status'] == 'angeboten' %}<span class="pill offered">angeboten</span>
+          {% else %}<span class="pill none">nicht angeboten</span>{% endif %}
+        </td>
+        <td class="muted small">
+          {% if t['offered_at'] %}angeboten: {{ t['offered_at'] | ts }}{% endif %}
+          {% if t['purchased_at'] %}<br>gekauft: {{ t['purchased_at'] | ts }}{% endif %}
+          {% if not t['offered_at'] and not t['purchased_at'] %}–{% endif %}
+        </td>
+        <td>
+          <form method="post" action="/chats/{{ user_uuid }}/ppv/status" class="inline">
+            <input type="hidden" name="folder_name" value="{{ t['name'] }}">
+            <select name="status" onchange="this.form.submit()">
+              <option value="not_offered" {% if t['status_value']=='not_offered' %}selected{% endif %}>nicht angeboten (zurücksetzen)</option>
+              <option value="offered" {% if t['status_value']=='offered' %}selected{% endif %}>angeboten</option>
+              <option value="bought" {% if t['status_value']=='bought' %}selected{% endif %}>gekauft</option>
+            </select>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<style>
+.ppv-summary { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 14px; }
+.ins-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px 18px; }
+.ins-grid > div { font-size: 15px; }
+.ppv-table { width: 100%; border-collapse: collapse; }
+.ppv-table th, .ppv-table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+.ppv-table .set { font-weight: 500; }
+.pill { font-size: 12px; padding: 2px 9px; border-radius: 10px; border: 1px solid var(--border); }
+.pill.bought { color: var(--green); border-color: var(--green); }
+.pill.offered { color: #e0b050; border-color: #7a5c1a; }
+.pill.none { color: var(--muted); }
+.inline select { width: auto; }
+.small { font-size: 12px; }
+</style>
+{% endblock %}

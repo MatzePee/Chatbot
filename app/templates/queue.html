@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Freigabe-Queue</h1>
+<p class="muted">Vom Bot generierte Antworten. Bearbeite den Text bei Bedarf und gib ihn frei.
+Wartende Entwürfe werden im Hintergrund regelmäßig auf Aktualität geprüft; blockierte
+werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
+
+{% if msg %}<div class="card stale">{{ msg }}</div>{% endif %}
+
+{% for d in drafts %}
+<div class="card draft{% if d['stale_note'] %} is-stale{% endif %}">
+  <div class="draft-head">
+    <strong>{{ d['display_name'] or d['handle'] or d['user_uuid'] }}</strong>
+    {% if d['is_ppv'] %}<span class="tag">💰 PPV · ${{ (d['ppv_price_cents'] or 0)/100 }} · Set „{{ d['ppv_folder'] }}"</span>{% endif %}
+    {% if d['regen_count'] %}
+    <span class="tag regen{% if d['regen_count'] >= max_regen %} maxed{% endif %}"
+          title="So oft wurde dieser Entwurf bereits neu generiert">↻ {{ d['regen_count'] }}/{{ max_regen }}</span>
+    {% endif %}
+    {% if d['user_edited'] %}<span class="tag">✏️ bearbeitet</span>{% endif %}
+    <span class="muted">· {{ d['created_at'] | ts }} · Modell: {{ d['model'] }}{% if d['last_check_at'] %} · geprüft {{ d['last_check_at'] | ts }}{% endif %}</span>
+  </div>
+  {% if d['stale_note'] %}
+  <div class="stale">🕓 {{ d['stale_note'] }}</div>
+  {% endif %}
+  {% if d['error'] %}
+  <div class="guard">⛔ {{ d['error'] }}</div>
+  {% endif %}
+  {% for m in contexts.get(d['id'], []) %}
+  <div class="ctx {{ 'me' if m['who']=='Ich' else '' }}">
+    <span class="tag">{{ m['who'] }}</span> {{ m['text'] }}{% if m['media'] %} 📎{% endif %}
+  </div>
+  {% endfor %}
+  {% if d['incoming_text'] %}
+  <div class="incoming"><span class="tag">Fan</span> {{ d['incoming_text'] }}</div>
+  {% endif %}
+  {% if d['guardrail_note'] %}
+  <div class="guard">⚠ {{ d['guardrail_note'] }}</div>
+  {% endif %}
+  <form method="post" action="/queue/{{ d['id'] }}/approve">
+    <textarea name="edited_text" rows="7">{{ d['edited_text'] or d['generated_text'] }}</textarea>
+    <div class="draft-actions">
+      <button class="btn-primary" type="submit">✓ Freigeben &amp; Senden</button>
+      <button class="btn" formaction="/queue/{{ d['id'] }}/save" formmethod="post">💾 Speichern</button>
+      <button class="btn" formaction="/queue/{{ d['id'] }}/regenerate" formmethod="post">↻ Neu generieren</button>
+      <button class="btn-danger" formaction="/queue/{{ d['id'] }}/reject" formmethod="post">✗ Verwerfen</button>
+    </div>
+  </form>
+</div>
+{% else %}
+<div class="card muted">Keine wartenden Freigaben.</div>
+{% endfor %}
+
+<style>
+.ctx { font-size: 13px; color: var(--muted); margin: 2px 0; padding: 4px 8px;
+  border-left: 2px solid var(--border); opacity: .85; }
+.ctx .tag { opacity: .8; }
+.ctx.me { border-left-color: var(--green); }
+/* Veralteter Entwurf: der Fan hat inzwischen weitergeschrieben */
+.draft.is-stale { border-color: #d9a441; }
+.stale { font-size: 13px; margin: 6px 0; padding: 7px 10px; border-radius: 6px;
+  background: rgba(217,164,65,.14); border-left: 3px solid #d9a441; }
+.tag.regen { background: rgba(127,127,127,.18); }
+.tag.regen.maxed { background: rgba(220,80,80,.20); }
+</style>
+{% endblock %}

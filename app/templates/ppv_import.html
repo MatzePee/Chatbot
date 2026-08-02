@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>PPV-Käufe per CSV importieren</h1>
+<p><a href="/ppv">← zurück zur PPV-Übersicht</a></p>
+
+{% if errors %}
+<div class="card warn">
+  <strong>Import nicht gestartet:</strong>
+  <ul class="small">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<div id="job-box" class="card" style="display:none">
+  <h3>Import-Fortschritt</h3>
+  <div id="job-bar-wrap" style="background:var(--panel2);border-radius:6px;overflow:hidden;height:14px;margin:8px 0">
+    <div id="job-bar" style="height:100%;width:0;background:var(--primary);transition:width .3s"></div>
+  </div>
+  <div id="job-text" class="small"></div>
+</div>
+
+<div class="card">
+  <h3>CSV hochladen</h3>
+  <form method="post" action="/ppv/import" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv,text/csv" required>
+    <label class="chk" style="margin:10px 0"><input type="checkbox" name="check_api" checked>
+      Käufe über die Fanvue-API prüfen (empfohlen – prüft jede Zeile; dauert bei vielen Zeilen einige Minuten)</label>
+    <button class="btn-primary" type="submit">Importieren</button>
+  </form>
+  <p class="small muted">Ohne Häkchen werden die Zeilen nur als Angebote gespeichert und nur die in der
+  CSV als „gekauft" markierten Sets als Kauf gesetzt. Mit Häkchen wird zusätzlich pro Subscriber die
+  echte Kaufhistorie aus Fanvue abgeglichen.</p>
+</div>
+
+<div class="card">
+  <h3>Welche Spalten werden benötigt?</h3>
+  <p class="muted">Erste Zeile = Kopfzeile mit Spaltennamen. Reihenfolge egal, Groß/Klein egal.
+  Trennzeichen Komma oder Semikolon wird automatisch erkannt.</p>
+  <table class="cols">
+    <thead><tr><th>Spalte</th><th>Pflicht?</th><th>Inhalt</th><th>Synonyme</th></tr></thead>
+    <tbody>
+      <tr><td><code>handle</code></td><td>Pflicht*</td><td>Fanvue-Benutzername des Subscribers</td><td>username, user, fan, subscriber</td></tr>
+      <tr><td><code>user_uuid</code></td><td>Pflicht*</td><td>Alternativ die interne Fanvue-UUID des Fans</td><td>uuid, fan_uuid, user_id, id</td></tr>
+      <tr><td><code>folder</code></td><td>Pflicht</td><td>Name des PPV-Sets/Ordners (exakt wie in Fanvue)</td><td>set, ppv, content, name, title, ordner</td></tr>
+      <tr><td><code>price</code></td><td>optional</td><td>Preis in Dollar (9.99 oder 9,99) – für Umsatzstatistik</td><td>amount, betrag, preis · alt.: <code>price_cents</code></td></tr>
+      <tr><td><code>purchased_at</code></td><td>optional</td><td>Kaufdatum (ISO oder TT.MM.JJJJ)</td><td>date, datum, gekauft_am</td></tr>
+      <tr><td><code>status</code></td><td>optional</td><td>„purchased"/„gekauft"/1/yes = Kauf. Alles andere (z.B. „offered", „unknown") = nur Angebot.</td><td>purchased, gekauft</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted">Bei aktivierter API-Prüfung werden auch als „offered" markierte Zeilen geprüft und
+  bei tatsächlichem Kauf automatisch auf „gekauft" gesetzt.</p>
+  <p class="small">* Mindestens <strong>eine</strong> Fan-Spalte (<code>handle</code> oder <code>user_uuid</code>) plus <code>folder</code>.
+  <code>handle</code> wird gegen die bereits erfassten Chats aufgelöst – der Fan muss dem Bot also schon einmal begegnet sein
+  (oder gib die <code>user_uuid</code> direkt an).</p>
+
+  <h4>Beispiel</h4>
+  <pre class="example">handle,folder,price,purchased_at
+maxmuster,PPV_001_spread legs in black heels_18,12.99,2026-07-01
+janedoe,PPV_047_Privat Pussy Shot at my vacation_13,9.99,2026-07-03
+janedoe,PPV_048_Stockings an red Heels on Bed_28,15.00,2026-07-05</pre>
+</div>
+
+<script>
+(function () {
+  const box = document.getElementById('job-box');
+  const bar = document.getElementById('job-bar');
+  const txt = document.getElementById('job-text');
+  function render(j) {
+    if (!j || (!j.running && !j.total && !j.finished_at)) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    const pct = j.total ? Math.round(100 * j.done / j.total) : (j.running ? 5 : 100);
+    bar.style.width = pct + '%';
+    let t = '';
+    if (j.running) t = 'Läuft… ' + j.done + ' von ' + j.total + ' Subscribern geprüft';
+    else if (j.finished_at) t = '✓ Fertig: ' + j.done + ' Subscriber, ' + j.offers + ' Offers importiert';
+    t += ' · Käufe via API: ' + (j.matched_folders||0) + ' · via CSV: ' + (j.csv_purchased||0);
+    if (j.unresolved) t += ' · ' + j.unresolved + ' Zeilen ohne Fan';
+    if (j.error) t += ' · ⚠ ' + j.error;
+    txt.textContent = t;
+  }
+  async function poll() {
+    try {
+      const r = await fetch('/ppv/import/status');
+      const j = await r.json();
+      render(j);
+      if (j.running) setTimeout(poll, 2000);
+    } catch (e) { setTimeout(poll, 3000); }
+  }
+  poll();
+})();
+</script>
+
+<style>
+table.cols { width: 100%; border-collapse: collapse; }
+table.cols th, table.cols td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+.example { background: var(--panel2); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+.small { font-size: 12px; } .cols code { font-size: 12px; }
+</style>
+{% endblock %}

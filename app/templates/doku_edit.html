@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="doku-head">
+  <h1>Doku bearbeiten</h1>
+  <a class="btn" href="/doku">← zurück</a>
+</div>
+
+<p class="muted">Markdown wird unterstützt: <code># Überschrift</code>, <code>- Liste</code>,
+<code>**fett**</code>, <code>`Code`</code>, Codeblöcke mit dreifachem Backtick, und Links
+<code>[Text](https://…)</code>.</p>
+
+<form method="post" action="/doku/edit">
+  <textarea name="doku_markdown" rows="28" class="doku-editor">{{ doku_markdown }}</textarea>
+  <div class="draft-actions">
+    <button class="btn-primary" type="submit">💾 Speichern</button>
+    <a class="btn" href="/doku">Abbrechen</a>
+    <button class="btn-danger" type="submit" formaction="/doku/reset"
+            onclick="return confirm('Doku wirklich auf den Standardtext zurücksetzen? Deine Änderungen gehen verloren.');">
+      ↺ Auf Standard zurücksetzen
+    </button>
+  </div>
+</form>
+
+<style>
+.doku-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.doku-editor { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.5; }
+</style>
+{% endblock %}

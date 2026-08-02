@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Subs</h1>
+<p class="muted">Prio 1 (<strong>{{ p1_name }}</strong>) wird schnell bearbeitet, Prio 2 (<strong>{{ p2_name }}</strong>)
+seltener (spart Tokens). Über das Dropdown wählst du die Ansicht – auch beide Gruppen gleichzeitig.
+Die Gruppen-Zuordnung erfolgt über deine Fanvue-Listen (in den Einstellungen).</p>
+
+{% if error %}
+<div class="card warn">Liste konnte nicht geladen werden: {{ error }} – zeige stattdessen erfasste Chats.</div>
+{% endif %}
+{% if msg %}
+<div class="card ok">{{ msg }}</div>
+{% endif %}
+
+{% if connected and not has_insights %}
+<div class="card warn">Fan-Insights (Ausgaben/Abo) sind nicht verfügbar. Dafür braucht Fanvue den Scope
+<code>read:insights</code>, der nur für <strong>Creator-/Agentur-Konten</strong> freigegeben ist.
+Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen → verbinden).</div>
+{% endif %}
+
+<div class="card">
+  <div class="row">
+    <label>Ansicht
+      <select id="view-select" onchange="location.href='/chats?view='+this.value">
+        <option value="prio1" {% if view in ['prio1','group'] %}selected{% endif %}>Prio 1 ({{ p1_name }})</option>
+        {% if has_prio2 %}
+        <option value="prio2" {% if view=='prio2' %}selected{% endif %}>Prio 2 ({{ p2_name }})</option>
+        <option value="both" {% if view=='both' %}selected{% endif %}>Beide Gruppen</option>
+        {% endif %}
+        <option value="subscribers" {% if view=='subscribers' %}selected{% endif %}>Alle Abonnenten</option>
+        <option value="followers" {% if view=='followers' %}selected{% endif %}>Alle Follower</option>
+      </select>
+    </label>
+    <label style="flex:2">Suche
+      <input id="chat-search" type="text" placeholder="🔍 Nach Anzeigename oder @username suchen…" autocomplete="off" value="{{ q }}">
+    </label>
+    <label>&nbsp;
+      <a class="btn" href="/chats?view={{ view }}" style="display:block; text-align:center">🔄 Aktualisieren</a>
+    </label>
+  </div>
+  <div class="filter-foot">
+    <span class="muted small" id="chat-count"></span>
+    <form method="post" action="/chats/export-all" class="inline"
+          onsubmit="return confirm('Alle Chats dieser Gruppe exportieren? Das läuft im Hintergrund und kann bei vielen Fans dauern.');">
+      <button class="btn">⬇ Alle Chats exportieren</button>
+    </form>
+  </div>
+  <div class="muted small" id="export-status"></div>
+</div>
+
+{% for c in chats %}
+<div class="card chat-card" data-search="{{ (c['display_name'] ~ ' ' ~ c['handle']) | lower }}">
+  <div class="chat-head">
+    <div>
+      <strong>{{ c['display_name'] or c['handle'] or c['uuid'] }}</strong>
+      {% if c['handle'] %}<span class="muted">@{{ c['handle'] }}</span>{% endif %}
+    </div>
+    <div class="badges">
+      {% if c['insight'] %}
+        {% if c['insight']['status'] == 'subscriber' %}<span class="pill on">Abonnent</span>
+        {% elif c['insight']['status'] == 'follower' %}<span class="pill">Follower</span>
+        {% elif c['insight']['status'] == 'expired' %}<span class="pill off">abgelaufen</span>{% endif %}
+      {% endif %}
+      {% if c['bot_enabled'] %}<span class="pill on">Bot aktiv</span>{% else %}<span class="pill off">Bot aus</span>{% endif %}
+      {% if c['group'] %}<span class="pill">{{ c['group'] }}</span>{% endif %}
+      <span class="pill">{{ c['mode_override'] or 'global' }}</span>
+    </div>
+  </div>
+  {% if c['insight'] %}
+  <div class="insight-line small muted">
+    💰 Gesamt <strong class="green-t">${{ c['insight']['total_cents'] | dollars }}</strong>
+    · Größter Kauf ${{ c['insight']['max_cents'] | dollars }}
+    {% if c['insight']['last_purchase'] %}· letzter Kauf {{ c['insight']['last_purchase'] | fdate }}{% endif %}
+    {% if c['insight']['auto_renew'] %}· 🔁 Auto-Verlängerung{% endif %}
+  </div>
+  {% endif %}
+
+  {% set s = c['stats'] %}
+  <div class="ppv-block">
+    <div class="ppv-summary">
+      <span>Angeboten <strong>{{ s['offered'] }}</strong></span>
+      <span>Gekauft <strong class="green-t">{{ s['purchased'] }}</strong></span>
+      <span>Conversion <strong>{{ '%.0f' | format(s['conversion']) }}%</strong></span>
+      <span>Umsatz <strong>${{ s['revenue_cents'] | dollars }}</strong></span>
+      <a class="btn" href="/chats/{{ c['uuid'] }}/ppv">PPV-Status verwalten →</a>
+      <form method="post" action="/chats/{{ c['uuid'] }}/reactivate" class="inline"
+            onsubmit="return confirm('Reaktivierungs-Nachricht für {{ (c['display_name'] or c['handle'] or 'diesen Fan') | e }} erstellen? Sie landet in der Freigabe-Queue.');">
+        <input type="hidden" name="handle" value="{{ c['handle'] }}">
+        <input type="hidden" name="display_name" value="{{ c['display_name'] }}">
+        <input type="hidden" name="view" value="{{ view }}">
+        <button class="btn">💬 Reaktivierung auslösen</button>
+      </form>
+    </div>
+  </div>
+
+  <details class="settings">
+    <summary>⚙ Einstellungen</summary>
+    <form method="post" action="/chats/{{ c['uuid'] }}/update">
+      <div class="row">
+        <label class="chk"><input type="checkbox" name="bot_enabled" {% if c['bot_enabled'] %}checked{% endif %}> Bot aktiv</label>
+        <label>Modus:
+          <select name="mode_override">
+            <option value="" {% if not c['mode_override'] %}selected{% endif %}>Global</option>
+            <option value="approval" {% if c['mode_override']=='approval' %}selected{% endif %}>Freigabe</option>
+            <option value="auto" {% if c['mode_override']=='auto' %}selected{% endif %}>Auto</option>
+          </select>
+        </label>
+      </div>
+      <label>Eigener System-Prompt (optional):
+        <textarea name="persona_override" rows="2" placeholder="Leer = globale Persona">{{ c['persona_override'] }}</textarea>
+      </label>
+      <label>Notizen / Gedächtnis über den Fan:
+        <textarea name="notes" rows="2" placeholder="z.B. Name, Vorlieben, Grenzen">{{ c['notes'] }}</textarea>
+      </label>
+      <button class="btn-primary">Speichern</button>
+    </form>
+  </details>
+
+  {% if c['insight'] %}
+  {% set i = c['insight'] %}
+  <details class="settings">
+    <summary>📊 Fanvue Daten</summary>
+    <div class="ins-grid">
+      <div><span class="muted small">Benutzertyp</span><br>
+        {% if i['status']=='subscriber' %}<strong class="green-t">Abonnent</strong>
+        {% elif i['status']=='follower' %}<strong>Follower</strong>
+        {% elif i['status']=='expired' %}<strong>abgelaufen</strong>
+        {% else %}<strong>{{ i['status'] }}</strong>{% endif %}</div>
+      <div><span class="muted small">Insgesamt ausgegeben</span><br><strong>${{ i['total_cents'] | dollars }}</strong></div>
+      <div><span class="muted small">Größter Kauf</span><br><strong>${{ i['max_cents'] | dollars }}</strong></div>
+      <div><span class="muted small">Letzter Kauf</span><br><strong>{{ i['last_purchase'] | fdate }}</strong></div>
+      <div><span class="muted small">Abo seit</span><br><strong>{{ i['created_at'] | fdate }}</strong></div>
+      <div><span class="muted small">Verlängert am</span><br><strong>{{ i['renews_at'] | fdate }}</strong></div>
+      <div><span class="muted small">Auto-Verlängerung</span><br>
+        {% if i['auto_renew'] %}<strong class="green-t">An</strong>{% else %}<strong>Aus</strong>{% endif %}</div>
+    </div>
+    {% if i['sources'] %}
+    <div class="small muted" style="margin-top:8px">Ausgaben nach Quelle:
+      {% for src, cents in i['sources'].items() %}{{ src }} ${{ cents | dollars }}{% if not loop.last %} · {% endif %}{% endfor %}
+    </div>
+    {% endif %}
+    <p class="small muted" style="margin-top:8px">Fanvues automatische Notizen sind über die API nicht abrufbar –
+    nutze dafür das Feld „Notizen / Gedächtnis" unter „Einstellungen".</p>
+  </details>
+  {% endif %}
+</div>
+{% else %}
+<div class="card muted">Keine Fans in dieser Gruppe gefunden. Prüfe die Chat-Gruppe/Liste in den <a href="/settings">Einstellungen</a>.</div>
+{% endfor %}
+
+<style>
+#chat-search { width: 100%; }
+.chat-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.badges { display: flex; gap: 6px; }
+.pill { font-size: 12px; padding: 2px 9px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--border); }
+.pill.on { color: var(--green); border-color: var(--green); }
+.pill.off { color: var(--muted); }
+.small { font-size: 12px; margin-top: 8px; }
+.ppv-block { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.ppv-summary { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 14px; }
+details.settings { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+details.settings summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+.ins-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px 16px; margin-top: 6px; }
+.ins-grid > div { font-size: 15px; }
+.filter-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; }
+.inline { display: inline-flex; gap: 6px; align-items: center; }
+details.settings[open] summary { margin-bottom: 10px; }
+</style>
+<script>
+(function () {
+  const box = document.getElementById('chat-search');
+  const cards = Array.from(document.querySelectorAll('.chat-card'));
+  const counter = document.getElementById('chat-count');
+  function apply() {
+    const q = (box.value || '').trim().toLowerCase();
+    let shown = 0;
+    for (const c of cards) {
+      const ok = !q || (c.dataset.search || '').includes(q);
+      c.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    }
+    counter.textContent = shown + ' von ' + cards.length + ' Fans';
+  }
+  if (box) { box.addEventListener('input', apply); apply(); }
+
+  // Export-Fortschritt anzeigen
+  const es = document.getElementById('export-status');
+  async function pollExport() {
+    try {
+      const r = await fetch('/chats/export-status');
+      const j = await r.json();
+      if (j.running) {
+        es.textContent = 'Export läuft… ' + j.done + ' von ' + j.total + ' Chats';
+        setTimeout(pollExport, 2000);
+      } else if (j.done && j.total && j.done >= j.total) {
+        es.textContent = '✓ Export fertig: ' + j.done + ' Chats in exports/';
+      } else { es.textContent = ''; }
+    } catch (e) {}
+  }
+  pollExport();
+})();
+</script>
+{% endblock %}

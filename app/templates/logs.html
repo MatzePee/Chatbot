@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Logs</h1>
+<table class="logs">
+  <thead><tr><th>Zeit</th><th>Level</th><th>Kategorie</th><th>Meldung</th><th>Detail</th></tr></thead>
+  <tbody>
+    {% for l in logs %}
+    <tr class="lvl-{{ l['level'] }}">
+      <td class="nowrap">{{ l['ts'] | ts }}</td>
+      <td>{{ l['level'] }}</td>
+      <td>{{ l['category'] }}</td>
+      <td>{{ l['message'] }}</td>
+      <td class="detail">{{ l['detail'] }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="muted">Keine Logs.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

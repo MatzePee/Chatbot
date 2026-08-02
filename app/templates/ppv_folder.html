@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Bilder: {{ folder_name }}</h1>
+<p><a href="/ppv">← zurück zur Ordnerübersicht</a>
+{% if folder_cfg and folder_cfg['enabled'] %}<span class="tag">PPV aktiv · ${{ folder_cfg['price_cents'] | dollars }}</span>{% endif %}
+</p>
+<p class="muted">Vergib pro Bild eigene Tags oder lass sie vom LLM automatisch bestimmen.</p>
+
+{% if analyze_err %}
+<div class="card warn">⚠ Bildanalyse fehlgeschlagen: {{ analyze_err }}</div>
+{% elif analyze_ok %}
+<div class="card ok">✓ Bild analysiert – Tags wurden ergänzt.</div>
+{% endif %}
+
+{% if error %}
+<div class="card warn">Medien konnten nicht geladen werden: {{ error }}</div>
+{% elif not media %}
+<div class="card muted">Keine fertigen Bilder in diesem Ordner.</div>
+{% endif %}
+
+<div class="ppv-grid">
+{% for m in media %}
+  {% set is_preview = folder_cfg and folder_cfg['preview_media_uuid'] == m['uuid'] %}
+  <div class="card ppv-item {% if is_preview %}preview-active{% endif %}">
+    <div class="thumb-wrap">
+      {% if m['thumb'] %}<img src="{{ m['thumb'] }}" alt="{{ m['name'] }}" loading="lazy">{% endif %}
+      {% if m['is_video'] %}<span class="vid-badge">▶ Video</span>{% endif %}
+    </div>
+    <div class="muted small">{{ m['name'] }}{% if m['recommended'] %} · empf. ${{ m['recommended'] | dollars }}{% endif %}</div>
+    {% if m['fanvue_tags'] %}<div class="small">Fanvue-KI: <span class="muted">{{ m['fanvue_tags'] }}</span></div>{% endif %}
+    <form method="post" action="/ppv/media/{{ m['uuid'] }}/tags">
+      <input type="hidden" name="folder_name" value="{{ folder_name }}">
+      <textarea name="tags" rows="2" placeholder="Tags kommagetrennt">{{ m['tags'] }}</textarea>
+      <div class="draft-actions">
+        <button class="btn-primary" type="submit">💾 Tags speichern</button>
+        <button class="btn" formaction="/ppv/media/{{ m['uuid'] }}/analyze" formmethod="post"
+                {% if not m['thumb'] %}disabled{% endif %}>🔍 Analysieren</button>
+      </div>
+      <input type="hidden" name="image_url" value="{{ m['analyze_url'] or m['thumb'] }}">
+    </form>
+    <form method="post" action="/ppv/folder/preview/set">
+      <input type="hidden" name="folder_name" value="{{ folder_name }}">
+      <input type="hidden" name="media_uuid" value="{{ m['uuid'] }}">
+      <button class="btn" type="submit" {% if is_preview %}disabled{% endif %}>
+        {% if is_preview %}⭐ Vorschaubild{% else %}☆ Als Vorschau{% endif %}
+      </button>
+    </form>
+    {% if m['analyzed'] %}<div class="small green-t">✓ analysiert</div>{% endif %}
+  </div>
+{% endfor %}
+</div>
+
+<style>
+.ppv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.ppv-item img { width: 100%; border-radius: 8px; max-height: 220px; object-fit: cover; display: block; }
+.ppv-item .thumb-wrap { position: relative; margin-bottom: 8px; }
+.ppv-item .vid-badge { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.7);
+  color: #fff; font-size: 12px; padding: 2px 8px; border-radius: 6px; }
+.ppv-item textarea { margin-top: 6px; }
+.ppv-item.preview-active { border-color: var(--primary); }
+.small { font-size: 12px; margin: 4px 0; }
+</style>
+{% endblock %}

@@ -1,0 +1,186 @@
+:root {
+  --bg: #0f1115; --panel: #181b22; --panel2: #1f232c; --text: #e6e8ec;
+  --muted: #8b93a1; --border: #2a2f3a; --primary: #6d5efc; --primary-h: #5a4be8;
+  --green: #33c98c; --red: #f0556a; --gray: #6b7280; --warn: #3a2f1a; --warn-b: #7a5c1a;
+  --ok: #163a2b; --ok-b: #1f6b4a;
+}
+
+/* Info-Tooltip: sofort beim Hovern (oder Fokus) sichtbar */
+.info { position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%; font-size: 11px; color: var(--muted);
+  border: 1px solid var(--border); cursor: help; margin-left: 4px; user-select: none;
+  vertical-align: middle; }
+.info:hover { color: var(--text); border-color: var(--primary); }
+.info::after {
+  content: attr(data-tip);
+  position: absolute; bottom: 135%; left: 0; transform: translateX(-45%);
+  background: #0b0d12; color: var(--text); padding: 8px 10px; border-radius: 8px;
+  width: max-content; max-width: 260px; white-space: normal; text-align: left;
+  font-size: 12px; font-weight: normal; line-height: 1.45; z-index: 100;
+  border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0,0,0,.5);
+  opacity: 0; visibility: hidden; transition: opacity .12s; pointer-events: none;
+}
+.info:hover::after, .info:focus::after { opacity: 1; visibility: visible; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px; line-height: 1.5;
+}
+header {
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+.brand { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 9px; }
+.brand-logo { width: 26px; height: 26px; display: block; flex: none; }
+nav { display: flex; gap: 16px; flex: 1; }
+nav a { color: var(--muted); text-decoration: none; font-weight: 500; }
+nav a:hover { color: var(--text); }
+/* Standard-Links (z.B. Subscriber-Namen in Tabellen) weiss statt Browser-Blau.
+   Buttons (.btn*) und nav behalten ihre Farbe (hoehere Spezifitaet). */
+a { color: var(--text); text-decoration: none; }
+a:not(.btn):not(.btn-primary):not(.btn-danger):hover { text-decoration: underline; }
+.status { font-size: 13px; color: var(--muted); }
+.badge { background: var(--primary); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 12px; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+.dot.green { background: var(--green); } .dot.red { background: var(--red); } .dot.gray { background: var(--gray); }
+main { max-width: 920px; margin: 0 auto; padding: 24px 20px 60px; }
+h1 { font-size: 24px; margin: 0 0 6px; } h3 { margin: 0 0 12px; }
+.muted { color: var(--muted); } .red-t { color: var(--red); } .green-t { color: var(--green); }
+.card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px; margin-bottom: 18px;
+}
+.card.warn { background: var(--warn); border-color: var(--warn-b); }
+.card.ok { background: var(--ok); border-color: var(--ok-b); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+button, .btn, .btn-primary, .btn-danger {
+  font: inherit; border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+  padding: 8px 14px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block;
+}
+.btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-h); }
+.btn-danger { background: transparent; border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: var(--red); color: #fff; }
+.big { font-size: 16px; padding: 12px 22px; }
+label { display: block; margin: 10px 0; font-size: 14px; color: var(--muted); }
+input, select, textarea {
+  width: 100%; margin-top: 4px; padding: 9px 11px; background: var(--panel2);
+  border: 1px solid var(--border); border-radius: 8px; color: var(--text); font: inherit;
+}
+textarea { resize: vertical; font-family: inherit; }
+.row { display: flex; gap: 14px; flex-wrap: wrap; }
+.row > label { flex: 1; min-width: 140px; }
+.chk { display: flex; align-items: center; gap: 8px; }
+.chk input { width: auto; margin: 0; }
+table { width: 100%; border-collapse: collapse; }
+table.kv td { padding: 5px 0; border-bottom: 1px solid var(--border); }
+table.kv td:last-child { text-align: right; }
+table.logs th, table.logs td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+.nowrap { white-space: nowrap; } .detail { color: var(--muted); font-size: 12px; max-width: 300px; word-break: break-word; }
+.lvl-error td { color: var(--red); } .lvl-warn td { color: #e0b050; }
+.draft-head { margin-bottom: 8px; }
+.incoming { background: var(--panel2); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 14px; }
+.tag { background: var(--primary); color: #fff; border-radius: 6px; padding: 1px 6px; font-size: 11px; margin-right: 6px; }
+.guard { color: #e0b050; font-size: 13px; margin-bottom: 8px; }
+.draft-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
+.sep { margin: 0 6px; opacity: .5; }
+
+/* Klapp-Menue. Auf Desktop-Breite sind Checkbox und Schalter unsichtbar und
+   ohne Wirkung; die Nav steht dauerhaft offen.
+   Die Checkbox wird bewusst mehrfach abgesichert (appearance, clip, opacity):
+   die generische Regel fuer input/select/textarea weiter oben wuerde sie sonst
+   als sichtbares Kaestchen im Header rendern. */
+.navtoggle-cb {
+  position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; padding: 0;
+  border: 0; appearance: none; -webkit-appearance: none; pointer-events: none;
+  clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden;
+}
+.navtoggle { display: none; }
+nav { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; min-width: 0; }
+.navtoggle-cb:focus-visible + .navtoggle { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ===================== Tablet und schmaler =====================
+   900px statt 760: neun Links brauchen nebeneinander rund 750px, dazu Logo
+   und Statuszeile. Darunter wird umgeschaltet, bevor etwas gequetscht wird. */
+@media (max-width: 900px) {
+  header { gap: 10px; padding: 10px 14px; }
+  .brand { font-size: 16px; gap: 8px; }
+  .brand-logo { width: 24px; height: 24px; }
+  .navtoggle {
+    display: block; margin: 0 0 0 auto; cursor: pointer; user-select: none;
+    padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel2); font-size: 14px; font-weight: 500; color: var(--text);
+  }
+  .navtoggle-cb:checked + .navtoggle { border-color: var(--primary); }
+  /* Zugeklappt = weg. Aufgeklappt = gestapelte Liste mit grossen Tap-Zielen. */
+  nav { display: none; }
+  /* flex: 1 1 100% statt width: 100% - die Basisregel setzt flex: 1 (Basis 0),
+     das wuerde die Liste sonst auf der Zeile des Schalters zusammenquetschen. */
+  .navtoggle-cb:checked ~ nav {
+    display: flex; flex-direction: column; gap: 0; order: 3; flex: 1 1 100%; margin-top: 4px;
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  nav a {
+    padding: 13px 14px; border-bottom: 1px solid var(--border);
+    background: var(--panel2); color: var(--text);
+  }
+  nav a:last-child { border-bottom: none; }
+  .status { width: 100%; order: 4; font-size: 12px; }
+
+  main { padding: 16px 14px 48px; }
+  h1 { font-size: 20px; }
+  .card { padding: 14px; margin-bottom: 14px; border-radius: 10px; }
+  .grid { grid-template-columns: 1fr; gap: 14px; }
+
+  /* Formularzeilen einspaltig - zwei Felder nebeneinander sind auf 360px unlesbar */
+  .row { gap: 0; }
+  .row > label { flex: 1 1 100%; min-width: 0; }
+
+  /* iOS zoomt beim Fokus in Felder mit Schriftgroesse < 16px hinein und
+     verschiebt dabei das ganze Layout. 16px verhindert das zuverlaessig. */
+  input, select, textarea { font-size: 16px; padding: 11px 12px; }
+
+  /* Tap-Ziele: 44px ist die uebliche Mindestgroesse fuer Finger */
+  button, .btn, .btn-primary, .btn-danger { padding: 11px 16px; min-height: 44px; }
+  .draft-actions { gap: 8px; }
+  .draft-actions > *, .draft-actions button { flex: 1 1 auto; }
+
+  /* Breite Tabellen horizontal scrollbar machen, statt Spalten zu zerquetschen.
+     min-width auf thead/tbody haelt die Spaltenbreiten brauchbar. */
+  table.logs, table.ppv-table, table.cols {
+    display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
+  table.logs thead, table.logs tbody,
+  table.ppv-table thead, table.ppv-table tbody,
+  table.cols thead, table.cols tbody { display: table; width: 100%; min-width: 520px; }
+  table.logs th, table.logs td { padding: 8px 8px; }
+  /* Kopfzeile mitscrollen lassen, aber Umbruch vermeiden */
+  table.logs th { white-space: nowrap; }
+  .detail { max-width: 220px; }
+
+  /* Tooltip nicht ueber den Bildschirmrand hinaus */
+  .info::after {
+    left: auto; right: 0; transform: none;
+    max-width: min(260px, calc(100vw - 40px));
+  }
+}
+
+/* ===================== Kleine Smartphones ===================== */
+@media (max-width: 420px) {
+  main { padding: 12px 10px 40px; }
+  .card { padding: 12px; }
+  h1 { font-size: 19px; }
+  .brand { font-size: 15px; }
+  /* Aktionsknoepfe untereinander - nebeneinander werden sie zu schmal */
+  .draft-actions { flex-direction: column; }
+  .draft-actions > *, .draft-actions button { width: 100%; }
+  table.logs thead, table.logs tbody,
+  table.ppv-table thead, table.ppv-table tbody,
+  table.cols thead, table.cols tbody { min-width: 460px; }
+  /* Kopfzeilen-Leisten in Karten umbrechen lassen statt zu quetschen */
+  .filter-foot, .ppv-summary { flex-wrap: wrap; }
+}
