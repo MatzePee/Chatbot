@@ -17,12 +17,15 @@ as_user() { runuser -u "$SVC_USER" -- "$@"; }
 do_update() {
   cd "$REPO"
 
-  # 1. Datenbank sichern. Sie liegt in data/ und wird von git nicht angefasst,
-  #    aber ein Update kann Schema-Migrationen ausloesen - davor ein Stand zum
-  #    Zurueckgehen. Die letzten 10 Sicherungen bleiben liegen.
+  # 1. Datenbank und .env sichern. Beide liegen ausserhalb der Versionierung und
+  #    werden von git nicht angefasst, aber ein Update kann Schema-Migrationen
+  #    ausloesen - davor ein Stand zum Zurueckgehen. Die letzten 10 bleiben.
   if [ -f "$REPO/data/bot.db" ]; then
     as_user mkdir -p "$REPO/data/backups"
     STAMP="$(date +%Y%m%d-%H%M%S)"
+    if [ -f "$REPO/.env" ]; then
+      as_user cp -p "$REPO/.env" "$REPO/data/backups/env-$STAMP"
+    fi
     # sqlite3 .backup ist auch bei laufendem Zugriff sicher (WAL-Modus); ohne
     # das Werkzeug faellt es auf ein einfaches cp zurueck.
     if command -v sqlite3 >/dev/null 2>&1; then
@@ -44,6 +47,21 @@ do_update() {
     echo "Kein Versions-Tag (vX.Y.Z) im Repository gefunden." >&2
     exit 1
   fi
+  # SICHERUNG: Enthaelt die neue Version versehentlich .env oder data/, wuerde
+  # `git checkout -f` genau diese Dateien ueberschreiben - Zugangsdaten und die
+  # komplette Datenbank der Nutzerin waeren weg. Das ist der einzige Weg, auf
+  # dem ein Update Einstellungen zerstoeren koennte, also vorher pruefen.
+  # Bewusst NUR die echte .env und data/ - .env.example gehoert ins Repository
+  # und wuerde bei einem zu weiten Muster jedes Update blockieren.
+  BAD="$(as_user git ls-tree -r --name-only "$TAG" \
+         | grep -E '^(\.env|\.env\.local)$|^data/' || true)"
+  if [ -n "$BAD" ]; then
+    echo "ABBRUCH: Version $TAG enthaelt Dateien, die deine Konfiguration" >&2
+    echo "ueberschreiben wuerden. Es wurde nichts geaendert." >&2
+    echo "$BAD" | sed 's/^/  /' >&2
+    exit 1
+  fi
+
   echo "Wechsle auf $TAG"
   # -f verwirft lokale Aenderungen am Programmcode. data/ und .env sind per
   # .gitignore ausgenommen und bleiben unangetastet.

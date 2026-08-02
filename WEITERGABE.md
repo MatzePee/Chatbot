@@ -99,12 +99,17 @@ ssh -T git@github.com          # einmal bestätigen; "successfully authenticated
 
 ## 3. Erstinstallation auf ihrem Server
 
-Auf einem **frisch installierten Ubuntu** erledigt ein Skript alles:
+Auf einem **frisch installierten Ubuntu** genügt ein einziger Befehl:
 
 ```bash
-sudo apt update && sudo apt install -y git
-git clone git@github.com:MatzePee/Chatbot.git /tmp/chatbot
-sudo bash /tmp/chatbot/deploy/install.sh
+curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh | sudo bash
+```
+
+Der Befehl holt das Repository, wählt automatisch die **neueste markierte
+Version** und startet die Installation. Eine bestimmte Version geht auch:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh | sudo REF=v1.0.2 bash
 ```
 
 Das Skript fragt nach Benutzer, Verzeichnis, Port und optional den Schlüsseln
@@ -163,13 +168,31 @@ sind ihr Änderungsprotokoll.
 
 ## 5. Was beim Update auf ihrem Server passiert
 
-1. Datenbank wird gesichert nach `data/backups/bot-<datum>.db` (die letzten 10 bleiben)
-2. `git fetch` und Wechsel auf das neueste Tag
-3. `pip install -r requirements.txt` — falls neue Pakete dazugekommen sind
-4. Dienst startet neu; fehlende Datenbankspalten legt das Programm selbst an
+1. Datenbank und `.env` werden gesichert nach `data/backups/` (die letzten 10 bleiben)
+2. Prüfung, dass die neue Version weder `.env` noch `data/` mitbringt — sonst Abbruch
+3. `git fetch` und Wechsel auf das neueste Tag
+4. `pip install -r requirements.txt` — falls neue Pakete dazugekommen sind
+5. Dienst startet neu; fehlende Datenbankspalten legt das Programm selbst an
 
-`data/` und `.env` bleiben unangetastet. **Lokale Änderungen am Programmcode
-werden dabei verworfen** — auf ihrem Server sollte niemand Dateien bearbeiten.
+### Ihre Einstellungen bleiben erhalten
+
+Alles, was sie einstellt, liegt in `data/bot.db` — Persona und System-Prompt,
+Tagesrhythmus, API-Schlüssel, PPV-Regeln, Telegram-Daten sowie pro Fan die
+Notizen und die abweichende Persona. Dieser Ordner steht in `.gitignore` und
+wird von einem Update nicht angefasst; dasselbe gilt für `.env`.
+
+Auch wenn du in einer neuen Version einen **Standardwert änderst**, bleibt ihr
+eigener Wert bestehen: Beim Start werden nur Einstellungen angelegt, die es
+noch gar nicht gibt. Neue Optionen kommen also dazu, vorhandene bleiben.
+
+Was ein Update **verwirft**, sind Änderungen am Programmcode selbst — an
+Dateien unter `app/`, `deploy/` und den Vorlagen. Auf ihrem Server sollte
+deshalb niemand Dateien bearbeiten; alles Einstellbare gehört in die
+Oberfläche.
+
+> `deploy/sally_persona.txt` ist nur eine **Vorlage zum Hineinkopieren** und
+> wird vom Programm nie gelesen. Die tatsächlich benutzte Persona steht in den
+> Einstellungen und damit in der Datenbank.
 
 ### Wenn ein Update Probleme macht
 
