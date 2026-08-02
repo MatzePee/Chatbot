@@ -48,13 +48,6 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
   Plattform-Regeln (z.B. Kennzeichnung automatisierter/Team-Nachrichten, sofern gefordert).
 - Client-Secret, Tokens und API-Keys liegen lokal in `data/bot.db`. Diese Datei nicht teilen.
 
-## Später auf Ubuntu
-
-Gleicher Code. Dort zusätzlich empfehlenswert:
-- Redirect-URI auf die Server-Domain/HTTPS umstellen (in Fanvue-App **und** Einstellungen).
-- Reverse-Proxy (nginx/Caddy) mit TLS vor uvicorn.
-- systemd-Service für Autostart, GUI hinter Login/VPN absichern.
-
 ## Projektstruktur
 
 ```
