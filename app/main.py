@@ -7,6 +7,7 @@ import subprocess
 import threading
 import time
 from datetime import datetime
+from urllib.parse import quote as _q
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -88,6 +89,61 @@ def _base_ctx(request: Request) -> dict:
 def _display(name_map, uuid):
     handle, display = name_map.get(uuid, ("", ""))
     return {"uuid": uuid, "handle": handle, "display_name": display or handle or uuid[:8]}
+
+
+# ----------------------------------------------------------------- Upload
+@app.get("/upload", response_class=HTMLResponse)
+def upload_page(request: Request, msg: str = "", err: str = ""):
+    from . import publisher
+    ctx = _base_ctx(request)
+    ctx["s"] = db.all_settings()
+    ctx["st"] = publisher.status()
+    ctx["problems"] = publisher.guard() if not ctx["st"].get("error") else []
+    ctx["msg"] = msg
+    ctx["err"] = err
+    return templates.TemplateResponse("upload.html", ctx)
+
+
+@app.get("/api/upload-status")
+def api_upload_status():
+    from . import publisher
+    st = publisher.status()
+    st["problems"] = publisher.guard() if not st.get("error") else []
+    return st
+
+
+@app.post("/upload/settings")
+async def upload_settings(request: Request):
+    form = await request.form()
+    for key in ("git_remote_url", "git_branch", "git_user_name", "git_user_email",
+                "git_commit_default"):
+        if key in form:
+            db.set_setting(key, str(form[key]).strip())
+    # Leeres Token-Feld bedeutet "unverändert lassen", nicht "löschen" -
+    # sonst wuerde ein versehentlicher Speichern-Klick den Token entfernen.
+    token = str(form.get("github_token", "")).strip()
+    if token:
+        db.set_setting("github_token", token)
+    elif str(form.get("clear_token", "")) == "1":
+        db.set_setting("github_token", "")
+    db.log("info", "upload", "Upload-Einstellungen gespeichert")
+    return RedirectResponse(f"/upload?msg={_q('Einstellungen gespeichert')}", status_code=303)
+
+
+@app.post("/upload/publish")
+async def upload_publish(request: Request):
+    from . import publisher
+    form = await request.form()
+    message = str(form.get("message", "")).strip() or db.get_setting("git_commit_default", "Aktueller Stand")
+    tag = str(form.get("tag", "")).strip()
+    do_push = str(form.get("push", "1")) == "1"
+    res = publisher.publish(message, tag=tag, do_push=do_push)
+    if res.get("ok"):
+        return RedirectResponse(f"/upload?msg={_q(' · '.join(res['log']))}", status_code=303)
+    detail = res.get("error", "Unbekannter Fehler")
+    if res.get("problems"):
+        detail += " — " + " ".join(res["problems"])
+    return RedirectResponse(f"/upload?err={_q(detail[:400])}", status_code=303)
 
 
 @app.get("/api/update-check")

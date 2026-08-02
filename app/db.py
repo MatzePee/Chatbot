@@ -298,6 +298,13 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "draft_max_regen": 10,              # max. automatische Neugenerierungen pro Draft
     "draft_regen_on_stale": True,       # veraltete Drafts automatisch neu erzeugen
                                         # (manuell bearbeitete NIE - dort nur ein Hinweis)
+    # --- Veroeffentlichen nach GitHub (Seite /upload) ---
+    "git_remote_url": "",               # z.B. https://github.com/MatzePee/Chatbot.git
+    "git_branch": "main",
+    "git_user_name": "",                # Name fuer Commits (auch GitHub-Benutzername)
+    "git_user_email": "",
+    "github_token": "",                 # Personal Access Token mit Recht 'repo'
+    "git_commit_default": "Aktueller Stand",
     # --- Update-Pruefung (Git-Tags) ---
     "update_check_enabled": True,       # regelmaessig auf neue Versionen pruefen
     "update_check_interval_hours": 6,   # Pruefabstand

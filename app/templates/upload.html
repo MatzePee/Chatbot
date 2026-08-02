@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Upload</h1>
+<p class="muted">Aktuellen Stand nach GitHub veröffentlichen. Von hier aus laufen dieselben
+Schritte wie in <code>deploy/git-setup.sh</code> – inklusive der Prüfung, dass keine
+Zugangsdaten oder Datenbankdateien mitgehen.</p>
+
+{% if msg %}<div class="card ok">✓ {{ msg }}</div>{% endif %}
+{% if err %}<div class="card warn">⚠ {{ err }}</div>{% endif %}
+
+{% if st.error %}
+<div class="card warn">
+  <strong>Kein Git-Repository.</strong><br>{{ st.error }}
+</div>
+{% else %}
+
+{% if problems %}
+<div class="card warn">
+  <strong>Veröffentlichen ist blockiert:</strong>
+  <ul style="margin:8px 0 0;padding-left:20px">
+    {% for p in problems %}<li>{{ p }}</li>{% endfor %}
+  </ul>
+  <p class="muted small" style="margin-bottom:0">Ein einmal veröffentlichter Schlüssel lässt
+  sich nicht zurückholen – deshalb blockiert die Prüfung, statt nur zu warnen.</p>
+</div>
+{% endif %}
+
+<div class="grid">
+  <div class="card">
+    <h3>Stand</h3>
+    <table class="kv">
+      <tr><td>Version</td><td><strong>{{ st.described or '–' }}</strong></td></tr>
+      <tr><td>Branch</td><td>{{ st.branch }}</td></tr>
+      <tr><td>Letzter Commit</td><td>{{ st.last_commit or '–' }}</td></tr>
+      <tr><td>Geänderte Dateien</td><td><strong>{{ st.change_count }}</strong></td></tr>
+      <tr><td>Noch nicht hochgeladen</td><td>{{ st.unpushed }} Commit(s)</td></tr>
+      <tr><td>Ziel</td><td>{{ st.remote or 'nicht gesetzt' }}</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Änderungen seit dem letzten Upload</h3>
+    {% if st.changes %}
+    <div class="chg-list">
+      {% for c in st.changes %}
+      <div class="chg"><span class="tag chg-{{ c.kind }}">{{ c.kind }}</span> {{ c.path }}</div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">Keine Änderungen – der lokale Stand entspricht dem letzten Commit.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h3>Veröffentlichen</h3>
+  <form method="post" action="/upload/publish"
+        onsubmit="return confirm('Aktuellen Stand committen und hochladen?');">
+    <label>Commit-Nachricht
+      <input name="message" value="" placeholder="{{ s['git_commit_default'] }}"></label>
+
+    <label>Version (leer lassen, wenn es noch keine neue Version sein soll)
+      <input name="tag" id="tagfield" value="" placeholder="z.B. {{ st.suggestions.patch }}"></label>
+    <p class="muted small" style="margin-top:-4px">
+      Aktuell höchste Version: <strong>{{ st.latest_tag or 'noch keine' }}</strong> ·
+      Vorschläge:
+      <a href="#" class="vsug" data-v="{{ st.suggestions.patch }}">{{ st.suggestions.patch }}</a> (Fehlerbehebung) ·
+      <a href="#" class="vsug" data-v="{{ st.suggestions.minor }}">{{ st.suggestions.minor }}</a> (neue Funktion) ·
+      <a href="#" class="vsug" data-v="{{ st.suggestions.major }}">{{ st.suggestions.major }}</a> (großer Umbau)
+    </p>
+
+    <div class="draft-actions">
+      <button class="btn-primary big" name="push" value="1"
+        {% if problems or not st.token_set %}disabled{% endif %}>⬆ Committen und hochladen</button>
+      <button class="btn" name="push" value="0" {% if problems %}disabled{% endif %}>💾 Nur lokal committen</button>
+    </div>
+    {% if not st.token_set %}
+    <p class="muted small">Zum Hochladen fehlt noch das GitHub-Token – unten eintragen.</p>
+    {% endif %}
+  </form>
+</div>
+{% endif %}
+
+<form method="post" action="/upload/settings">
+  <div class="card">
+    <h3>Einstellungen</h3>
+    <label>Repository-URL
+      <input name="git_remote_url" value="{{ s['git_remote_url'] }}"
+        placeholder="https://github.com/MatzePee/Chatbot.git"></label>
+    <div class="row">
+      <label>Branch <input name="git_branch" value="{{ s['git_branch'] }}" placeholder="main"></label>
+      <label>Name für Commits <input name="git_user_name" value="{{ s['git_user_name'] }}"
+        placeholder="MatzePee (zugleich GitHub-Benutzername)"></label>
+      <label>E-Mail für Commits <input name="git_user_email" value="{{ s['git_user_email'] }}"
+        placeholder="m.pohl@ymail.com"></label>
+    </div>
+    <label>Standard-Commit-Nachricht
+      <input name="git_commit_default" value="{{ s['git_commit_default'] }}"></label>
+
+    <label>GitHub-Token
+      <input name="github_token" type="password" value=""
+        placeholder="{% if s['github_token'] %}hinterlegt – leer lassen, um es zu behalten{% else %}ghp_… oder github_pat_…{% endif %}"></label>
+    <p class="muted small">Personal Access Token mit der Berechtigung <code>repo</code>
+      (github.com → Settings → Developer settings → Personal access tokens).
+      Das Feld bleibt beim Speichern leer – ein leeres Feld ändert das gespeicherte Token nicht.
+      {% if s['github_token'] %}
+      <label class="chk" style="margin-top:6px"><input type="checkbox" name="clear_token" value="1">
+        Gespeichertes Token löschen</label>
+      {% endif %}
+    </p>
+    <button class="btn-primary">Einstellungen speichern</button>
+  </div>
+</form>
+
+<div class="card">
+  <h3>Hinweis zur Sicherheit</h3>
+  <p class="muted" style="margin-bottom:0">Das Token liegt – wie der OpenRouter- und der
+  Telegram-Schlüssel – im Klartext in der Datenbank. Beim Hochladen wird es weder in die
+  Kommandozeile noch in <code>.git/config</code> geschrieben, sondern nur an den git-Prozess
+  gereicht. Da die Oberfläche keine Anmeldung hat, sollte sie ausschließlich im eigenen Netz
+  erreichbar sein.</p>
+</div>
+
+<style>
+.chg-list { max-height: 260px; overflow-y: auto; }
+.chg { font-size: 13px; padding: 3px 0; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.tag.chg-neu { background: var(--green); }
+.tag.chg-geändert { background: #d9a441; color: #2a2000; }
+.tag.chg-gelöscht { background: var(--red); }
+.vsug { text-decoration: underline; cursor: pointer; }
+</style>
+<script>
+document.querySelectorAll('.vsug').forEach(function (a) {
+  a.addEventListener('click', function (e) {
+    e.preventDefault();
+    document.getElementById('tagfield').value = a.dataset.v;
+  });
+});
+</script>
+{% endblock %}
