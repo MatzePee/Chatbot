@@ -147,9 +147,18 @@ def status() -> dict[str, Any]:
     ok, last = _git("log", "-1", "--pretty=%s (%cr)")
     st["last_commit"] = last if ok else ""
 
-    # Liegen lokale Commits vor, die noch nicht oben sind?
-    ok, ahead = _git("rev-list", "--count", f"origin/{st['branch']}..HEAD")
-    st["unpushed"] = int(ahead) if ok and ahead.isdigit() else 0
+    # Vorne/hinten gegenueber dem Remote. Achtung: das rechnet gegen den ZULETZT
+    # geholten Stand von origin. Ohne fetch merkt man nicht, dass jemand (oder
+    # man selbst ueber die GitHub-Weboberflaeche) dort etwas geaendert hat.
+    ok, counts = _git("rev-list", "--left-right", "--count",
+                      f"origin/{st['branch']}...HEAD")
+    behind = ahead = 0
+    if ok:
+        parts = counts.split()
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            behind, ahead = int(parts[0]), int(parts[1])
+    st["unpushed"] = ahead
+    st["behind"] = behind
 
     st["token_set"] = bool(str(db.get_setting("github_token", "") or "").strip())
     return st
@@ -229,6 +238,38 @@ def _askpass_env() -> tuple[dict[str, str], Optional[str]]:
             "GIT_ASKPASS_TOKEN": token}, path
 
 
+def _set_tag(tag: str, log: list, result: dict) -> bool:
+    """Setzt das Versions-Tag auf HEAD. Rueckgabe: weitermachen?
+
+    Sonderfall: Das Tag existiert bereits, zeigt aber auf einen Commit, der
+    nicht mehr im Branch liegt. Das passiert nach einem Rebase - etwa wenn ein
+    frueherer Upload scheiterte, Commit und Tag aber schon erzeugt waren. Ein
+    solches Tag ist ein Ueberbleibsel und wird auf HEAD nachgezogen; ein Tag,
+    das bereits auf GitHub liegt, bleibt unangetastet.
+    """
+    exists, _ = _git("rev-parse", "--verify", f"refs/tags/{tag}")
+    if exists:
+        reachable, _ = _git("merge-base", "--is-ancestor", f"{tag}^{{commit}}", "HEAD")
+        if reachable:
+            log.append(f"Tag {tag} existierte bereits – übersprungen")
+            return True
+        on_remote, _ = _git("ls-remote", "--exit-code", "--tags", "origin", f"refs/tags/{tag}")
+        if on_remote:
+            result["error"] = (
+                f"Version {tag} liegt bereits auf GitHub, zeigt hier aber auf einen "
+                f"anderen Stand. Bitte eine neue Versionsnummer wählen.")
+            return False
+        _git("tag", "-d", tag)
+        log.append(f"Verwaistes Tag {tag} aus einem früheren Versuch neu gesetzt")
+
+    ok, out = _git("tag", "-a", tag, "-m", tag)
+    if not ok:
+        result["error"] = f"Tag fehlgeschlagen: {_scrub(out)[:300]}"
+        return False
+    log.append(f"Version {tag} markiert")
+    return True
+
+
 # ------------------------------------------------------------ Veroeffentlichen
 def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]:
     """Committet den aktuellen Stand, setzt optional ein Tag und laedt hoch."""
@@ -272,18 +313,9 @@ def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]
     else:
         log.append("Keine Änderungen – kein neuer Commit nötig")
 
-    if tag:
-        ok, _ = _git("rev-parse", tag)
-        if ok:
-            log.append(f"Tag {tag} existierte bereits – übersprungen")
-        else:
-            ok, out = _git("tag", "-a", tag, "-m", tag)
-            if not ok:
-                result["error"] = f"Tag fehlgeschlagen: {_scrub(out)[:300]}"
-                return result
-            log.append(f"Version {tag} markiert")
-
     if not do_push:
+        if tag and not _set_tag(tag, log, result):
+            return result
         result["ok"] = True
         log.append("Nur lokal festgehalten – nicht hochgeladen")
         return result
@@ -299,6 +331,32 @@ def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]
     branch = str(db.get_setting("git_branch", "main") or "main").strip()
     env_extra, askpass_path = _askpass_env()
     try:
+        # Erst holen und ggf. aufsetzen, DANN taggen. Liegen auf GitHub Commits,
+        # die hier fehlen (z.B. eine Änderung über die Weboberfläche), scheitert
+        # der Push sonst mit "non-fast-forward" - für den Nutzer unverständlich.
+        # Die Reihenfolge ist wichtig: ein vor dem Rebase gesetztes Tag würde auf
+        # einem Commit hängenbleiben, der danach nicht mehr im Branch liegt.
+        ok, out = _git("fetch", "origin", branch, timeout=120, env_extra=env_extra)
+        if ok:
+            ok2, counts = _git("rev-list", "--left-right", "--count",
+                               f"origin/{branch}...HEAD")
+            parts = counts.split() if ok2 else []
+            behind = int(parts[0]) if len(parts) == 2 and parts[0].isdigit() else 0
+            if behind:
+                ok3, rout = _git("rebase", f"origin/{branch}", timeout=120)
+                if not ok3:
+                    _git("rebase", "--abort")
+                    result["error"] = (
+                        f"Auf GitHub liegen {behind} Änderung(en), die sich nicht "
+                        f"automatisch mit deinen zusammenführen lassen. Auf dem Server: "
+                        f"git pull --rebase origin {branch} – Konflikte lösen – dann erneut. "
+                        f"Details: {_scrub(rout)[:200]}")
+                    return result
+                log.append(f"{behind} Commit(s) von GitHub geholt und aufgesetzt")
+
+        if tag and not _set_tag(tag, log, result):
+            return result
+
         ok, out = _git("push", "-u", "origin", f"HEAD:{branch}",
                        timeout=180, env_extra=env_extra)
         if not ok:

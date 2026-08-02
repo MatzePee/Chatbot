@@ -34,6 +34,9 @@ Zugangsdaten oder Datenbankdateien mitgehen.</p>
       <tr><td>Letzter Commit</td><td>{{ st.last_commit or '–' }}</td></tr>
       <tr><td>Geänderte Dateien</td><td><strong>{{ st.change_count }}</strong></td></tr>
       <tr><td>Noch nicht hochgeladen</td><td>{{ st.unpushed }} Commit(s)</td></tr>
+      {% if st.behind %}
+      <tr><td>Auf GitHub voraus</td><td class="red-t">{{ st.behind }} Commit(s)</td></tr>
+      {% endif %}
       <tr><td>Ziel</td><td>{{ st.remote or 'nicht gesetzt' }}</td></tr>
     </table>
   </div>
