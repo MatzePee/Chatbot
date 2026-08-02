@@ -52,12 +52,25 @@ DEFAULT_USER="${SUDO_USER:-}"
 if [ -z "$DEFAULT_USER" ] || [ "$DEFAULT_USER" = "root" ]; then
   DEFAULT_USER="fanvue"
 fi
+echo "  Mit Enter wird der vorhandene Benutzer übernommen (empfohlen)."
+echo "  Ein anderer Name legt einen neuen Systembenutzer an."
 SVC_USER="$(ask "Unter welchem Benutzer soll der Bot laufen?" "$DEFAULT_USER")"
 [ "$SVC_USER" = "root" ] && die "Der Bot darf nicht als root laufen. Bitte anderen Benutzer wählen."
 if ! id -u "$SVC_USER" >/dev/null 2>&1; then
   step "Benutzer '$SVC_USER' anlegen"
-  adduser --system --group --shell /bin/bash --home "/home/$SVC_USER" "$SVC_USER" || true
-  # Nachkontrolle: adduser meldet nicht immer zuverlaessig einen Fehler
+  # Streng nicht-interaktiv: adduser erbt sonst das Terminal als Standardeingabe
+  # und bleibt bei einer Rueckfrage stehen, die im Skriptablauf niemand sieht -
+  # die Installation wirkt dann eingefroren. </dev/null erzwingt den Abbruch
+  # einer Rueckfrage statt endloses Warten.
+  export DEBIAN_FRONTEND=noninteractive
+  if ! adduser --system --group --disabled-password --gecos "" \
+        --shell /bin/bash --home "/home/$SVC_USER" "$SVC_USER" </dev/null; then
+    # Aeltere/neuere adduser-Fassungen kennen nicht alle Schalter - Rueckfall
+    # auf die immer vorhandenen Basiswerkzeuge.
+    warn "adduser fehlgeschlagen – versuche useradd"
+    useradd --system --create-home --home-dir "/home/$SVC_USER" \
+            --shell /bin/bash --user-group "$SVC_USER" </dev/null || true
+  fi
   id -u "$SVC_USER" >/dev/null 2>&1 || die "Benutzer '$SVC_USER' konnte nicht angelegt werden."
   ok "Benutzer angelegt"
 else
