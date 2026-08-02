@@ -1,31 +1,4 @@
-# Fanvue Chatbot (MVP)
-
-Ein lokal laufender Chatbot für Fanvue: er liest eingehende Chatnachrichten über die
-Fanvue-API, generiert Antworten über OpenRouter und sendet sie – entweder nach
-manueller Freigabe oder vollautomatisch. Steuerung über eine Web-GUI im Browser.
-
-Bewusst als lokaler Web-Server gebaut (Python/FastAPI), damit derselbe Code später
-1:1 auf einem Ubuntu-Server läuft – der „Port" ist dann nur ein Deployment.
-
-## Funktionen
-
-- **Zwei Modi, umschaltbar** – global und pro Chat: *Freigabe* (Bot schlägt vor, du gibst frei)
-  oder *Auto* (Bot sendet selbst).
-- **Freigabe-Queue** – Vorschläge ansehen, bearbeiten, neu generieren, freigeben oder verwerfen.
-- **Master-Schalter / Kill-Switch** – alles mit einem Klick pausieren.
-- **Pro-Fan-Steuerung** – Bot an/aus, eigener System-Prompt, Notizen (Fan-Gedächtnis).
-- **Persona** – frei konfigurierbarer System-Prompt.
-- **Guardrails** – Längenlimit, verbotene Wörter (blocken Auto-Send), Eskalations-Stichworte.
-- **Menschenähnliches Verhalten** – zufällige Sende-Verzögerung, aktive Zeiten, Antwort-Cooldown.
-- **OpenRouter** – Modell, Temperatur, Token-Limit, Verlaufstiefe frei wählbar.
-- **Audit-Log** – jede Generierung und jeder Versand wird protokolliert.
-
-## Voraussetzungen
-
-- Python 3.10+
-- Ein **Fanvue Creator-Account mit abgeschlossenem KYC** und einer angelegten OAuth-App
-  (Client-ID, Client-Secret, Redirect-URI). Fanvue nutzt OAuth 2.0, **keine** API-Keys.
-- Ein **OpenRouter-API-Key**.
+# Chatbot
 
 ## Fanvue-App einrichten
 
