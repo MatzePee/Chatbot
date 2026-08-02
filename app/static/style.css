@@ -89,6 +89,36 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px
 code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
 .sep { margin: 0 6px; opacity: .5; }
 
+/* --- Einstellungen: Gruppen mit aufklappbaren Abschnitten --- */
+h2.grp {
+  font-size: 13px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); font-weight: 600; margin: 30px 0 2px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.grp-desc { font-size: 13px; margin: 6px 0 12px; }
+/* Die Huelle bringt kein Innenabstand mit - den setzen die Kinder selbst,
+   sonst haette der zugeklappte Zustand oben und unten Luft ohne Inhalt. */
+details.sect { padding: 0; overflow: hidden; }
+details.sect > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  padding: 14px 18px; font-weight: 600; font-size: 16px;
+  display: flex; align-items: center; gap: 9px;
+}
+details.sect > summary::-webkit-details-marker { display: none; }
+details.sect > summary::before {
+  content: "›"; font-size: 19px; line-height: 1; color: var(--muted);
+  transition: transform .15s ease; display: inline-block;
+}
+details.sect[open] > summary::before { transform: rotate(90deg); }
+details.sect > summary:hover { color: var(--primary); }
+details.sect[open] > summary { border-bottom: 1px solid var(--border); }
+details.sect > *:not(summary) { margin-left: 18px; margin-right: 18px; }
+details.sect > *:first-of-type:not(summary) { margin-top: 14px; }
+details.sect > *:last-child:not(summary) { margin-bottom: 16px; }
+.sect-tools { display: flex; gap: 10px; margin: 4px 0 14px; font-size: 13px; }
+.sect-tools a { color: var(--muted); text-decoration: underline; cursor: pointer; }
+.sect-tools a:hover { color: var(--text); }
+
 /* Klapp-Menue. Auf Desktop-Breite sind Checkbox und Schalter unsichtbar und
    ohne Wirkung; die Nav steht dauerhaft offen.
    Die Checkbox wird bewusst mehrfach abgesichert (appearance, clip, opacity):

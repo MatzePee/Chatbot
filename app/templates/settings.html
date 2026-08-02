@@ -27,18 +27,25 @@
   {% endif %}
 </div>
 
+<div class="sect-tools">
+  <a id="sect-all">alle aufklappen</a><span class="muted">·</span>
+  <a id="sect-none">alle zuklappen</a>
+</div>
+
 <form method="post" action="/settings">
-  <div class="card">
-    <h3>Fanvue OAuth</h3>
+
+  <h2 class="grp">Verbindung &amp; Schlüssel</h2>
+  <p class="muted grp-desc">Zugangsdaten für Fanvue, OpenRouter und die Bildanalyse.</p>
+  <details class="card sect" open>
+    <summary>Fanvue OAuth</summary>
     <label>Client-ID <input name="fanvue_client_id" value="{{ s['fanvue_client_id'] }}"></label>
     <label>Client-Secret <input name="fanvue_client_secret" type="password" value="{{ s['fanvue_client_secret'] }}"></label>
     <label>Redirect-URI (exakt in Fanvue-App hinterlegen)
       <input name="fanvue_redirect_uri" value="{{ s['fanvue_redirect_uri'] }}"></label>
     <label>API-Version <input name="fanvue_api_version" value="{{ s['fanvue_api_version'] }}"></label>
-  </div>
-
-  <div class="card">
-    <h3>OpenRouter</h3>
+  </details>
+  <details class="card sect">
+    <summary>OpenRouter</summary>
     <label>API-Key <input name="openrouter_api_key" type="password" value="{{ s['openrouter_api_key'] }}"></label>
     <label>Chat-Modell (Antworten) <span class="info" tabindex="0" data-tip="Das Hauptmodell für die normalen Chat-Antworten. Hier gehört dein unzensiertes Modell hin.">ⓘ</span>
       <input name="openrouter_model" value="{{ s['openrouter_model'] }}"
@@ -56,10 +63,9 @@
       <label>Neuversuche bei leerer Antwort <span class="info" tabindex="0" data-tip="Liefert das Modell eine leere Antwort (kommt bei Reasoning-Modellen vor), wird bis zu so oft neu generiert. Erst wenn alle Versuche leer bleiben, landet der Entwurf zur manuellen Freigabe. Standard 3.">ⓘ</span> <input name="generation_retries" type="number" min="1" max="10" value="{{ s['generation_retries'] }}"></label>
       <label>Pause zwischen Neuversuchen (s) <span class="info" tabindex="0" data-tip="Wartezeit zwischen den Neuversuchen bei leerer Antwort. Gilt nur im automatischen Hintergrundbetrieb – beim manuellen „Neu generieren\" und im Test-Modus wird nicht gewartet. Standard 60.">ⓘ</span> <input name="generation_retry_delay" type="number" min="0" max="600" value="{{ s['generation_retry_delay'] }}"></label>
     </div>
-  </div>
-
-  <div class="card">
-    <h3>Bildanalyse (separates Vision-LLM)</h3>
+  </details>
+  <details class="card sect">
+    <summary>Bildanalyse (separates Vision-LLM)</summary>
     <p class="muted">Eigenes multimodales Modell für die PPV-Tag-Analyse. Der API-Key ist optional –
     bleibt er leer, wird der OpenRouter-Key von oben verwendet.</p>
     <label>Vision-Modell
@@ -70,140 +76,16 @@
         placeholder="leer = OpenRouter-Key von oben"></label>
     <label>Analyse-Prompt (Tags aus Bild)
       <textarea name="vision_prompt" rows="2">{{ s['vision_prompt'] }}</textarea></label>
-  </div>
+  </details>
 
-  <div class="card">
-    <h3>Eingehende Fan-Bilder</h3>
-    <p class="muted small">Ein <em>normales</em> Fan-Bild wird <strong>nicht</strong> als Kaufsignal gewertet
-    (kein automatisches PPV). Stattdessen analysiert das Vision-LLM das Bild und der Bot geht im Chat
-    natürlich darauf ein. <strong>Ausnahme 1:</strong> Ist eine (angezogene) Frau zu sehen, kann der Bot
-    nicht wissen, ob das die Creatorin selbst ist – dann antwortet er bewusst vorsichtig/ausweichend.
-    <strong>Ausnahme 2:</strong> Ein <strong>explizites</strong> Bild (nackte Frau oder Penis) gilt als
-    Kaufsignal und löst – wenn ein passendes Set verfügbar ist – ein PPV aus.</p>
-    <label class="chk"><input type="checkbox" name="incoming_image_enabled" {% if s['incoming_image_enabled'] %}checked{% endif %}> Fan-Bilder analysieren und darauf eingehen</label>
-    <label>Reaktions-Prompt (normales Bild) <span class="info" tabindex="0" data-tip="Wird an den System-Prompt angehängt, wenn der Fan ein Bild OHNE erkennbare Frau schickt. Der Platzhalter {beschreibung} wird durch die automatische Bildbeschreibung ersetzt.">ⓘ</span>
-      <textarea name="incoming_image_react_prompt" rows="3">{{ s['incoming_image_react_prompt'] }}</textarea></label>
-    <label>Vorsichts-Prompt (Frau im Bild) <span class="info" tabindex="0" data-tip="Wird angehängt, wenn eine Frau im Bild erkannt wird oder das Bild nicht analysiert werden konnte. Der Bot bestätigt/verneint dann NICHT, ob er das ist, und bleibt ausweichend.">ⓘ</span>
-      <textarea name="incoming_image_woman_prompt" rows="3">{{ s['incoming_image_woman_prompt'] }}</textarea></label>
-  </div>
-
-  <div class="card">
-    <h3>Trinkgeld-Dank</h3>
-    <label class="chk"><input type="checkbox" name="tip_thanks_enabled" {% if s['tip_thanks_enabled'] %}checked{% endif %}> Bei einem Trinkgeld automatisch bedanken <span class="info" tabindex="0" data-tip="Erkennt Trinkgelder (Fanvue-Nachrichten vom Typ TIP) und lässt den Bot sich dafür bedanken – ohne Verkauf oder Gegenfrage. Der Betrag wird, falls verfügbar, mit einbezogen.">ⓘ</span></label>
-    <label>Dank-Prompt (Stil der Trinkgeld-Antwort)
-      <textarea name="tip_thanks_prompt" rows="2">{{ s['tip_thanks_prompt'] }}</textarea></label>
-  </div>
-
-  <div class="card">
-    <h3>Persona / System-Prompt</h3>
+  <h2 class="grp">Persona &amp; Antwortverhalten</h2>
+  <p class="muted grp-desc">Wer die Persona ist, wie und wann sie antwortet.</p>
+  <details class="card sect">
+    <summary>Persona / System-Prompt</summary>
     <textarea name="system_prompt" rows="5">{{ s['system_prompt'] }}</textarea>
-  </div>
-
-  <div class="card">
-    <h3>Updates</h3>
-    <p class="muted">Prüft regelmäßig, ob im Repository eine neue Version (Git-Tag <code>vX.Y.Z</code>)
-    veröffentlicht wurde. Installiert wird nur auf Knopfdruck über das Dashboard – nie von selbst.</p>
-    <div class="row">
-      <label class="chk"><input type="checkbox" name="update_check_enabled"
-        {% if s['update_check_enabled'] %}checked{% endif %}> Automatisch nach Updates sehen</label>
-      <label class="chk"><input type="checkbox" name="update_notify_telegram"
-        {% if s['update_notify_telegram'] %}checked{% endif %}> Neue Version per Telegram melden</label>
-      <label>Prüfabstand (Stunden)
-        <input name="update_check_interval_hours" type="number" min="1" max="168"
-          value="{{ s['update_check_interval_hours'] }}"></label>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>Telegram-Benachrichtigung</h3>
-    <p class="muted">Meldet sofort, wenn ein Entwurf endgültig hängt – also alle automatischen
-    Neuversuche aufgebraucht sind und ohne dich nichts mehr passiert. Jeder Entwurf wird
-    genau einmal gemeldet.</p>
-    <details style="margin-bottom:10px">
-      <summary class="muted" style="cursor:pointer">Einrichtung in 3 Schritten</summary>
-      <ol class="muted" style="font-size:13px;line-height:1.7;margin:8px 0 0 0">
-        <li>In Telegram <code>@BotFather</code> anschreiben, <code>/newbot</code> senden,
-            Namen vergeben → du bekommst ein Token.</li>
-        <li>Token unten eintragen. Dann deinen <em>eigenen neuen Bot</em> in Telegram suchen
-            und ihm einmal kurz „hallo“ schreiben (vorher darf er dir nicht antworten).</li>
-        <li>Auf „Chat-ID ermitteln“ klicken, danach „Testnachricht senden“.</li>
-      </ol>
-    </details>
-    <div class="row">
-      <label class="chk"><input type="checkbox" name="telegram_enabled"
-        {% if s['telegram_enabled'] %}checked{% endif %}> Benachrichtigungen aktiv</label>
-      <label>Chat-ID <input name="telegram_chat_id" value="{{ s['telegram_chat_id'] }}"
-        placeholder="wird unten ermittelt"></label>
-    </div>
-    <label>Bot-Token (von @BotFather)
-      <input name="telegram_bot_token" type="password" value="{{ s['telegram_bot_token'] }}"
-        placeholder="123456789:ABCdef..."></label>
-    <label>Basis-URL dieser Oberfläche (für den Link in der Meldung)
-      <input name="app_base_url" value="{{ s['app_base_url'] }}"
-        placeholder="http://192.168.20.16:8000"></label>
-    <div class="draft-actions" style="margin-top:8px">
-      <button type="button" class="btn" id="tg-chatid">🔎 Chat-ID ermitteln</button>
-      <button type="button" class="btn" id="tg-test">📨 Testnachricht senden</button>
-    </div>
-    <p id="tg-out" class="muted" style="margin-top:8px"></p>
-  </div>
-
-  <script>
-  (function () {
-    var out = document.getElementById('tg-out');
-    if (!out) return;
-    function post(url, extra) {
-      var body = new URLSearchParams(Object.assign({
-        token: document.querySelector('[name=telegram_bot_token]').value
-      }, extra || {}));
-      out.textContent = 'Verbinde mit Telegram…';
-      return fetch(url, {method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
-        .then(function (r) { return r.json(); })
-        .catch(function (e) { return {ok: false, msg: 'Fehler: ' + e}; });
-    }
-    document.getElementById('tg-chatid').addEventListener('click', function () {
-      post('/settings/telegram-chatid').then(function (d) {
-        if (d.ok && d.chat_id) {
-          document.querySelector('[name=telegram_chat_id]').value = d.chat_id;
-          out.textContent = '✅ ' + d.msg + ' – Chat-ID eingetragen. Nicht vergessen zu speichern.';
-        } else { out.textContent = '⚠ ' + d.msg; }
-      });
-    });
-    document.getElementById('tg-test').addEventListener('click', function () {
-      post('/settings/telegram-test',
-           {chat_id: document.querySelector('[name=telegram_chat_id]').value})
-        .then(function (d) { out.textContent = (d.ok ? '✅ ' : '⚠ ') + d.msg; });
-    });
-  })();
-  </script>
-
-  <div class="card">
-    <h3>Freigabe-Queue: Selbstheilung</h3>
-    <p class="muted">Prüft wartende Entwürfe regelmäßig und direkt vor dem Senden: Hat der Fan
-    inzwischen weitergeschrieben, wird der Entwurf mit dem vollständigen neuen Verlauf neu
-    erzeugt. Entwürfe ohne Text, mit fremden Schriftzeichen oder mit einer Modell-Weigerung
-    werden ebenfalls automatisch wiederholt. <strong>Manuell bearbeitete Entwürfe werden nie
-    überschrieben</strong> – dort erscheint nur ein Hinweis.</p>
-    <div class="row">
-      <label class="chk"><input type="checkbox" name="draft_recheck_enabled"
-        {% if s['draft_recheck_enabled'] %}checked{% endif %}> Prüfung aktiv</label>
-      <label class="chk"><input type="checkbox" name="draft_regen_on_stale"
-        {% if s['draft_regen_on_stale'] %}checked{% endif %}> Veraltete automatisch neu erzeugen</label>
-      <label>Prüfabstand (s)
-        <input name="draft_recheck_interval_seconds" type="number" min="30"
-          value="{{ s['draft_recheck_interval_seconds'] }}"></label>
-      <label>Max. Neuversuche
-        <input name="draft_max_regen" type="number" min="0" max="50"
-          value="{{ s['draft_max_regen'] }}"></label>
-    </div>
-    <p class="muted">Der Prüfabstand wird pro Entwurf gezählt, nicht global – der Poll-Intervall
-    muss also kleiner sein, damit er greift. Eskalations-Stichwörter lösen bewusst nie eine
-    automatische Neugenerierung aus.</p>
-  </div>
-
-  <div class="card">
-    <h3>Zeit &amp; Tagesrhythmus</h3>
+  </details>
+  <details class="card sect">
+    <summary>Zeit &amp; Tagesrhythmus</summary>
     <p class="muted">Ohne diesen Block bekommt das Modell keinerlei Zeitinformation und
     rät die Tageszeit – daher „ich geh ins Bett“ um 10 Uhr morgens. Der Tagesrhythmus wird
     im Code ausgewertet; das Modell bekommt die aktuelle Tätigkeit als fertigen Fakt.</p>
@@ -242,37 +124,40 @@
     </div>
     <pre id="tc-out" class="muted" style="white-space:pre-wrap;background:rgba(127,127,127,.10);
       padding:10px;border-radius:6px;font-size:12.5px;margin-top:6px">Noch nicht geladen.</pre>
-  </div>
+  </details>
+  <details class="card sect">
+    <summary>Anti-AI (natürlichere Antworten)</summary>
+    <label class="chk"><input type="checkbox" name="anti_ai_enabled" {% if s['anti_ai_enabled'] %}checked{% endif %}> Aktiv – verhindert Wiederholung von Kosenamen/Namen &amp; wirkt menschlicher</label>
+    <label>Kosenamen / Namen, die nicht wiederholt werden sollen (kommagetrennt)
+      <input name="anti_ai_petnames" value="{{ s['anti_ai_petnames'] }}"></label>
+    <label>Verhaltens-Regeln (an den System-Prompt angehängt)
+      <textarea name="anti_ai_rules" rows="3">{{ s['anti_ai_rules'] }}</textarea></label>
+  </details>
+  <details class="card sect">
+    <summary>Eingehende Fan-Bilder</summary>
+    <p class="muted small">Ein <em>normales</em> Fan-Bild wird <strong>nicht</strong> als Kaufsignal gewertet
+    (kein automatisches PPV). Stattdessen analysiert das Vision-LLM das Bild und der Bot geht im Chat
+    natürlich darauf ein. <strong>Ausnahme 1:</strong> Ist eine (angezogene) Frau zu sehen, kann der Bot
+    nicht wissen, ob das die Creatorin selbst ist – dann antwortet er bewusst vorsichtig/ausweichend.
+    <strong>Ausnahme 2:</strong> Ein <strong>explizites</strong> Bild (nackte Frau oder Penis) gilt als
+    Kaufsignal und löst – wenn ein passendes Set verfügbar ist – ein PPV aus.</p>
+    <label class="chk"><input type="checkbox" name="incoming_image_enabled" {% if s['incoming_image_enabled'] %}checked{% endif %}> Fan-Bilder analysieren und darauf eingehen</label>
+    <label>Reaktions-Prompt (normales Bild) <span class="info" tabindex="0" data-tip="Wird an den System-Prompt angehängt, wenn der Fan ein Bild OHNE erkennbare Frau schickt. Der Platzhalter {beschreibung} wird durch die automatische Bildbeschreibung ersetzt.">ⓘ</span>
+      <textarea name="incoming_image_react_prompt" rows="3">{{ s['incoming_image_react_prompt'] }}</textarea></label>
+    <label>Vorsichts-Prompt (Frau im Bild) <span class="info" tabindex="0" data-tip="Wird angehängt, wenn eine Frau im Bild erkannt wird oder das Bild nicht analysiert werden konnte. Der Bot bestätigt/verneint dann NICHT, ob er das ist, und bleibt ausweichend.">ⓘ</span>
+      <textarea name="incoming_image_woman_prompt" rows="3">{{ s['incoming_image_woman_prompt'] }}</textarea></label>
+  </details>
+  <details class="card sect">
+    <summary>Trinkgeld-Dank</summary>
+    <label class="chk"><input type="checkbox" name="tip_thanks_enabled" {% if s['tip_thanks_enabled'] %}checked{% endif %}> Bei einem Trinkgeld automatisch bedanken <span class="info" tabindex="0" data-tip="Erkennt Trinkgelder (Fanvue-Nachrichten vom Typ TIP) und lässt den Bot sich dafür bedanken – ohne Verkauf oder Gegenfrage. Der Betrag wird, falls verfügbar, mit einbezogen.">ⓘ</span></label>
+    <label>Dank-Prompt (Stil der Trinkgeld-Antwort)
+      <textarea name="tip_thanks_prompt" rows="2">{{ s['tip_thanks_prompt'] }}</textarea></label>
+  </details>
 
-  <script>
-  (function () {
-    var out = document.getElementById('tc-out');
-    if (!out) return;
-    function load() {
-      // Vorschau nutzt den GESPEICHERTEN Stand -> ungespeicherte Änderungen
-      // im Textfeld werden mitgeschickt, damit man vor dem Speichern testen kann.
-      var body = new URLSearchParams({
-        schedule: document.querySelector('[name=persona_schedule]').value,
-        timezone: document.querySelector('[name=persona_timezone]').value,
-        weekday: document.getElementById('tc-weekday').value,
-        time: document.getElementById('tc-time').value
-      });
-      out.textContent = 'Lade…';
-      fetch('/settings/time-preview', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body
-      }).then(function (r) { return r.json(); })
-        .then(function (d) { out.textContent = d.block || d.error || '(leer)'; })
-        .catch(function (e) { out.textContent = 'Fehler: ' + e; });
-    }
-    document.getElementById('tc-btn').addEventListener('click', load);
-    load();
-  })();
-  </script>
-
-  <div class="card">
-    <h3>Betrieb (allgemein)</h3>
+  <h2 class="grp">Betrieb</h2>
+  <p class="muted grp-desc">Takt, Chat-Gruppen und die Pflege der Freigabe-Queue.</p>
+  <details class="card sect">
+    <summary>Betrieb (allgemein)</summary>
     <div class="row">
       <label>Standard-Modus
         <select name="mode">
@@ -318,10 +203,9 @@
       <label>Start (Std) <input name="active_hour_start" type="number" min="0" max="23" value="{{ s['active_hour_start'] }}"></label>
       <label>Ende (Std) <input name="active_hour_end" type="number" min="0" max="23" value="{{ s['active_hour_end'] }}"></label>
     </div>
-  </div>
-
-  <div class="card">
-    <h3>Prio 1 – aktive Fans (schnell)</h3>
+  </details>
+  <details class="card sect">
+    <summary>Prio 1 – aktive Fans (schnell)</summary>
     <p class="muted small">Diese Gruppe wird im normalen Poll-Intervall (oben) bearbeitet – für aktive Käufer, die schnelle Antworten bekommen sollen.</p>
     <div class="row">
       <label>Prio-1-Gruppe – Fanvue-Liste <span class="info" tabindex="0" data-tip="Diese Fans werden schnell/häufig bearbeitet (Poll-Intervall in „Betrieb (allgemein)"). Für aktive Käufer.">ⓘ</span>
@@ -340,10 +224,9 @@
     {% elif not custom_lists %}
     <p class="muted">Keine eigenen Listen in Fanvue gefunden.</p>
     {% endif %}
-  </div>
-
-  <div class="card">
-    <h3>Prio 2 – Nur-Chatter (spart Tokens)</h3>
+  </details>
+  <details class="card sect">
+    <summary>Prio 2 – Nur-Chatter (spart Tokens)</summary>
     <p class="muted small">Diese Gruppe wird seltener bearbeitet (eigenes Intervall + Zufalls-Delay). Wer in Prio 1 UND Prio 2 ist, wird als Prio 1 behandelt.</p>
     <div class="row">
       <label>Prio-2-Gruppe – Fanvue-Liste <span class="info" tabindex="0" data-tip="Diese Fans werden seltener bearbeitet (Intervall + Zufalls-Delay unten). Für Nur-Chatter, um Tokens zu sparen. Wer in Prio 1 UND Prio 2 ist, wird als Prio 1 behandelt.">ⓘ</span>
@@ -359,19 +242,35 @@
       <label>Prio-2-Intervall (Min) <span class="info" tabindex="0" data-tip="Wie oft die Prio-2-Gruppe bearbeitet wird. Standard 30 Minuten.">ⓘ</span> <input name="prio2_interval_minutes" type="number" min="1" value="{{ s['prio2_interval_minutes'] }}"></label>
       <label>Prio-2 Zusatz-Delay bis (Min) <span class="info" tabindex="0" data-tip="Zusätzlicher Zufalls-Delay von 1 bis X Minuten nach jedem Prio-2-Lauf. Wirkt menschlicher und streut die Last. Standard 30.">ⓘ</span> <input name="prio2_jitter_minutes" type="number" min="1" value="{{ s['prio2_jitter_minutes'] }}"></label>
     </div>
-  </div>
+  </details>
+  <details class="card sect">
+    <summary>Freigabe-Queue: Selbstheilung</summary>
+    <p class="muted">Prüft wartende Entwürfe regelmäßig und direkt vor dem Senden: Hat der Fan
+    inzwischen weitergeschrieben, wird der Entwurf mit dem vollständigen neuen Verlauf neu
+    erzeugt. Entwürfe ohne Text, mit fremden Schriftzeichen oder mit einer Modell-Weigerung
+    werden ebenfalls automatisch wiederholt. <strong>Manuell bearbeitete Entwürfe werden nie
+    überschrieben</strong> – dort erscheint nur ein Hinweis.</p>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="draft_recheck_enabled"
+        {% if s['draft_recheck_enabled'] %}checked{% endif %}> Prüfung aktiv</label>
+      <label class="chk"><input type="checkbox" name="draft_regen_on_stale"
+        {% if s['draft_regen_on_stale'] %}checked{% endif %}> Veraltete automatisch neu erzeugen</label>
+      <label>Prüfabstand (s)
+        <input name="draft_recheck_interval_seconds" type="number" min="30"
+          value="{{ s['draft_recheck_interval_seconds'] }}"></label>
+      <label>Max. Neuversuche
+        <input name="draft_max_regen" type="number" min="0" max="50"
+          value="{{ s['draft_max_regen'] }}"></label>
+    </div>
+    <p class="muted">Der Prüfabstand wird pro Entwurf gezählt, nicht global – der Poll-Intervall
+    muss also kleiner sein, damit er greift. Eskalations-Stichwörter lösen bewusst nie eine
+    automatische Neugenerierung aus.</p>
+  </details>
 
-  <div class="card">
-    <h3>Guardrails</h3>
-    <label>Max. Zeichen pro Antwort <input name="max_reply_chars" type="number" value="{{ s['max_reply_chars'] }}"></label>
-    <label>Verbotene Wörter (kommagetrennt, blockt Auto-Send)
-      <input name="banned_words" value="{{ s['banned_words'] }}"></label>
-    <label>Eskalations-Stichworte (kommagetrennt; Fan-Nachricht → nur Freigabe, kein Auto)
-      <input name="escalation_keywords" value="{{ s['escalation_keywords'] }}"></label>
-  </div>
-
-  <div class="card">
-    <h3>PPV Auto-Selling</h3>
+  <h2 class="grp">Verkauf</h2>
+  <p class="muted grp-desc">Automatisches PPV-Anbieten und das Zurückholen stiller Fans.</p>
+  <details class="card sect">
+    <summary>PPV Auto-Selling</summary>
     <div class="row">
       <label class="chk"><input type="checkbox" name="ppv_enabled" {% if s['ppv_enabled'] %}checked{% endif %}> PPV-Engine aktiv (bietet automatisch Sets an)</label>
       <label class="chk"><input type="checkbox" name="ppv_use_llm_classifier" {% if s['ppv_use_llm_classifier'] %}checked{% endif %}> Intent per LLM bewerten</label>
@@ -407,19 +306,9 @@
       <textarea name="ppv_sales_prompt" rows="4">{{ s['ppv_sales_prompt'] }}</textarea></label>
     <label>Gratis-Umleitung (System-Prompt)
       <textarea name="ppv_freecontent_prompt" rows="3">{{ s['ppv_freecontent_prompt'] }}</textarea></label>
-  </div>
-
-  <div class="card">
-    <h3>Anti-AI (natürlichere Antworten)</h3>
-    <label class="chk"><input type="checkbox" name="anti_ai_enabled" {% if s['anti_ai_enabled'] %}checked{% endif %}> Aktiv – verhindert Wiederholung von Kosenamen/Namen &amp; wirkt menschlicher</label>
-    <label>Kosenamen / Namen, die nicht wiederholt werden sollen (kommagetrennt)
-      <input name="anti_ai_petnames" value="{{ s['anti_ai_petnames'] }}"></label>
-    <label>Verhaltens-Regeln (an den System-Prompt angehängt)
-      <textarea name="anti_ai_rules" rows="3">{{ s['anti_ai_rules'] }}</textarea></label>
-  </div>
-
-  <div class="card">
-    <h3>Proaktive Reaktivierung stiller Fans</h3>
+  </details>
+  <details class="card sect">
+    <summary>Proaktive Reaktivierung stiller Fans</summary>
     <label class="chk"><input type="checkbox" name="reactivation_enabled" {% if s['reactivation_enabled'] %}checked{% endif %}> Aktiv – schreibt inaktive Fans automatisch wieder an</label>
     <div class="row">
       <label>Inaktiv ab (Stunden) <span class="info" tabindex="0" data-tip="Ab wie vielen Stunden ohne Fan-Nachricht eine Reaktivierung ausgelöst wird. Standard 14.">ⓘ</span> <input name="reactivation_inactive_hours" type="number" min="1" value="{{ s['reactivation_inactive_hours'] }}"></label>
@@ -435,8 +324,151 @@
     <label>Reaktivierungs-Prompt
       <textarea name="reactivation_prompt" rows="3">{{ s['reactivation_prompt'] }}</textarea></label>
     <p class="muted small">Reaktivierungen knüpfen an euer letztes Chat-Thema an (persönlich), laufen im gewählten Modus (Freigabe/Auto) und respektieren die aktiven Zeiten. Im Auto-Modus wird zufällig 15–45 Min (einstellbar) gewartet; bei „Freigabe" landen sie sofort in der Queue.</p>
-  </div>
+  </details>
+
+  <h2 class="grp">Sicherheit</h2>
+  <p class="muted grp-desc">Was den Bot bremst, bevor etwas Falsches rausgeht.</p>
+  <details class="card sect">
+    <summary>Guardrails</summary>
+    <label>Max. Zeichen pro Antwort <input name="max_reply_chars" type="number" value="{{ s['max_reply_chars'] }}"></label>
+    <label>Verbotene Wörter (kommagetrennt, blockt Auto-Send)
+      <input name="banned_words" value="{{ s['banned_words'] }}"></label>
+    <label>Eskalations-Stichworte (kommagetrennt; Fan-Nachricht → nur Freigabe, kein Auto)
+      <input name="escalation_keywords" value="{{ s['escalation_keywords'] }}"></label>
+  </details>
+
+  <h2 class="grp">Benachrichtigungen &amp; Updates</h2>
+  <p class="muted grp-desc">Meldungen per Telegram und neue Programmversionen.</p>
+  <details class="card sect">
+    <summary>Telegram-Benachrichtigung</summary>
+    <p class="muted">Meldet sofort, wenn ein Entwurf endgültig hängt – also alle automatischen
+    Neuversuche aufgebraucht sind und ohne dich nichts mehr passiert. Jeder Entwurf wird
+    genau einmal gemeldet.</p>
+    <details style="margin-bottom:10px">
+      <summary class="muted" style="cursor:pointer">Einrichtung in 3 Schritten</summary>
+      <ol class="muted" style="font-size:13px;line-height:1.7;margin:8px 0 0 0">
+        <li>In Telegram <code>@BotFather</code> anschreiben, <code>/newbot</code> senden,
+            Namen vergeben → du bekommst ein Token.</li>
+        <li>Token unten eintragen. Dann deinen <em>eigenen neuen Bot</em> in Telegram suchen
+            und ihm einmal kurz „hallo“ schreiben (vorher darf er dir nicht antworten).</li>
+        <li>Auf „Chat-ID ermitteln“ klicken, danach „Testnachricht senden“.</li>
+      </ol>
+    </details>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="telegram_enabled"
+        {% if s['telegram_enabled'] %}checked{% endif %}> Benachrichtigungen aktiv</label>
+      <label>Chat-ID <input name="telegram_chat_id" value="{{ s['telegram_chat_id'] }}"
+        placeholder="wird unten ermittelt"></label>
+    </div>
+    <label>Bot-Token (von @BotFather)
+      <input name="telegram_bot_token" type="password" value="{{ s['telegram_bot_token'] }}"
+        placeholder="123456789:ABCdef..."></label>
+    <label>Basis-URL dieser Oberfläche (für den Link in der Meldung)
+      <input name="app_base_url" value="{{ s['app_base_url'] }}"
+        placeholder="http://192.168.20.16:8000"></label>
+    <div class="draft-actions" style="margin-top:8px">
+      <button type="button" class="btn" id="tg-chatid">🔎 Chat-ID ermitteln</button>
+      <button type="button" class="btn" id="tg-test">📨 Testnachricht senden</button>
+    </div>
+    <p id="tg-out" class="muted" style="margin-top:8px"></p>
+  </details>
+  <details class="card sect">
+    <summary>Updates</summary>
+    <p class="muted">Prüft regelmäßig, ob im Repository eine neue Version (Git-Tag <code>vX.Y.Z</code>)
+    veröffentlicht wurde. Installiert wird nur auf Knopfdruck über das Dashboard – nie von selbst.</p>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="update_check_enabled"
+        {% if s['update_check_enabled'] %}checked{% endif %}> Automatisch nach Updates sehen</label>
+      <label class="chk"><input type="checkbox" name="update_notify_telegram"
+        {% if s['update_notify_telegram'] %}checked{% endif %}> Neue Version per Telegram melden</label>
+      <label>Prüfabstand (Stunden)
+        <input name="update_check_interval_hours" type="number" min="1" max="168"
+          value="{{ s['update_check_interval_hours'] }}"></label>
+    </div>
+  </details>
+  <script>
+  (function () {
+    var out = document.getElementById('tg-out');
+    if (!out) return;
+    function post(url, extra) {
+      var body = new URLSearchParams(Object.assign({
+        token: document.querySelector('[name=telegram_bot_token]').value
+      }, extra || {}));
+      out.textContent = 'Verbinde mit Telegram…';
+      return fetch(url, {method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+        .then(function (r) { return r.json(); })
+        .catch(function (e) { return {ok: false, msg: 'Fehler: ' + e}; });
+    }
+    document.getElementById('tg-chatid').addEventListener('click', function () {
+      post('/settings/telegram-chatid').then(function (d) {
+        if (d.ok && d.chat_id) {
+          document.querySelector('[name=telegram_chat_id]').value = d.chat_id;
+          out.textContent = '✅ ' + d.msg + ' – Chat-ID eingetragen. Nicht vergessen zu speichern.';
+        } else { out.textContent = '⚠ ' + d.msg; }
+      });
+    });
+    document.getElementById('tg-test').addEventListener('click', function () {
+      post('/settings/telegram-test',
+           {chat_id: document.querySelector('[name=telegram_chat_id]').value})
+        .then(function (d) { out.textContent = (d.ok ? '✅ ' : '⚠ ') + d.msg; });
+    });
+  })();
+  </script>
+  <script>
+  (function () {
+    var out = document.getElementById('tc-out');
+    if (!out) return;
+    function load() {
+      // Vorschau nutzt den GESPEICHERTEN Stand -> ungespeicherte Änderungen
+      // im Textfeld werden mitgeschickt, damit man vor dem Speichern testen kann.
+      var body = new URLSearchParams({
+        schedule: document.querySelector('[name=persona_schedule]').value,
+        timezone: document.querySelector('[name=persona_timezone]').value,
+        weekday: document.getElementById('tc-weekday').value,
+        time: document.getElementById('tc-time').value
+      });
+      out.textContent = 'Lade…';
+      fetch('/settings/time-preview', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body
+      }).then(function (r) { return r.json(); })
+        .then(function (d) { out.textContent = d.block || d.error || '(leer)'; })
+        .catch(function (e) { out.textContent = 'Fehler: ' + e; });
+    }
+    document.getElementById('tc-btn').addEventListener('click', load);
+    load();
+  })();
+  </script>
 
   <button class="btn-primary big">Alle Einstellungen speichern</button>
 </form>
+
+<h2 class="grp">Veröffentlichen</h2>
+<p class="muted grp-desc">Den aktuellen Programmstand nach GitHub hochladen.</p>
+<div class="card">
+  <p class="muted" style="margin-top:0">Zeigt die geänderten Dateien, lässt die Versionsnummer
+  festlegen und lädt auf Knopfdruck hoch. Prüft vorher, dass keine Zugangsdaten und keine
+  Datenbank mitgehen.</p>
+  <a class="btn-primary" href="/upload">⬆ Zur Upload-Seite</a>
+</div>
+
+<script>
+(function () {
+  var sects = document.querySelectorAll('details.sect');
+  function setAll(v) { sects.forEach(function (d) { d.open = v; }); }
+  document.getElementById('sect-all').addEventListener('click', function (e) { e.preventDefault(); setAll(true); });
+  document.getElementById('sect-none').addEventListener('click', function (e) { e.preventDefault(); setAll(false); });
+
+  // Abschnitt mit einem Treffer aufklappen, wenn per #anker verlinkt wird,
+  // und beim Absenden alles öffnen – sonst sieht man nach einem Fehler nicht,
+  // in welchem zugeklappten Abschnitt das betroffene Feld steckt.
+  var form = document.querySelector('form[action="/settings"]');
+  if (form) form.addEventListener('invalid', function (e) {
+    var d = e.target.closest('details.sect');
+    if (d) d.open = true;
+  }, true);
+})();
+</script>
 {% endblock %}
