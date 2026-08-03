@@ -1130,10 +1130,29 @@ def regenerate_draft(draft_id: int, reason: str = "", interactive: bool = False)
     if not _draft_is_edited(draft):
         fields["edited_text"] = clean_text
 
-    # Wieder sauber und im Auto-Modus? Dann normal mit Verzoegerung einplanen.
-    if ok and draft["auto_send"]:
+    # Auto-Send NEU bewerten statt den alten Wert zu uebernehmen.
+    #
+    # Grund: Schlaegt bei der ERSTgenerierung ein Guardrail an, wird auto_send
+    # auf 0 gesetzt. Wuerde man das hier nur fortschreiben, bliebe ein Entwurf
+    # dauerhaft in der Freigabe haengen - auch wenn der zweite Versuch
+    # einwandfrei ist. Ein misslungener erster Anlauf soll die Antwort aber
+    # nicht fuer immer aufhalten.
+    #
+    # Zwei Faelle bleiben bewusst in der Freigabe:
+    #   - Eskalations-Stichwort: braucht menschliche Augen, egal wie sauber
+    #     der Text aussieht.
+    #   - Vom Menschen bearbeitet: wer den Text angefasst hat, will ihn auch
+    #     selbst freigeben.
+    #   - Manuell angestossen: wer in der Queue auf "Neu generieren" klickt,
+    #     sitzt gerade davor und will den Text ansehen, nicht 30 Sekunden
+    #     spaeter ueberrascht werden.
+    escalated = any(k in (draft["guardrail_note"] or "").lower()
+                    for k in _HUMAN_ONLY_NOTES)
+    if (ok and not interactive and _effective_mode(chat) == "auto"
+            and not escalated and not _draft_is_edited(draft)):
         delay_min = int(db.get_setting("send_delay_min_seconds", 20))
         delay_max = int(db.get_setting("send_delay_max_seconds", 90))
+        fields["auto_send"] = 1
         fields["scheduled_send_at"] = now + random.randint(
             min(delay_min, delay_max), max(delay_min, delay_max))
 

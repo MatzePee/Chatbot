@@ -9,7 +9,19 @@ Weboberfläche steuern.
 Auf einem frisch installierten Ubuntu genügt ein Befehl:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh -o /tmp/fanvue-install.sh && sudo bash /tmp/fanvue-install.sh
+```
+
+> Das Skript wird bewusst **erst heruntergeladen und dann ausgeführt**, statt
+> es direkt in `sudo bash` zu leiten. Bei `curl | sudo bash` belegt das Skript
+> selbst die Standardeingabe und `sudo` spannt zusätzlich ein eigenes
+> Pseudo-Terminal auf — die Rückfragen bleiben dann je nach System stehen.
+
+Ganz ohne Rückfragen geht es mit Vorgaben:
+
+```bash
+sudo env SVC_USER=fanvue INSTALL_DIR=/srv/fanvue/Fanvue_Chatbot PORT=8000 \
+  bash /tmp/fanvue-install.sh
 ```
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh -o /tmp/fanvue-install.sh && sudo bash /tmp/fanvue-install.sh

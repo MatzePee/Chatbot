@@ -31,10 +31,26 @@ die()   { echo "  ${R}✗ $*${N}" >&2; exit 1; }
 if (exec 3</dev/tty) 2>/dev/null; then HAS_TTY=1; else HAS_TTY=0; fi
 
 # Fragt am Terminal, sonst auf der Standardeingabe.
+#
+# Jede Frage laesst sich ueber eine Umgebungsvariable vorbelegen und wird dann
+# uebersprungen. Das ist der verlaessliche Weg, wenn kein Terminal zur
+# Verfuegung steht - etwa bei `curl | sudo bash`, wo das Skript selbst ueber
+# die Standardeingabe kommt und sudo zusaetzlich ein eigenes Pseudo-Terminal
+# aufspannt. Dort kann `read` sonst endlos warten.
+#
+# Das Zeitlimit ist die zweite Absicherung: lieber nach 120 Sekunden mit der
+# Vorgabe weitermachen als scheinbar einfrieren.
 ask()   {
-  local p="$1" d="${2:-}" a=""
-  if [ "$HAS_TTY" = "1" ]; then read -r -p "  $p${d:+ [$d]}: " a </dev/tty || true
-  else read -r -p "  $p${d:+ [$d]}: " a || true
+  local p="$1" d="${2:-}" var="${3:-}" a=""
+  if [ -n "$var" ]; then
+    local preset="${!var:-}"
+    if [ -n "$preset" ]; then
+      echo "  $p: $preset  (aus $var)" >&2
+      echo "$preset"; return
+    fi
+  fi
+  if [ "$HAS_TTY" = "1" ]; then read -r -t 120 -p "  $p${d:+ [$d]}: " a </dev/tty || true
+  else read -r -t 120 -p "  $p${d:+ [$d]}: " a || true
   fi
   echo "${a:-$d}"
 }
@@ -54,7 +70,7 @@ if [ -z "$DEFAULT_USER" ] || [ "$DEFAULT_USER" = "root" ]; then
 fi
 echo "  Mit Enter wird der vorhandene Benutzer übernommen (empfohlen)."
 echo "  Ein anderer Name legt einen neuen Systembenutzer an."
-SVC_USER="$(ask "Unter welchem Benutzer soll der Bot laufen?" "$DEFAULT_USER")"
+SVC_USER="$(ask "Unter welchem Benutzer soll der Bot laufen?" "$DEFAULT_USER" SVC_USER)"
 [ "$SVC_USER" = "root" ] && die "Der Bot darf nicht als root laufen. Bitte anderen Benutzer wählen."
 if ! id -u "$SVC_USER" >/dev/null 2>&1; then
   step "Benutzer '$SVC_USER' anlegen"
@@ -78,8 +94,8 @@ else
 fi
 SVC_GROUP="$(id -gn "$SVC_USER" 2>/dev/null || echo "$SVC_USER")"
 
-INSTALL_DIR="$(ask "Installationsverzeichnis" "$INSTALL_DIR_DEFAULT")"
-PORT="$(ask "Port für die Weboberfläche" "$PORT_DEFAULT")"
+INSTALL_DIR="$(ask "Installationsverzeichnis" "$INSTALL_DIR_DEFAULT" INSTALL_DIR)"
+PORT="$(ask "Port für die Weboberfläche" "$PORT_DEFAULT" PORT)"
 
 # --------------------------------------------------------------------- Pakete
 step "Systempakete installieren"
@@ -109,7 +125,7 @@ if [ -f "$SRC_DIR/requirements.txt" ] && [ -d "$SRC_DIR/app" ]; then
 elif [ -d "$INSTALL_DIR/.git" ]; then
   ok "Vorhandenes Git-Repository unter $INSTALL_DIR"
 else
-  REPO_URL="$(ask "Repository-URL" "$REPO_URL_DEFAULT")"
+  REPO_URL="$(ask "Repository-URL" "$REPO_URL_DEFAULT" REPO_URL)"
   mkdir -p "$(dirname "$INSTALL_DIR")"
   echo "  Klone $REPO_URL ..."
   sudo -u "$SVC_USER" git clone --quiet "$REPO_URL" "$INSTALL_DIR" \
@@ -139,9 +155,9 @@ else
   SECRET="$(openssl rand -hex 32 2>/dev/null || head -c32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   echo "  Die Schlüssel lassen sich auch später in der Oberfläche unter"
   echo "  „Einstellungen\" eintragen. Jetzt einfach mit Enter überspringen."
-  FV_ID="$(ask "Fanvue Client-ID (optional)" "")"
-  FV_SECRET="$(ask "Fanvue Client-Secret (optional)" "")"
-  OR_KEY="$(ask "OpenRouter API-Key (optional)" "")"
+  FV_ID="$(ask "Fanvue Client-ID (optional)" "" FANVUE_CLIENT_ID)"
+  FV_SECRET="$(ask "Fanvue Client-Secret (optional)" "" FANVUE_CLIENT_SECRET)"
+  OR_KEY="$(ask "OpenRouter API-Key (optional)" "" OPENROUTER_API_KEY)"
   cat > .env <<EOF
 # Erzeugt von deploy/install.sh am $(date +%Y-%m-%d)
 HOST=0.0.0.0

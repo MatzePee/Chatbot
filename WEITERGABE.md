@@ -102,15 +102,29 @@ ssh -T git@github.com          # einmal bestätigen; "successfully authenticated
 Auf einem **frisch installierten Ubuntu** genügt ein einziger Befehl:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh -o /tmp/fanvue-install.sh && sudo bash /tmp/fanvue-install.sh
 ```
 
 Der Befehl holt das Repository, wählt automatisch die **neueste markierte
-Version** und startet die Installation. Eine bestimmte Version geht auch:
+Version** und startet die Installation.
+
+> Erst herunterladen, dann ausführen — nicht direkt in `sudo bash` leiten.
+> Sonst belegt das Skript selbst die Standardeingabe, `sudo` spannt ein
+> eigenes Pseudo-Terminal auf, und die Rückfragen bleiben je nach System
+> stehen.
+
+Eine bestimmte Version, oder ganz ohne Rückfragen:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh | sudo REF=v1.0.2 bash
+sudo env REF=v1.0.2 bash /tmp/fanvue-install.sh
+
+sudo env SVC_USER=fanvue INSTALL_DIR=/srv/fanvue/Fanvue_Chatbot PORT=8000 \
+  bash /tmp/fanvue-install.sh
 ```
+
+Vorbelegbar sind `SVC_USER`, `INSTALL_DIR`, `PORT`, `REPO_URL`, `REF` sowie
+`FANVUE_CLIENT_ID`, `FANVUE_CLIENT_SECRET` und `OPENROUTER_API_KEY`. Das
+`env` davor ist wichtig — `sudo` filtert Umgebungsvariablen sonst weg.
 
 Das Skript fragt nach Benutzer, Verzeichnis, Port und optional den Schlüsseln
 und richtet dann selbstständig ein:
