@@ -11,6 +11,9 @@ Auf einem frisch installierten Ubuntu genügt ein Befehl:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh | sudo bash
 ```
+```bash
+curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/main/deploy/bootstrap.sh -o /tmp/fanvue-install.sh && sudo bash /tmp/fanvue-install.sh
+```
 
 Das Skript fragt nach Benutzer, Verzeichnis und Port und richtet dann alles
 ein: Systempakete, Dienst-Benutzer, virtuelle Umgebung, `.env` mit zufälligem
