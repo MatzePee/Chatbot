@@ -123,8 +123,12 @@ def _esc(value: Any, limit: int = 200) -> str:
     return html.escape(str(value or "")[:limit])
 
 
-def notify_blocked_draft(draft: Any, max_regen: int) -> bool:
-    """Meldet einen Entwurf, der sich nach allen Neuversuchen nicht repariert hat."""
+def notify_blocked_draft(draft: Any, max_regen: int, grund: str = "") -> bool:
+    """Meldet einen Entwurf, der ohne Zutun nicht mehr weiterkommt.
+
+    grund: warum er festhaengt (Eskalation, verbotenes Wort, Limit erreicht ...).
+    Ohne Angabe wird der klassische Fall 'alle Neuversuche erfolglos' gemeldet.
+    """
     if not db.get_setting("telegram_enabled", False) or not is_configured():
         return False
 
@@ -137,14 +141,19 @@ def notify_blocked_draft(draft: Any, max_regen: int) -> bool:
         waiting = (f"\n⏱ Wartet seit {minutes} Min."
                    if minutes < 120 else f"\n⏱ Wartet seit {minutes // 60} Std.")
 
+    versuche = int(draft["regen_count"] or 0)
     lines = [
         "⚠️ <b>Entwurf hängt in der Freigabe-Queue</b>",
         "",
         f"👤 <b>{_esc(who, 80)}</b>",
-        f"🚫 {_esc(reason, 300)}",
-        f"↻ {max_regen} automatische Neuversuche ohne Erfolg – "
-        f"hier passiert ohne dich nichts mehr.",
+        f"🚫 {_esc(grund or reason, 300)}",
     ]
+    # Guardrail-Notiz nur zusaetzlich zeigen, wenn sie etwas Neues sagt
+    if grund and reason and reason[:40] not in grund:
+        lines.append(f"📝 {_esc(reason, 300)}")
+    if versuche:
+        lines.append(f"↻ {versuche} von {max_regen} automatischen Neuversuchen verbraucht")
+    lines.append("Hier passiert ohne dich nichts mehr.")
     if incoming:
         lines.append(f"\n💬 Fan schrieb: „{_esc(incoming, 300)}“")
     if waiting:

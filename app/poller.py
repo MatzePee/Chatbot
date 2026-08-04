@@ -26,7 +26,11 @@ _status: dict[str, Any] = {"last_poll": None, "last_error": None, "cycles": 0}
 
 # ---------------------------------------------------------------- Hilfsfunktionen
 def status() -> dict[str, Any]:
-    return dict(_status)
+    st = dict(_status)
+    st["alive"] = bool(_thread and _thread.is_alive())
+    last = st.get("last_poll")
+    st["stale_seconds"] = (time.time() - last) if last else None
+    return st
 
 
 def _within_active_hours() -> bool:
@@ -211,10 +215,16 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
             if folder:
                 payload = ppv_engine.build_payload(folder)
                 if payload:
-                    _create_ppv_draft(user_uuid, handle, display_name, incoming_text,
-                                      messages_chrono, me_uuid, system_prompt, fan_notes,
-                                      payload, decision, chat, banned)
-                    db.update_chat(user_uuid, last_inbound_uuid=last_uuid)
+                    # Nur als erledigt markieren, wenn wirklich ein Entwurf entstand.
+                    # Sonst geht die Nachricht bei einem Timeout dauerhaft verloren.
+                    if _create_ppv_draft(user_uuid, handle, display_name, incoming_text,
+                                         messages_chrono, me_uuid, system_prompt, fan_notes,
+                                         payload, decision, chat, banned):
+                        db.update_chat(user_uuid, last_inbound_uuid=last_uuid)
+                    else:
+                        db.log("warn", "generate",
+                               f"PPV-Entwurf für {handle} fehlgeschlagen – "
+                               f"nächster Durchlauf versucht es erneut", "")
                     return
                 db.log("warn", "generate", f"PPV-Set '{folder['name']}' hat keine Medien", "")
             else:
@@ -257,8 +267,13 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
     try:
         generated = _generate(system_prompt, messages_chrono, me_uuid, fan_notes, banned)
     except Exception as exc:  # noqa: BLE001 – nie den ganzen Poll-Zyklus abbrechen
-        db.log("error", "generate", f"Generierung fehlgeschlagen ({handle})", str(exc))
-        db.update_chat(user_uuid, last_inbound_uuid=last_uuid)
+        # BEWUSST OHNE last_inbound_uuid: Die Nachricht darf NICHT als erledigt
+        # gelten. Ein Netzwerk-Timeout ist voruebergehend - wird hier markiert,
+        # bekommt der Fan nie eine Antwort, weil der naechste Durchlauf die
+        # Nachricht fuer bereits verarbeitet haelt.
+        db.log("error", "generate",
+               f"Generierung fehlgeschlagen ({handle}) – wird beim nächsten Durchlauf erneut versucht",
+               str(exc))
         return
 
     clean_text, note = guardrails.check_outgoing(generated, has_media=False)
@@ -390,8 +405,12 @@ def _generate(system_prompt: str, messages_chrono: list, me_uuid: str, fan_notes
 
 def _create_ppv_draft(user_uuid: str, handle: str, display_name: str, incoming_text: str,
                       messages_chrono: list, me_uuid: str, system_prompt: str, fan_notes: str,
-                      payload: dict, decision: dict, chat: Any, banned: list[str] | None = None) -> None:
-    """Erzeugt einen PPV-Entwurf (Verkaufston + Media/Preis/Vorschau)."""
+                      payload: dict, decision: dict, chat: Any,
+                      banned: list[str] | None = None) -> bool:
+    """Erzeugt einen PPV-Entwurf (Verkaufston + Media/Preis/Vorschau).
+
+    Rueckgabe: True, wenn ein Entwurf entstand. Nur dann darf die Nachricht
+    als beantwortet markiert werden."""
     sales_prompt = db.get_setting("ppv_sales_prompt", "")
     content_context = payload.get("tags") or "exklusiver Content"
     media_count = len(payload.get("media_uuids") or [])
@@ -416,7 +435,7 @@ def _create_ppv_draft(user_uuid: str, handle: str, display_name: str, incoming_t
                               task="caption")
     except openrouter.OpenRouterError as exc:
         db.log("error", "generate", f"PPV-Text fehlgeschlagen ({handle})", str(exc))
-        return
+        return False
     # Sicherheitsnetz: 'Set' -> 'PPV' (impliziert faelschlich mehrere Bilder)
     generated = re.sub(r"(?i)\bsets?\b", "PPV", generated)
     clean_text, note = guardrails.check_outgoing(generated, has_media=True)
@@ -444,6 +463,7 @@ def _create_ppv_draft(user_uuid: str, handle: str, display_name: str, incoming_t
     db.log("info", "generate",
            f"PPV-Draft #{draft_id} fuer {handle or user_uuid} ({'auto' if auto else 'freigabe'})",
            decision.get("reason", ""))
+    return True
 
 
 def _detect_purchase(user_uuid: str, messages_chrono: list, me_uuid: str) -> None:
@@ -982,6 +1002,47 @@ _REGENERABLE_NOTES = (
 # Diese Notiz braucht menschliche Augen - nie automatisch neu generieren.
 _HUMAN_ONLY_NOTES = ("eskalations-stichwort",)
 
+# Guardrails, die einen Entwurf blockieren, aber NICHT durch eine
+# Neugenerierung heilbar sind - hier hilft nur Handarbeit.
+_MANUAL_ONLY_NOTES = (
+    "verbotenes wort",
+    "erfundene preisangabe",
+    "kündigt",          # "Kuendigt ... an, es haengt aber kein Content an"
+    "kuendigt",
+)
+
+# Alles, was ueberhaupt eine Blockade darstellt. Notizen wie "PPV · Bildanfrage
+# ..." oder "Reaktivierung" sind dagegen rein informativ - solche Entwuerfe
+# warten normal auf die Freigabe und sind NICHT festgefahren.
+_BLOCKING_NOTES = _REGENERABLE_NOTES + _HUMAN_ONLY_NOTES + _MANUAL_ONLY_NOTES
+
+
+def _stuck_reason(draft: Any, max_regen: int) -> Optional[str]:
+    """Warum kommt dieser Entwurf ohne Zutun nicht mehr weiter?
+
+    Rueckgabe: Klartext-Grund, oder None wenn er sich noch selbst loest bzw.
+    ganz normal auf die Freigabe wartet.
+
+    Wichtig: Die Meldung darf NICHT allein am erreichten Neuversuch-Limit
+    haengen. Blockaden, die gar nicht erst wiederholt werden (Eskalation,
+    verbotenes Wort, erfundener Preis), erreichen dieses Limit nie - und
+    blieben damit fuer immer stumm in der Queue liegen.
+    """
+    note = (draft["guardrail_note"] or "").strip()
+    low = note.lower()
+
+    if any(k in low for k in _HUMAN_ONLY_NOTES):
+        return "Eskalations-Stichwort – wird bewusst nie automatisch beantwortet"
+    if any(k in low for k in _MANUAL_ONLY_NOTES):
+        return note
+    if _is_broken(draft):
+        if (draft["regen_count"] or 0) >= max_regen:
+            return f"{max_regen} automatische Neuversuche ohne Erfolg"
+        return None                      # wird noch wiederholt
+    if any(k in low for k in _BLOCKING_NOTES):
+        return note                      # blockiert, aber nicht wiederholbar
+    return None                          # informative Notiz oder gar keine
+
 
 def _is_broken(draft: Any) -> bool:
     """Draft unsendbar, aber durch Neugenerierung reparierbar?"""
@@ -1230,29 +1291,30 @@ def recheck_pending_cycle() -> None:
             time.sleep(0.4)
             continue
 
-        # --- Fall 2: kaputt (leer / fremde Schrift / Weigerung) ---
-        if broken:
-            if count >= max_regen:
-                db.update_draft(draft_id, last_check_at=time.time())
-                # Genau einmal melden: notified_at ist der Riegel dagegen, dass
-                # derselbe Draft alle 3 Minuten erneut aufs Handy kommt.
-                if not draft["notified_at"]:
-                    db.update_draft(draft_id, notified_at=time.time(),
-                                    error=f"Limit erreicht: {max_regen} Neuversuche ohne Erfolg")
-                    db.log("warn", "generate",
-                           f"Draft #{draft_id} ({handle}): {max_regen} Neuversuche erfolglos – "
-                           f"bitte manuell bearbeiten", draft["guardrail_note"] or "")
-                    try:
-                        notify.notify_blocked_draft(db.get_draft(draft_id), max_regen)
-                    except Exception as exc:  # noqa: BLE001 - nie den Zyklus abbrechen
-                        db.log("error", "notify", "Telegram-Meldung fehlgeschlagen", str(exc))
-                continue
+        # --- Fall 2: reparierbar kaputt -> neuen Versuch starten ---
+        if broken and count < max_regen:
             regenerate_draft(draft_id, reason=f"Auto-Retry: {draft['guardrail_note'] or 'leerer Text'}")
             time.sleep(0.4)
             continue
 
-        # --- Fall 3: alles in Ordnung -> nur Pruefzeit vermerken ---
-        db.update_draft(draft_id, last_check_at=time.time(), stale_note=None)
+        # --- Fall 3: festgefahren? ---
+        # Bewusst NICHT nur bei erreichtem Neuversuch-Limit: Blockaden, die gar
+        # nicht wiederholt werden (Eskalation, verbotenes Wort, erfundener
+        # Preis), erreichen dieses Limit nie und blieben sonst stumm liegen.
+        grund = _stuck_reason(draft, max_regen)
+        db.update_draft(draft_id, last_check_at=time.time(),
+                        **({} if newer else {"stale_note": None}))
+        if grund and not draft["notified_at"]:
+            # Genau einmal melden: notified_at ist der Riegel dagegen, dass
+            # derselbe Draft alle 3 Minuten erneut aufs Handy kommt.
+            db.update_draft(draft_id, notified_at=time.time(), error=grund)
+            db.log("warn", "generate",
+                   f"Draft #{draft_id} ({handle}) hängt fest: {grund}",
+                   draft["guardrail_note"] or "")
+            try:
+                notify.notify_blocked_draft(db.get_draft(draft_id), max_regen, grund)
+            except Exception as exc:  # noqa: BLE001 - nie den Zyklus abbrechen
+                db.log("error", "notify", "Telegram-Meldung fehlgeschlagen", str(exc))
 
 
 # ------------------------------------------------------------- Update-Pruefung
@@ -1303,7 +1365,16 @@ def _notify_update(state: dict) -> None:
 
 # ---------------------------------------------------------------- Loop-Steuerung
 def _loop() -> None:
+    """Hauptschleife des Workers.
+
+    ALLES steht im Schutzbereich - auch das Lesen des Intervalls und das
+    Warten. Frueher lagen beide ausserhalb: warf `db.get_setting` (etwa bei
+    kurzzeitig gesperrter SQLite-Datei) oder das Logging im Fehlerzweig, verliess
+    die Schleife den Thread lautlos. Der Bot stand dann still, waehrend das
+    Dashboard weiter "laeuft" anzeigte.
+    """
     while not _stop.is_set():
+        interval = 60.0
         try:
             if db.get_setting("bot_running", False):
                 if _within_active_hours():
@@ -1322,21 +1393,75 @@ def _loop() -> None:
             _status["cycles"] += 1
         except fanvue.NotAuthenticated as exc:
             _status["last_error"] = str(exc)
-        except Exception as exc:  # noqa: BLE001
+        except BaseException as exc:  # noqa: BLE001 - der Thread darf NIE sterben
             _status["last_error"] = str(exc)
-            db.log("error", "system", "Poller-Fehler", str(exc))
-        # Warten bis zum naechsten Zyklus (unterbrechbar)
-        interval = max(15, int(db.get_setting("poll_interval_seconds", 60)))
-        _stop.wait(interval)
+            try:
+                db.log("error", "system", "Poller-Fehler", str(exc))
+            except Exception:  # noqa: BLE001 - Logging darf nicht mitreissen
+                pass
+        # Intervall lesen und warten - ebenfalls abgesichert
+        try:
+            interval = max(15.0, float(db.get_setting("poll_interval_seconds", 60)))
+        except Exception:  # noqa: BLE001
+            interval = 60.0
+        try:
+            _stop.wait(interval)
+        except Exception:  # noqa: BLE001
+            time.sleep(interval)
+    _status["stopped_at"] = time.time()
+
+
+# ------------------------------------------------------------------- Waechter
+# Selbst eine sturzsichere Schleife hilft nicht gegen einen Thread, der aus
+# anderen Gruenden verschwindet. Der Waechter ist bewusst winzig: er prueft nur,
+# ob der Worker noch lebt, und holt ihn zurueck.
+_watchdog: threading.Thread | None = None
+_WATCHDOG_INTERVAL = 60.0
+
+
+def is_alive() -> bool:
+    return bool(_thread and _thread.is_alive())
+
+
+def _watchdog_loop() -> None:
+    while not _stop.is_set():
+        try:
+            if not _stop.is_set() and not is_alive():
+                db.log("error", "system",
+                       "Worker war gestoppt – wird automatisch neu gestartet",
+                       f"letzter Durchlauf: {_status.get('last_poll')} · "
+                       f"letzter Fehler: {_status.get('last_error')}")
+                _status["restarts"] = int(_status.get("restarts", 0)) + 1
+                _start_thread()
+                try:
+                    from . import notify
+                    notify.send(
+                        "⚠️ <b>Bot-Worker war stehengeblieben</b>\n\n"
+                        "Er wurde automatisch neu gestartet. Nachrichten in der "
+                        "Zwischenzeit werden jetzt nachgeholt.")
+                except Exception:  # noqa: BLE001
+                    pass
+        except BaseException:  # noqa: BLE001 - der Waechter erst recht nicht
+            pass
+        _stop.wait(_WATCHDOG_INTERVAL)
+
+
+def _start_thread() -> None:
+    global _thread
+    _thread = threading.Thread(target=_loop, name="fanvue-poller", daemon=True)
+    _thread.start()
 
 
 def start() -> None:
-    global _thread
-    if _thread and _thread.is_alive():
+    global _watchdog
+    if is_alive():
         return
     _stop.clear()
-    _thread = threading.Thread(target=_loop, name="fanvue-poller", daemon=True)
-    _thread.start()
+    _start_thread()
+    if not (_watchdog and _watchdog.is_alive()):
+        _watchdog = threading.Thread(target=_watchdog_loop, name="fanvue-watchdog",
+                                     daemon=True)
+        _watchdog.start()
     db.log("info", "system", "Worker gestartet")
 
 

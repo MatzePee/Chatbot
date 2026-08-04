@@ -123,10 +123,20 @@ def generate(messages: list[dict[str, str]], model: str = "", api_key: str = "",
         "HTTP-Referer": "http://localhost",
         "X-Title": "Fanvue Chatbot",
     }
-    resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
+    # Netzwerkfehler (Timeout, SSL-Handshake, DNS ...) als OpenRouterError
+    # kapseln. Sonst fliegen sie an generate_retry vorbei, das nur
+    # OpenRouterError abfaengt - ein voruebergehender Timeout fuehrte dann zu
+    # GAR KEINEM Wiederholungsversuch, und die Fan-Nachricht blieb unbeantwortet.
+    try:
+        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
+    except Exception as exc:  # noqa: BLE001 - httpx.TimeoutException, SSLError, ...
+        raise OpenRouterError(f"Netzwerkfehler bei OpenRouter: {exc}") from exc
     if resp.status_code != 200:
         raise OpenRouterError(f"OpenRouter-Fehler [{resp.status_code}]: {resp.text}")
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError as exc:
+        raise OpenRouterError(f"Antwort war kein JSON: {resp.text[:200]}") from exc
     _record_cost(data, model, category)
     # _extract_content behandelt content=None (Reasoning-Modelle), Listen-Content
     # und Refusals robust – statt hart .strip() auf evtl. None aufzurufen.
@@ -180,19 +190,38 @@ def generate_retry(messages: list[dict[str, str]], model: str = "", api_key: str
     wenn alle Versuche leer bleiben – der Aufrufer leitet dann zur manuellen Freigabe."""
     attempts = max(1, attempts)
     for i in range(attempts):
+        netzfehler = False
         try:
             text = generate(messages, model=model, api_key=api_key, category=category)
         except OpenRouterError as exc:
             text = ""
+            netzfehler = "Netzwerkfehler" in str(exc)
             db.log("warn", "generate", f"Generierung-Versuch {i + 1}/{attempts} fehlgeschlagen",
                    str(exc)[:200])
         if text and text.strip():
             return text
         if i < attempts - 1:
-            wait = max(0.0, delay_seconds)
+            # Zwei sehr verschiedene Faelle:
+            #  - LEERE Antwort: das Modell hat geantwortet, nur ohne Inhalt
+            #    (Reasoning-Modelle). Da lohnt eine laengere Pause.
+            #  - NETZWERKFEHLER: jeder Versuch laeuft schon bis zu 60s ins
+            #    Timeout. Mit der langen Pause wuerde ein einziger haengender
+            #    Chat den ganzen Poll-Zyklus minutenlang blockieren und alle
+            #    anderen Fans warten lassen. Deshalb kurz antesten und sonst
+            #    aufgeben - der Recheck-Zyklus versucht es spaeter erneut,
+            #    ohne den Betrieb aufzuhalten.
+            if netzfehler:
+                if i >= 1:
+                    db.log("warn", "generate",
+                           "Netzwerk weiterhin gestört – Entwurf geht zur späteren "
+                           "Wiederholung in die Queue", "")
+                    break
+                wait = 2.0
+            else:
+                wait = max(0.0, delay_seconds)
             db.log("info", "generate",
-                   f"Leere Antwort – neuer Versuch {i + 2}/{attempts}"
-                   + (f" in {int(wait)}s" if wait else ""), "")
+                   f"{'Netzwerkfehler' if netzfehler else 'Leere Antwort'} – "
+                   f"neuer Versuch {i + 2}/{attempts}" + (f" in {int(wait)}s" if wait >= 1 else ""), "")
             if wait:
                 time.sleep(wait)
     return ""

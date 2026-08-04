@@ -38,7 +38,15 @@
       <tr><td>Wartende Freigaben</td><td><strong>{{ pending_count }}</strong></td></tr>
       <tr><td>Gesendet (gesamt)</td><td>{{ sent_count }}</td></tr>
       <tr><td>Fehlgeschlagen</td><td>{{ failed_count }}</td></tr>
-      <tr><td>Letzter Poll</td><td>{{ poller_status.last_poll | ts }}</td></tr>
+      <tr><td>Worker</td>
+        <td>{% if poller_status.alive %}<strong class="green-t">aktiv</strong>
+            {%- else %}<strong class="red-t">GESTOPPT</strong>{% endif %}
+            {%- if poller_status.restarts %} <span class="muted">· {{ poller_status.restarts }}× neu gestartet</span>{% endif %}</td></tr>
+      <tr><td>Letzter Poll</td>
+        <td>{{ poller_status.last_poll | ts }}
+          {%- if poller_status.stale_seconds and poller_status.stale_seconds > 600 %}
+          <strong class="red-t">· seit {{ (poller_status.stale_seconds / 60) | round | int }} Min nichts mehr</strong>
+          {%- endif %}</td></tr>
       <tr><td>Zyklen</td><td>{{ poller_status.cycles }}</td></tr>
       {% if tokens and tokens['account_handle'] %}
       <tr><td>Account</td><td>{{ tokens['account_handle'] }}</td></tr>

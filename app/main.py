@@ -1029,6 +1029,12 @@ def chats(request: Request, view: str = "group", q: str = "", msg: str = ""):
             "stats": db.ppv_offer_stats(m["uuid"]),
             "insight": insights.get(m["uuid"]),
             "group": m.get("group", ""),
+            "last_inbound_uuid": (row["last_inbound_uuid"] if row else "") or "",
+            "last_inbound_at": (row["last_inbound_at"] if row else None),
+            # Wartet dieser Fan auf eine Antwort? Die letzte Fan-Nachricht ist
+            # neuer als alles, was ihm je gesendet wurde - dann ist die
+            # Verarbeitungsmarke vermutlich zu weit vorgerueckt.
+            "waiting": _chat_is_waiting(row) if row else False,
         })
     ctx["chats"] = enriched
     ctx["has_insights"] = bool(insights)
@@ -1191,6 +1197,53 @@ def update_chat_route(user_uuid: str, bot_enabled: str = Form("on"),
         notes=notes.strip() or None,
     )
     return RedirectResponse("/chats", status_code=303)
+
+
+def _chat_is_waiting(row) -> bool:
+    """Fan-Nachricht neuer als die letzte gesendete Antwort und kein offener Entwurf?
+
+    Genau das ist der Zustand, in dem jemand haengt: der Bot haelt die Nachricht
+    fuer verarbeitet, obwohl nie eine Antwort rausging.
+    """
+    try:
+        li = row["last_inbound_at"]
+        if not li:
+            return False
+        if db.has_open_draft(row["user_uuid"]):
+            return False        # wartet regulaer in der Freigabe
+        letzte = db.last_sent_at(row["user_uuid"])
+        return not letzte or letzte < li
+    except Exception:  # noqa: BLE001
+        return False
+
+
+@app.post("/chats/{user_uuid}/reset-inbound")
+def chat_reset_inbound(user_uuid: str, view: str = Form("")):
+    """Setzt die Verarbeitungsmarke zurueck.
+
+    Der Bot merkt sich in last_inbound_uuid, bis zu welcher Nachricht er einen
+    Chat bearbeitet hat. Ist dort faelschlich eine Nachricht vermerkt, die nie
+    beantwortet wurde (etwa weil die Generierung an einem Netzwerk-Timeout
+    scheiterte oder ein Entwurf verworfen wurde), bleibt der Fan fuer immer
+    ohne Antwort. Nach dem Zuruecksetzen greift der naechste Durchlauf die
+    letzte Fan-Nachricht wieder auf.
+    """
+    sep = "&" if view else "?"
+    back = f"/chats?view={_q(view)}" if view else "/chats"
+    chat = db.get_chat(user_uuid)
+    if not chat:
+        return RedirectResponse(f"{back}{sep}msg={_q('Chat nicht gefunden')}", status_code=303)
+    if db.has_open_draft(user_uuid):
+        return RedirectResponse(
+            f"{back}{sep}msg={_q('Es gibt bereits einen offenen Entwurf – bitte zuerst freigeben oder verwerfen')}",
+            status_code=303)
+    db.update_chat(user_uuid, last_inbound_uuid=None)
+    name = chat["display_name"] or chat["handle"] or user_uuid[:8]
+    db.log("info", "system", f"Verarbeitungsmarke für {name} zurückgesetzt",
+           f"war: {chat['last_inbound_uuid']}")
+    return RedirectResponse(
+        f"{back}{sep}msg={_q(f'{name}: letzte Nachricht wird beim nächsten Durchlauf erneut beantwortet')}",
+        status_code=303)
 
 
 @app.post("/chats/{user_uuid}/reactivate")

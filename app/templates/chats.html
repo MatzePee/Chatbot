@@ -90,7 +90,19 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
         <input type="hidden" name="view" value="{{ view }}">
         <button class="btn">💬 Reaktivierung auslösen</button>
       </form>
+      <form method="post" action="/chats/{{ c['uuid'] }}/reset-inbound" class="inline"
+            onsubmit="return confirm('Verarbeitungsmarke für {{ (c['display_name'] or c['handle'] or 'diesen Fan') | e }} zurücksetzen?\n\nDer Bot greift die letzte Fan-Nachricht dann beim nächsten Durchlauf wieder auf und beantwortet sie.');">
+        <input type="hidden" name="view" value="{{ view }}">
+        <button class="btn{% if c['waiting'] %}-primary{% endif %}"
+                title="Setzt last_inbound_uuid zurück – die letzte Fan-Nachricht wird erneut beantwortet"
+                {% if not c['last_inbound_uuid'] %}disabled{% endif %}>
+          ↺ Nachricht erneut beantworten</button>
+      </form>
     </div>
+    {% if c['waiting'] %}
+    <p class="waiting-hint">⏳ Letzte Fan-Nachricht ({{ c['last_inbound_at'] | ts }}) ist neuer als die
+      letzte gesendete Antwort und es liegt kein Entwurf vor — dieser Fan wartet vermutlich.</p>
+    {% endif %}
   </div>
 
   <details class="settings">
@@ -165,6 +177,8 @@ details.settings summary { cursor: pointer; color: var(--muted); font-size: 14px
 .filter-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; }
 .inline { display: inline-flex; gap: 6px; align-items: center; }
 details.settings[open] summary { margin-bottom: 10px; }
+.waiting-hint { font-size: 12.5px; margin: 8px 0 0; padding: 6px 10px; border-radius: 6px;
+  background: rgba(217,164,65,.14); border-left: 3px solid #d9a441; color: var(--text); }
 </style>
 <script>
 (function () {
