@@ -81,6 +81,9 @@ def _base_ctx(request: Request) -> dict:
         "mode": db.get_setting("mode", "approval"),
         "pending_count": db.count_drafts("pending"),
         "tokens": db.get_tokens(),
+        # Ohne eigene Konto-Kennung kann der Bot eigene Nachrichten nicht von
+        # Fan-Nachrichten unterscheiden - das verfaelscht jeden Prompt.
+        "account_missing": fanvue.is_connected() and not fanvue.account_uuid(),
         "poller_status": poller.status(),
     }
 
@@ -430,8 +433,7 @@ def chat_export(user_uuid: str):
     from urllib.parse import quote as _q
     if not fanvue.is_connected():
         return RedirectResponse(f"/chats/{user_uuid}/ppv?err={_q('Nicht verbunden')}", status_code=303)
-    tokens = db.get_tokens()
-    me_uuid = tokens["account_uuid"] if tokens else ""
+    me_uuid = fanvue.account_uuid()
     chat = db.get_chat(user_uuid)
     try:
         path, n = _write_chat_export(user_uuid, chat["handle"] if chat else "",
@@ -479,8 +481,7 @@ def chat_export_all():
             members = _fetch_group_members(filter_=db.get_setting("chat_filter", "unread"))
     except Exception:  # noqa: BLE001
         members = _fetch_group_members(custom_list_id=custom_list)
-    tokens = db.get_tokens()
-    me_uuid = tokens["account_uuid"] if tokens else ""
+    me_uuid = fanvue.account_uuid()
     threading.Thread(target=_export_group_worker, args=(members, me_uuid),
                      name="chat-export", daemon=True).start()
     return RedirectResponse("/chats?exportstarted=1", status_code=303)
@@ -724,8 +725,7 @@ def queue(request: Request, msg: str = ""):
     ctx["drafts"] = drafts
     ctx["max_regen"] = int(db.get_setting("draft_max_regen", 10))
     n = int(db.get_setting("queue_context_messages", 2))
-    me = db.get_tokens()
-    me_uuid = me["account_uuid"] if me else ""
+    me_uuid = fanvue.account_uuid()
     contexts: dict[int, list[dict]] = {}
     if n > 0 and fanvue.is_connected():
         for d in drafts:
@@ -1143,8 +1143,7 @@ def chat_ppv_sync(user_uuid: str):
     if not fanvue.is_connected():
         return RedirectResponse(f"/chats/{user_uuid}/ppv?err={_q('Nicht mit Fanvue verbunden')}",
                                 status_code=303)
-    tokens = db.get_tokens()
-    me_uuid = tokens["account_uuid"] if tokens else ""
+    me_uuid = fanvue.account_uuid()
     try:
         purchases = fanvue.collect_purchased_ppv(user_uuid, me_uuid)
         # Medien-Index ueber ALLE PPV-Ordner (nicht nur aktivierte), zwischengespeichert
@@ -1268,8 +1267,7 @@ def reactivate_now_route(user_uuid: str, handle: str = Form(""), display_name: s
             status_code=303)
     db.upsert_chat(user_uuid, handle, display_name)
     chat = db.get_chat(user_uuid)
-    tokens = db.get_tokens()
-    me_uuid = tokens["account_uuid"] if tokens else ""
+    me_uuid = fanvue.account_uuid()
     folder = (db.get_setting("reactivation_folder", "") or "").strip()
     try:
         poller._create_reactivation_draft(chat, me_uuid, folder, manual=True)

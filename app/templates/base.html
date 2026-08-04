@@ -39,6 +39,15 @@
   </div>
 </header>
 <main>
+  {% if account_missing %}
+  <div class="card warn">
+    <strong>⚠ Eigene Konto-Kennung fehlt.</strong>
+    Der Bot kann seine eigenen Nachrichten nicht von Fan-Nachrichten unterscheiden —
+    das Modell bekommt den gesamten Verlauf als Fan-Text und weiß nicht, was es
+    bereits geschrieben hat. Abhilfe: in den <a href="/settings">Einstellungen</a>
+    die Fanvue-Verbindung einmal trennen und neu verbinden.
+  </div>
+  {% endif %}
   {% block content %}{% endblock %}
 </main>
 <footer>Daten in <code>data/bot.db</code></footer>

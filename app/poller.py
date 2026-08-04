@@ -52,8 +52,13 @@ def _effective_mode(chat: Any) -> str:
 
 
 def _me_uuid() -> str:
-    tokens = db.get_tokens()
-    return tokens["account_uuid"] if tokens and tokens["account_uuid"] else ""
+    """Eigene Konto-Kennung. Holt sie nach, falls sie fehlt - ohne sie kann der
+    Bot eigene Nachrichten nicht von Fan-Nachrichten unterscheiden."""
+    try:
+        return fanvue.account_uuid()
+    except Exception:  # noqa: BLE001
+        tokens = db.get_tokens()
+        return (tokens["account_uuid"] if tokens else "") or ""
 
 
 _UNSET = object()
@@ -677,8 +682,7 @@ def start_purchase_import(rows: list, check_api: bool = True) -> bool:
 
 def _purchase_import_worker(rows: list, check_api: bool) -> None:
     try:
-        tokens = db.get_tokens()
-        me_uuid = tokens["account_uuid"] if tokens else ""
+        me_uuid = _me_uuid()
         # Zeilen pro Subscriber gruppieren (handle -> uuid aufloesen)
         by_user: dict[str, dict] = {}
         for r in rows:
@@ -851,8 +855,7 @@ def reactivation_cycle() -> None:
     if not chats:
         return
     folder = (db.get_setting("reactivation_folder", "") or "").strip()
-    me = db.get_tokens()
-    me_uuid = me["account_uuid"] if me else ""
+    me_uuid = _me_uuid()
     for chat in chats:
         uuid = chat["user_uuid"]
         if db.has_open_draft(uuid):

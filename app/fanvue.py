@@ -224,11 +224,35 @@ def get_me() -> dict[str, Any]:
     return _request("GET", "/users/me").json()
 
 
+def account_uuid() -> str:
+    """Eigene Konto-Kennung - holt sie bei Bedarf nach.
+
+    Sie wurde bisher NUR einmal beim OAuth-Verbinden geschrieben. Schlug das
+    fehl, blieb sie dauerhaft leer - und damit konnte der Bot eigene
+    Nachrichten nicht mehr von Fan-Nachrichten unterscheiden. Folge: im Prompt
+    landete der komplette Verlauf als 'user', das Modell sah seine eigenen
+    Antworten als Fan-Text und wusste nie, was es bereits geschrieben hatte.
+    """
+    tokens = db.get_tokens()
+    uuid = (tokens["account_uuid"] if tokens else "") or ""
+    if uuid or not (tokens and tokens["access_token"]):
+        return uuid
+    _fetch_and_store_account()
+    tokens = db.get_tokens()
+    return (tokens["account_uuid"] if tokens else "") or ""
+
+
 def _fetch_and_store_account() -> None:
     try:
         me = get_me()
-        uuid = me.get("uuid") or me.get("id") or ""
+        # Fanvue liefert die Kennung je nach Endpunkt unterschiedlich benannt
+        uuid = (me.get("uuid") or me.get("id") or me.get("userUuid")
+                or me.get("user_uuid") or "")
         handle = me.get("handle") or me.get("displayName") or ""
+        if not uuid:
+            db.log("warn", "oauth",
+                   "Konto-Kennung fehlt in der Fanvue-Antwort – eigene Nachrichten "
+                   "können nicht erkannt werden", str(list(me.keys()))[:200])
         if uuid:
             tokens = db.get_tokens()
             db.save_tokens(
@@ -239,6 +263,7 @@ def _fetch_and_store_account() -> None:
                 account_uuid=uuid,
                 account_handle=handle,
             )
+            db.log("info", "oauth", f"Konto-Kennung geladen: {handle or uuid[:8]}", "")
     except Exception as exc:  # noqa: BLE001
         db.log("warn", "oauth", "Konnte Account-Infos nicht laden", str(exc))
 
