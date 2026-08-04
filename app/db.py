@@ -324,6 +324,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "max_tokens": 800,   # hoeher, damit Reasoning-Modelle (gpt-5.x) nicht abgeschnitten werden
     "history_messages": 15,             # wie viele vergangene Nachrichten in den Prompt
     "queue_context_messages": 2,        # wie viele vorherige Nachrichten in der Freigabe-Queue anzeigen
+    # Denkprozess des Modells: 'none' = abschalten (empfohlen fuer Chat-Antworten),
+    # 'exclude' = denken, aber nicht mitliefern, 'default' = Modell entscheidet.
+    "reasoning_mode": "none",
     "generation_retries": 3,            # so oft bei LEERER Modell-Antwort neu generieren
     "generation_retry_delay": 60,       # Pause (s) zwischen den Neuversuchen (nur Hintergrundbetrieb)
     # --- Selbstheilung wartender Drafts ---

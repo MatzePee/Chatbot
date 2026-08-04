@@ -116,6 +116,16 @@ def generate(messages: list[dict[str, str]], model: str = "", api_key: str = "",
         "max_tokens": int(db.get_setting("max_tokens", 300)),
         "usage": {"include": True},   # OpenRouter liefert dann usage.cost mit
     }
+    # Denkprozess steuern. Manche Modelle schreiben ihre Ueberlegungen sonst
+    # mitten in die Antwort ("Wait, the fan is writing in German, so I need
+    # to..."), und genau das landet dann im Chat. Fuer kurze Flirt-Antworten
+    # bringt langes Nachdenken ohnehin nichts, kostet aber Tokens.
+    modus = str(db.get_setting("reasoning_mode", "none") or "none").strip().lower()
+    if modus == "none":
+        payload["reasoning"] = {"effort": "none", "exclude": True}
+    elif modus == "exclude":
+        payload["reasoning"] = {"exclude": True}
+    # "default" -> gar nichts mitschicken, Modell entscheidet selbst
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",

@@ -249,6 +249,61 @@ def finds_unbacked_promise(text: str) -> Optional[str]:
     return m.group(0).strip() if m else None
 
 
+# ------------------------------------------------------- Ausgeplauderter Denkprozess
+# Manche Modelle schreiben ihre Ueberlegungen in die Antwort statt ins dafuer
+# vorgesehene Feld: "Wait, the fan is writing in German, so I need to reply in
+# German only. ... I should match that energy". Das darf NIE zum Fan.
+_RE_THINK_BLOCK = re.compile(r"<\s*(think|thinking|reasoning|scratchpad)\s*>.*?"
+                             r"<\s*/\s*\1\s*>", re.I | re.S)
+_RE_THINK_OPEN = re.compile(r"<\s*(?:think|thinking|reasoning|scratchpad)\s*>", re.I)
+
+# Verraeterisch ist vor allem die DRITTE Person ueber den Fan - die Persona
+# spricht ihn immer direkt an und wuerde nie "the fan" sagen.
+_REASONING_SIGNALS = (
+    re.compile(r"\bthe fan(?:'s)?\s+(?:is|was|wants|writes|is writing|asked|said|described)", re.I),
+    re.compile(r"\b(?:der|die)\s+fan\s+(?:schreibt|will|fragt|beschreibt)", re.I),
+    re.compile(r"\bi (?:need|should|have|want) to (?:reply|respond|answer|match|keep|acknowledge|write)", re.I),
+    re.compile(r"\b(?:my|the) (?:reply|response|answer) should\b", re.I),
+    re.compile(r"\bthe (?:current )?context (?:says|is|tells)\b", re.I),
+    re.compile(r"\blet me (?:craft|write|think|reply|respond|keep)\b", re.I),
+    re.compile(r"\b(?:okay|ok|alright|wait|hmm)[,.]\s+(?:so\s+)?(?:the|i|this)\b", re.I),
+    re.compile(r"\bin german only\b|\bnur auf deutsch antworten\b", re.I),
+    re.compile(r"\b(?:i'll|i will) (?:keep|make) (?:it|this) (?:short|warm|flirty|playful)", re.I),
+)
+
+
+def strip_think_blocks(text: str) -> str:
+    """Entfernt <think>…</think>-Bloecke. Fehlt das schliessende Tag, wird ab
+    dem oeffnenden alles verworfen - der Rest ist dann ohnehin Denkprozess."""
+    if not text:
+        return text
+    text = _RE_THINK_BLOCK.sub("", text)
+    m = _RE_THINK_OPEN.search(text)
+    if m:
+        text = text[:m.start()]
+    return text.strip()
+
+
+def looks_like_reasoning(text: str) -> Optional[str]:
+    """Sieht der Text nach ausgeplaudertem Denkprozess aus?
+
+    Rueckgabe: die verraeterische Stelle, sonst None. Bewusst mit mehreren
+    Signalen und einer Mindestlaenge - eine kurze Flirt-Antwort soll nicht
+    faelschlich haengenbleiben, nur weil zufaellig 'I should' vorkommt.
+    """
+    if not text:
+        return None
+    treffer = [m.group(0).strip() for m in
+               (rx.search(text) for rx in _REASONING_SIGNALS) if m]
+    if not treffer:
+        return None
+    # Ein einzelnes Signal reicht nur bei laengeren Texten (echte Antworten
+    # sind kurz); zwei Signale sind immer verdaechtig.
+    if len(treffer) >= 2 or len(text) > 400:
+        return treffer[0][:80]
+    return None
+
+
 def looks_like_refusal(text: str) -> bool:
     """True, wenn der Text nach einer Modell-Weigerung/Meta-Antwort aussieht."""
     return bool(text and _RE_REFUSAL.search(text))
@@ -326,9 +381,16 @@ def check_outgoing(text: str, has_media: bool = False) -> tuple[str, str | None]
     has_media: haengt der Nachricht tatsaechlich Content an? Ohne Anhang ist
     eine Ankuendigung wie "soll ich es dir schicken?" eine leere Zusage.
     """
-    text = strip_artifacts((text or "").strip())
+    # Denk-Bloecke zuerst weg - danach bleibt oft eine brauchbare Antwort uebrig
+    text = strip_artifacts(strip_think_blocks((text or "").strip()))
     if not text:
         return text, "Leere Antwort vom Modell"
+
+    # Ausgeplauderter Denkprozess: darf NIE zum Fan. Neu generieren lassen.
+    denk = looks_like_reasoning(text)
+    if denk:
+        return text, (f"Denkprozess des Modells statt Antwort („{denk}“) – "
+                      f"bitte prüfen (kein Auto-Send)")
 
     # Modell-Weigerung / Meta-Text: darf NIE zum Fan. Wenn eine echte Beispiel-Caption
     # in Anfuehrungszeichen steckt, diese retten; sonst blockieren (manuelle Freigabe).

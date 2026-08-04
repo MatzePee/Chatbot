@@ -60,6 +60,13 @@
       <label>Temperatur <span class="info" tabindex="0" data-tip="Kreativität/Zufall der Antworten (0–2). Niedrig = konsistenter/vorhersehbarer, höher = abwechslungsreicher/wilder. Empfohlen ~0.8–1.0.">ⓘ</span> <input name="temperature" type="number" step="0.1" min="0" max="2" value="{{ s['temperature'] }}"></label>
       <label>Max Tokens <span class="info" tabindex="0" data-tip="Maximale Länge der generierten Antwort. Bei Reasoning-Modellen (z.B. gpt-5.x) zählt internes Denken mit – zu niedrig schneidet den Text ab. Empfohlen ≥ 800.">ⓘ</span> <input name="max_tokens" type="number" value="{{ s['max_tokens'] }}"></label>
       <label>Verlauf (Nachrichten) <span class="info" tabindex="0" data-tip="Wie viele der letzten Chat-Nachrichten als Kontext in den Prompt gegeben werden. Mehr = besserer Bezug/Continuity, aber mehr Tokens/Kosten.">ⓘ</span> <input name="history_messages" type="number" value="{{ s['history_messages'] }}"></label>
+      <label>Denkprozess des Modells <span class="info" tabindex="0" data-tip="Reasoning-Modelle denken vor der Antwort. Manche schreiben diese Überlegungen versehentlich in den Antworttext („Wait, the fan is writing in German…“). Für kurze Chat-Antworten bringt Nachdenken kaum etwas, kostet aber Tokens – deshalb standardmäßig aus.">ⓘ</span>
+        <select name="reasoning_mode">
+          {% set rm = s['reasoning_mode'] or 'none' %}
+          <option value="none" {% if rm=='none' %}selected{% endif %}>aus (empfohlen)</option>
+          <option value="exclude" {% if rm=='exclude' %}selected{% endif %}>denken, aber nicht ausgeben</option>
+          <option value="default" {% if rm=='default' %}selected{% endif %}>Modell entscheidet</option>
+        </select></label>
       <label>Neuversuche bei leerer Antwort <span class="info" tabindex="0" data-tip="Liefert das Modell eine leere Antwort (kommt bei Reasoning-Modellen vor), wird bis zu so oft neu generiert. Erst wenn alle Versuche leer bleiben, landet der Entwurf zur manuellen Freigabe. Standard 3.">ⓘ</span> <input name="generation_retries" type="number" min="1" max="10" value="{{ s['generation_retries'] }}"></label>
       <label>Pause zwischen Neuversuchen (s) <span class="info" tabindex="0" data-tip="Wartezeit zwischen den Neuversuchen bei leerer Antwort. Gilt nur im automatischen Hintergrundbetrieb – beim manuellen „Neu generieren\" und im Test-Modus wird nicht gewartet. Standard 60.">ⓘ</span> <input name="generation_retry_delay" type="number" min="0" max="600" value="{{ s['generation_retry_delay'] }}"></label>
     </div>

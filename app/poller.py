@@ -1018,6 +1018,7 @@ _REGENERABLE_NOTES = (
     "modell-weigerung",
     "erfundener plattform",
     "zeit-widerspruch",
+    "denkprozess des modells",
 )
 # Diese Notiz braucht menschliche Augen - nie automatisch neu generieren.
 _HUMAN_ONLY_NOTES = ("eskalations-stichwort",)
