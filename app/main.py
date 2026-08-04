@@ -313,7 +313,7 @@ def _run_test(message: str, notes: str, img_analysis: Optional[dict] = None) -> 
                        f"ohne Preis, ohne das Wort 'Set'.")
                 txt = poller._generate(sys, hist, "me", notes, [], task="caption", retry_delay=0)
                 txt = _r.sub(r"(?i)\bsets?\b", "PPV", txt)
-                txt, _ = guardrails.check_outgoing(txt)
+                txt, _ = guardrails.check_outgoing(txt, has_media=True)
                 res["ppv"] = {"folder": folder["name"],
                               "price_cents": folder["price_cents"],
                               "media": len(payload["media_uuids"]) if payload else 0,

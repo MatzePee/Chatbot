@@ -130,7 +130,45 @@ def generate(messages: list[dict[str, str]], model: str = "", api_key: str = "",
     _record_cost(data, model, category)
     # _extract_content behandelt content=None (Reasoning-Modelle), Listen-Content
     # und Refusals robust – statt hart .strip() auf evtl. None aufzurufen.
-    return _extract_content(data)
+    text = _extract_content(data)
+    _log_if_suspicious(data, text, model, category)
+    return text
+
+
+def _log_if_suspicious(data: dict, text: str, model: str, category: str) -> None:
+    """Protokolliert die Rohantwort, wenn das Ergebnis unbrauchbar aussieht.
+
+    Ohne das laesst sich hinterher nicht mehr sagen, WARUM eine Antwort leer
+    oder nur ein Wortfetzen war: brach das Modell am Token-Limit ab, hat es
+    gefiltert, oder kam wirklich nur das zurueck? Genau diese Frage stand bei
+    Entwuerfen wie 'dilemma (1)' oder 'Mmm,' im Raum.
+    """
+    stripped = (text or "").strip()
+    if len(stripped) >= 25:
+        return
+    try:
+        choice = (data.get("choices") or [{}])[0]
+        msg = choice.get("message") or {}
+        usage = data.get("usage") or {}
+        details = usage.get("completion_tokens_details") or {}
+        info = {
+            "finish_reason": choice.get("finish_reason"),
+            "native_finish_reason": choice.get("native_finish_reason"),
+            "laenge": len(stripped),
+            "text": stripped[:120],
+            "prompt_tokens": usage.get("prompt_tokens"),
+            "completion_tokens": usage.get("completion_tokens"),
+            # Denk-Tokens zaehlen als Output und gehen von max_tokens ab
+            "reasoning_tokens": details.get("reasoning_tokens"),
+            "reasoning_feld": len(str(msg.get("reasoning") or "")),
+            "max_tokens": int(db.get_setting("max_tokens", 300)),
+            "modell": model,
+        }
+        db.log("warn", "generate",
+               f"Auffällig kurze Antwort ({len(stripped)} Zeichen) von {model}",
+               " · ".join(f"{k}={v}" for k, v in info.items() if v not in (None, "")))
+    except Exception:  # noqa: BLE001 - Diagnose darf nie etwas kaputt machen
+        pass
 
 
 def generate_retry(messages: list[dict[str, str]], model: str = "", api_key: str = "",

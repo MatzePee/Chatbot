@@ -207,6 +207,48 @@ def check_time_consistency(text: str, dt: Optional[datetime] = None,
     return None
 
 
+# --------------------------------------------------- Erfundene Preise/Zusagen
+# Den Preis setzt IMMER die Engine und Fanvue zeigt ihn selbst an - die Persona
+# hat nie einen Grund, eine Zahl zu nennen. Tut sie es doch, ist es erfunden.
+# Genau so entstand "20 € mit meinem persoenlichen Gruss" fuer Content, den es
+# gar nicht gibt: ein Versprechen, das niemand einloesen kann.
+_RE_PRICE = re.compile(
+    r"(?:[€$£]\s?\d{1,4}(?:[.,]\d{1,2})?)"                    # €20, $ 15.99
+    r"|(?:\d{1,4}(?:[.,]\d{1,2})?\s?(?:[€$£]|eur\b|usd\b|euros?\b|dollars?\b))",  # 20 €, 15 Euro
+    re.I)
+
+# Ankuendigung, gleich Content zu schicken. Ohne tatsaechlichen Anhang ist das
+# eine Zusage, die die Nachricht nicht einloest.
+#
+# Bewusst eng: Es muss entweder ein Content-Wort genannt sein oder das Objekt
+# ein blosses Fuerwort ("soll ich es dir schicken?") - dann meint es Content.
+# Ein "ich schick dir ein Kuesschen" ist dagegen harmlos und darf nicht in der
+# Freigabe landen, sonst ist der Filter mehr im Weg als er nuetzt.
+_CONTENT_WORT = (r"(?:video|clip|film|bild|bilder|foto|fotos|pic|pics|picture|photo|"
+                 r"content|aufnahme|set|material)")
+_RE_SEND_PROMISE = re.compile(
+    # "soll ich es/das dir schicken?" - blosses Fuerwort als Objekt
+    r"soll\s+ich\s+(?:es|das|ihn|sie)\b[^.?!]{0,24}(?:schicken|senden|zeigen)"
+    r"|soll\s+ich\s+(?:dir\s+)?(?:das\s+|ein[en]?\s+)?" + _CONTENT_WORT +
+    r"|(?:schicke?|sende|zeige?)\s+(?:ich\s+)?(?:dir\s+)?"
+    r"(?:gleich|jetzt|nachher|sp[äa]ter|noch)?\s*(?:ein[en]?\s+|das\s+|die\s+|mein\s+)?" + _CONTENT_WORT +
+    r"|(?:shall|should)\s+i\s+send\s+(?:it|you|them)"
+    r"|i(?:'ll|\s+will)\s+send\s+(?:it|you|them)",
+    re.I)
+
+
+def finds_invented_price(text: str) -> Optional[str]:
+    """Preisangabe im Text? Rueckgabe: die gefundene Stelle."""
+    m = _RE_PRICE.search(text or "")
+    return m.group(0).strip() if m else None
+
+
+def finds_unbacked_promise(text: str) -> Optional[str]:
+    """Ankuendigung, etwas zu schicken. Nur ohne echten Anhang problematisch."""
+    m = _RE_SEND_PROMISE.search(text or "")
+    return m.group(0).strip() if m else None
+
+
 def looks_like_refusal(text: str) -> bool:
     """True, wenn der Text nach einer Modell-Weigerung/Meta-Antwort aussieht."""
     return bool(text and _RE_REFUSAL.search(text))
@@ -274,12 +316,15 @@ def _word_list(setting_key: str) -> list[str]:
     return [w.strip().lower() for w in raw.split(",") if w.strip()]
 
 
-def check_outgoing(text: str) -> tuple[str, str | None]:
+def check_outgoing(text: str, has_media: bool = False) -> tuple[str, str | None]:
     """Prueft eine generierte Antwort.
 
     Rueckgabe: (bereinigter_text, guardrail_note_oder_None).
     Wenn note gesetzt ist, sollte der Draft NICHT automatisch gesendet werden,
     sondern zur manuellen Freigabe.
+
+    has_media: haengt der Nachricht tatsaechlich Content an? Ohne Anhang ist
+    eine Ankuendigung wie "soll ich es dir schicken?" eine leere Zusage.
     """
     text = strip_artifacts((text or "").strip())
     if not text:
@@ -302,6 +347,22 @@ def check_outgoing(text: str) -> tuple[str, str | None]:
     # Fanvue funktioniert so nicht -> nie automatisch senden, manuell pruefen.
     if looks_like_fake_navigation(text):
         return text, "Erfundener Plattform-/Navigationshinweis erkannt – bitte prüfen (kein Auto-Send)"
+
+    # Erfundener Preis: darf NIE automatisch rausgehen. Den Preis setzt die
+    # Engine, Fanvue zeigt ihn selbst an - eine Zahl im Text ist immer erfunden
+    # und der Fan koennte die Creatorin darauf festnageln.
+    preis = finds_invented_price(text)
+    if preis:
+        return text, (f"Erfundene Preisangabe „{preis}“ im Text – Preise setzt die "
+                      f"Engine, nie das Modell. Bitte prüfen (kein Auto-Send)")
+
+    # Ankuendigung ohne Anhang: "soll ich es dir schicken?" bei einer Nachricht,
+    # an der nichts haengt, ist ein Versprechen ins Leere.
+    if not has_media:
+        zusage = finds_unbacked_promise(text)
+        if zusage:
+            return text, (f"Kündigt „{zusage}“ an, es hängt aber kein Content an der "
+                          f"Nachricht – bitte prüfen (kein Auto-Send)")
 
     # Zeit-Widerspruch (Uhrzeit/Wochentag/Tagesplan): nicht automatisch senden.
     # Der Text selbst bleibt unveraendert - er ist meist brauchbar und muss nur

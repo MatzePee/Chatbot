@@ -280,10 +280,13 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     ),
     "ppv_no_match_prompt": (
         "Der Fan wuenscht sich ausdruecklich {wunsch}, davon ist aktuell aber nichts "
-        "Passendes mehr verfuegbar. Biete NICHTS anderes an und haenge nichts an. "
-        "Geh im Chat kurz und charmant darauf ein, vertroeste ihn ehrlich auf spaeter "
-        "(z.B. dass gerade etwas Neues entsteht) und halte die Stimmung. Erfinde keine "
-        "konkreten Zusagen und nenne keinen Termin."
+        "Passendes mehr verfuegbar. An dieser Nachricht haengt KEIN Content. "
+        "STRIKT VERBOTEN: einen Preis oder Betrag nennen (auch keinen ungefaehren), "
+        "etwas anbieten, ankuendigen etwas zu schicken ('soll ich es dir schicken?'), "
+        "einen Termin nennen oder Eigenschaften erfinden (z.B. 'mit persoenlichem Gruss'). "
+        "Preise und Inhalte legt allein das System fest - du kennst sie nicht. "
+        "Geh stattdessen kurz und charmant im Chat darauf ein, halte die Stimmung "
+        "und vertroeste ehrlich auf spaeter, ohne etwas zu versprechen."
     ),
     "ppv_freecontent_keywords": (
         "gratis,kostenlos,umsonst,for free,free content,geschenkt,kostenfrei,free pic,free pics,"

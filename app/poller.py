@@ -261,7 +261,7 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
         db.update_chat(user_uuid, last_inbound_uuid=last_uuid)
         return
 
-    clean_text, note = guardrails.check_outgoing(generated)
+    clean_text, note = guardrails.check_outgoing(generated, has_media=False)
     mode = _effective_mode(chat)
 
     # Entscheiden: Auto-Send oder manuelle Freigabe?
@@ -419,7 +419,7 @@ def _create_ppv_draft(user_uuid: str, handle: str, display_name: str, incoming_t
         return
     # Sicherheitsnetz: 'Set' -> 'PPV' (impliziert faelschlich mehrere Bilder)
     generated = re.sub(r"(?i)\bsets?\b", "PPV", generated)
-    clean_text, note = guardrails.check_outgoing(generated)
+    clean_text, note = guardrails.check_outgoing(generated, has_media=True)
     mode = _effective_mode(chat)
     auto = (mode == "auto") and not note
     scheduled = None
@@ -913,8 +913,8 @@ def _create_reactivation_draft(chat: Any, me_uuid: str, folder: str,
         if greet_name:
             banned = [b for b in banned if b != greet_name.lower()]
     generated = _generate(sys, messages_chrono, me_uuid, fan_notes, banned)
-    clean_text, note = guardrails.check_outgoing(generated)
     media = _reactivation_media(folder, uuid)
+    clean_text, note = guardrails.check_outgoing(generated, has_media=bool(media))
     mode = _effective_mode(chat)
     # Manuell ausgeloest -> immer in die Freigabe (kein Delay), damit der Creator
     # die Nachricht sofort pruefen und senden kann.
@@ -1117,7 +1117,7 @@ def regenerate_draft(draft_id: int, reason: str = "", interactive: bool = False)
 
     if is_ppv:
         generated = re.sub(r"(?i)\bsets?\b", "PPV", generated)
-    clean_text, note = guardrails.check_outgoing(generated)
+    clean_text, note = guardrails.check_outgoing(generated, has_media=is_ppv)
     count = (draft["regen_count"] or 0) + 1
     ok = bool((generated or "").strip()) and not note
 
