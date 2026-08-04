@@ -282,20 +282,25 @@ def _run_test(message: str, notes: str, img_analysis: Optional[dict] = None) -> 
         res["decision"] = decision
         prefs = decision.get("preferences", [])
         # Diagnose je aktivem Set
+        wanted_kind = decision.get("wanted_kind", "")
         for f in db.enabled_ppv_folders():
             all_tags = [t.strip() for t in (f["tags"] or "").split(",") if t.strip()]
             all_tags += db.folder_all_media_tags(f["name"])
             score = ppv_engine._score_folder(", ".join(all_tags), prefs)
             ro = bool(f["request_only"])
+            kind = ppv_engine._row_media_kind(f)
             res["diagnostics"].append({
                 "name": f["name"], "request_only": ro, "score": score,
-                "eligible": (not ro) or decision.get("request_unlock", False),
+                "media_kind": kind,
+                "eligible": ((not ro) or decision.get("request_unlock", False))
+                            and ppv_engine.kind_matches(kind, wanted_kind),
             })
         res["diagnostics"].sort(key=lambda d: (-d["score"], d["name"]))
 
         if decision["send"]:
             folder = ppv_engine.select_set("__TEST__", prefs,
-                                           allow_request_only=decision.get("request_unlock", False))
+                                           allow_request_only=decision.get("request_unlock", False),
+                                           wanted_kind=wanted_kind)
             if folder:
                 payload = ppv_engine.build_payload(folder)
                 sales = db.get_setting("ppv_sales_prompt", "")
@@ -1334,6 +1339,10 @@ def ppv_page(request: Request):
                     "price_cents": row["price_cents"] if row else 500,
                     "tags": row["tags"] if row else "",
                     "request_only": bool(row["request_only"]) if row else False,
+                    # Startwert fuer neue Ordner: Name entscheidet, Rest sind Bilder
+                    "media_kind": (row["media_kind"] or "image") if row else (
+                        "video" if ("video" in f["name"].lower() or "clip" in f["name"].lower())
+                        else "image"),
                     # Versions-Kennung fuer den Browser-Cache: aendert sich das
                     # Vorschaubild, wird der localStorage-Cache dieses Ordners ungueltig.
                     "preview": (row["preview_media_uuid"] or "") if row else "",
@@ -1361,6 +1370,7 @@ async def ppv_folder_save(request: Request):
         price_cents=price,
         tags=(form.get("tags", "") or "").strip(),
         request_only=1 if form.get("request_only") == "on" else 0,
+        media_kind=(form.get("media_kind", "image") or "image").strip().lower(),
     )
     return RedirectResponse("/ppv", status_code=303)
 

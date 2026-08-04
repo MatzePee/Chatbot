@@ -70,6 +70,12 @@ def evaluate(state: dict[str, Any], text: str, has_photo: bool,
     kw_body = _first_hit(t, _kw_list("ppv_bodyparts_keywords"))
     kw_pic = _first_hit(t, _kw_list("ppv_pic_request_keywords"))
     kw_free = _first_hit(t, _kw_list("ppv_freecontent_keywords"))
+    # Wuenscht sich der Fan ausdruecklich ein Video oder Fotos? Das entscheidet,
+    # welche Sets ueberhaupt in Frage kommen. Video hat Vorrang: "schick mal ein
+    # Video von den Bildern neulich" ist eine Video-Anfrage.
+    kw_video = _first_hit(t, _kw_list("ppv_video_keywords"))
+    kw_photo = _first_hit(t, _kw_list("ppv_photo_keywords"))
+    wanted_kind = "video" if kw_video else ("image" if kw_photo else "")
 
     intent = int(classifier.get("intent_score", 0) or 0)
     intent_threshold = int(db.get_setting("ppv_intent_threshold", 4))
@@ -95,12 +101,14 @@ def evaluate(state: dict[str, Any], text: str, has_photo: bool,
     # Eindeutige Aufforderung -> darf auch in der Aufwaermphase verkaufen.
     # Ein explizites Bild (nackte Frau/Penis) zaehlt als starkes Signal dazu,
     # ein normales Fan-Foto NICHT.
-    explicit = bool(kw_pic) or bool(kw_l1) or content_request or explicit_image
+    # Eine Videoanfrage ist genauso eine eindeutige Content-Anfrage wie eine
+    # Bildanfrage - ohne das waere "schick mir bitte ein Video" kein Kaufsignal.
+    explicit = bool(kw_pic) or bool(kw_l1) or content_request or explicit_image or bool(kw_video)
     # "Nur auf Anfrage"-Sets werden NUR durch eine echte Content-Anfrage
     # freigeschaltet (Bildanfrage-Keyword oder vom Klassifikator erkannte
     # Content-Anfrage) - NICHT durch ein allgemeines Kauf-Keyword ("ausziehen")
     # oder ein Fan-Foto.
-    request_unlock = bool(kw_pic) or content_request
+    request_unlock = bool(kw_pic) or content_request or bool(kw_video)
     min_fan = int(db.get_setting("ppv_min_fan_messages", 4))
     warmup_ok = fan_msg_count >= min_fan
 
@@ -118,6 +126,8 @@ def evaluate(state: dict[str, Any], text: str, has_photo: bool,
         # nur eine echte Content-Anfrage schaltet "nur auf Anfrage"-Sets frei
         "request_unlock": request_unlock,
         "emotional_distress": emotional_distress,
+        # '' = kein bestimmter Wunsch, sonst 'video' oder 'image'
+        "wanted_kind": wanted_kind,
     }
 
     # HARTES Verkaufsverbot: ist der Fan gerade seelisch verletzlich / in einer
@@ -146,6 +156,12 @@ def evaluate(state: dict[str, Any], text: str, has_photo: bool,
         trigger = f"Kauf-Keyword '{kw_l1}'"
     elif kw_pic:
         trigger = f"Bildanfrage '{kw_pic}'"
+    elif kw_video:
+        # Eine Videoanfrage ist genauso eindeutig wie eine Bildanfrage. Ohne
+        # diesen Zweig haenge die Entscheidung allein am LLM-Klassifikator -
+        # faellt der aus oder ist abgeschaltet, wuerde "schick mir ein Video"
+        # als Kaufsignal durchrutschen, "schick mir ein Bild" aber nicht.
+        trigger = f"Videoanfrage '{kw_video}'"
     elif content_request:
         trigger = "Explizite Content-Anfrage"
     elif intent_high:
@@ -209,11 +225,33 @@ def pick_folder(candidates: list[dict[str, Any]], preferences: list[str],
     return rng.choice(candidates)
 
 
+def _row_media_kind(row: Any) -> str:
+    """Medientyp eines Sets: 'image', 'video' oder 'mixed'. Fehlt die Spalte
+    (sehr alte Datenbank), gilt 'image' - das war der bisherige Zustand."""
+    try:
+        return (row["media_kind"] or "image").strip().lower()
+    except (IndexError, KeyError):
+        return "image"
+
+
+def kind_matches(set_kind: str, wanted: str) -> bool:
+    """Passt der Medientyp eines Sets zum Wunsch des Fans?
+
+    'mixed' passt immer - solche Sets enthalten beides. Ohne konkreten Wunsch
+    kommt ebenfalls alles in Frage.
+    """
+    if not wanted or set_kind == "mixed":
+        return True
+    return set_kind == wanted
+
+
 def select_set(user_uuid: str, preferences: list[str],
                rng: Optional[random.Random] = None,
-               allow_request_only: bool = False) -> Optional[dict[str, Any]]:
+               allow_request_only: bool = False,
+               wanted_kind: str = "") -> Optional[dict[str, Any]]:
     """Waehlt ein noch nicht angebotenes/gekauftes, aktives PPV-Set.
-    'Nur auf Anfrage'-Sets nur, wenn allow_request_only (explizite Anfrage)."""
+    'Nur auf Anfrage'-Sets nur, wenn allow_request_only (explizite Anfrage).
+    wanted_kind ('video'/'image') schraenkt auf den gewuenschten Medientyp ein."""
     # "angeboten" aus beiden Quellen: State-Liste UND tatsaechliche Angebots-Datensaetze
     offered = set(db.ppv_offered_sets(user_uuid)) | db.ppv_offered_folders(user_uuid)
     purchased = set(db.ppv_purchased_sets(user_uuid))
@@ -223,6 +261,9 @@ def select_set(user_uuid: str, preferences: list[str],
             continue
         # "Nur auf Anfrage"-Sets nur bei expliziter Aufforderung
         if not allow_request_only and _row_request_only(row):
+            continue
+        # Wer nach einem Video fragt, soll kein Bild-Set bekommen
+        if not kind_matches(_row_media_kind(row), wanted_kind):
             continue
         # Ordner-Tags + alle Bild-Tags (eigene + Fanvue-KI) fuer das Matching vereinen,
         # damit ein Treffer in irgendeinem Bild das ganze Set qualifiziert.

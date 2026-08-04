@@ -55,6 +55,10 @@ das Ergebnis, <strong>ohne etwas zu senden</strong> oder den Fan-Status zu ände
     <tr><td>Content-Anfrage erkannt?</td><td>{{ 'ja' if c.get('content_request') else 'nein' }}</td></tr>
     <tr><td>Anfrage-Sets freigeschaltet? <span class="info" tabindex="0" data-tip="Ob „nur auf Anfrage"-Sets bei dieser Nachricht angeboten werden dürfen. Nur bei einer echten Content-Anfrage (Bildanfrage-Keyword oder vom Klassifikator erkannte Content-Anfrage) – NICHT durch ein allgemeines Kauf-Keyword oder ein Fan-Foto.">ⓘ</span></td><td><strong class="{% if d['request_unlock'] %}green-t{% else %}red-t{% endif %}">{{ 'ja' if d['request_unlock'] else 'nein' }}</strong></td></tr>
     <tr><td>Emotionale Ausnahmesituation? <span class="info" tabindex="0" data-tip="Erkennt der Klassifikator seelische Verletzlichkeit (Traurigkeit, Krise, Trennung, Verlust …), wird kein PPV angeboten – der Bot antwortet nur zugewandt.">ⓘ</span></td><td><strong class="{% if d['emotional_distress'] %}red-t{% endif %}">{{ 'ja → kein PPV' if d['emotional_distress'] else 'nein' }}</strong></td></tr>
+    <tr><td>Gewünschter Medientyp <span class="info" tabindex="0" data-tip="Fragt der Fan ausdrücklich nach einem Video oder nach Fotos? Dann kommen nur Sets mit passendem Medientyp (oder „gemischt") in Frage. Ist nichts Passendes mehr da, wird KEIN Ersatz angeboten – der Bot vertröstet stattdessen im Chat.">ⓘ</span></td>
+      <td>{% if d.get('wanted_kind') == 'video' %}<strong class="green-t">Video</strong>
+          {%- elif d.get('wanted_kind') == 'image' %}<strong>Fotos</strong>
+          {%- else %}<span class="muted">kein bestimmter Wunsch</span>{% endif %}</td></tr>
     <tr><td>Sexuelle Energie?</td><td>{{ 'ja' if d['sexual_energy'] else 'nein' }}</td></tr>
     <tr><td>Erkannte Vorlieben (Tags)</td><td><code>{{ d['preferences'] | join(', ') if d['preferences'] else '–' }}</code></td></tr>
   </table>
@@ -68,7 +72,14 @@ das Ergebnis, <strong>ohne etwas zu senden</strong> oder den Fan-Status zu ände
   <p class="muted small">Generierte PPV-Nachricht:</p>
   <div class="gen">{{ result['ppv']['text'] }}</div>
   {% else %}
+  {% if d.get('wanted_kind') %}
+  <p>⚠ Der Fan wünscht sich ausdrücklich
+    <strong>{{ 'ein Video' if d['wanted_kind'] == 'video' else 'Fotos' }}</strong>,
+    davon ist aber nichts mehr verfügbar. Es wird bewusst <strong>kein Ersatz</strong>
+    angeboten — der Bot geht stattdessen im Chat darauf ein und vertröstet.</p>
+  {% else %}
   <p>⚠ Senden entschieden, aber <strong>kein passendes Set verfügbar</strong> (alle angeboten/gekauft, oder request_only nicht freigeschaltet).</p>
+  {% endif %}
   {% endif %}
 </div>
 {% elif result['reply'] %}
@@ -82,16 +93,17 @@ das Ergebnis, <strong>ohne etwas zu senden</strong> oder den Fan-Status zu ände
   <h3>Set-Diagnose</h3>
   <p class="muted small">Tag-Score = Übereinstimmung mit den erkannten Vorlieben. „Freigeschaltet" = würde bei dieser Nachricht berücksichtigt.</p>
   <table class="logs">
-    <thead><tr><th>Set</th><th>Nur auf Anfrage</th><th>Tag-Score</th><th>Freigeschaltet</th></tr></thead>
+    <thead><tr><th>Set</th><th>Medientyp</th><th>Nur auf Anfrage</th><th>Tag-Score</th><th>Freigeschaltet</th></tr></thead>
     <tbody>
       {% for f in result['diagnostics'] %}
       <tr>
         <td class="set">{{ f['name'] }}</td>
+        <td>{{ {'video': '🎬 Video', 'mixed': 'gemischt'}.get(f.get('media_kind'), 'Bilder') }}</td>
         <td>{{ 'ja' if f['request_only'] else '–' }}</td>
         <td>{% if f['score'] %}<strong class="green-t">{{ f['score'] }}</strong>{% else %}0{% endif %}</td>
         <td>{% if f['eligible'] %}✓{% else %}<span class="muted">gesperrt</span>{% endif %}</td>
       </tr>
-      {% else %}<tr><td colspan="4" class="muted">Keine aktiven Sets.</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="5" class="muted">Keine aktiven Sets.</td></tr>{% endfor %}
     </tbody>
   </table>
 </div>

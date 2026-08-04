@@ -204,8 +204,10 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
                                        explicit_image=explicit_image)
         db.update_ppv_state(user_uuid, sexual_streak=decision["sexual_streak"])
         if decision["send"] and not escalation:
+            wanted_kind = decision.get("wanted_kind", "")
             folder = ppv_engine.select_set(user_uuid, decision["preferences"],
-                                           allow_request_only=decision.get("request_unlock", False))
+                                           allow_request_only=decision.get("request_unlock", False),
+                                           wanted_kind=wanted_kind)
             if folder:
                 payload = ppv_engine.build_payload(folder)
                 if payload:
@@ -217,8 +219,18 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
                 db.log("warn", "generate", f"PPV-Set '{folder['name']}' hat keine Medien", "")
             else:
                 db.log("info", "generate",
-                       f"PPV getriggert, aber kein Set mehr uebrig fuer {handle or user_uuid}",
+                       f"PPV getriggert, aber kein Set mehr uebrig fuer {handle or user_uuid}"
+                       + (f" (gewuenscht: {wanted_kind})" if wanted_kind else ""),
                        decision["reason"])
+                # Ausdruecklicher Wunsch, aber nichts Passendes da: NICHTS anderes
+                # anbieten, sondern im Chat ehrlich vertroesten. Sonst bekaeme der
+                # Fan auf "schick mir ein Video" ein Bild-Set - genau das soll nicht
+                # passieren.
+                if wanted_kind:
+                    wunsch = "ein Video" if wanted_kind == "video" else "Fotos"
+                    hinweis = db.get_setting("ppv_no_match_prompt", "")
+                    if hinweis:
+                        system_prompt = system_prompt + "\n\n" + hinweis.replace("{wunsch}", wunsch)
         elif decision.get("free_request"):
             # Gratis-Anfrage -> normaler Chat, aber mit Umleit-Instruktion
             system_prompt = system_prompt + "\n\n" + db.get_setting("ppv_freecontent_prompt", "")

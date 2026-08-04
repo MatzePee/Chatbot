@@ -302,6 +302,12 @@
       <input name="ppv_pic_request_keywords" value="{{ s['ppv_pic_request_keywords'] }}"></label>
     <label>Keywords: Gratis-Content (→ freundlich umleiten)
       <input name="ppv_freecontent_keywords" value="{{ s['ppv_freecontent_keywords'] }}"></label>
+    <label>Keywords: Video gewünscht <span class="info" tabindex="0" data-tip="Trifft eines dieser Wörter, kommen nur Sets mit Medientyp „Video" oder „Gemischt" in Frage. Den Medientyp legst du pro Set auf der PPV-Seite fest.">ⓘ</span>
+      <input name="ppv_video_keywords" value="{{ s['ppv_video_keywords'] }}"></label>
+    <label>Keywords: Fotos gewünscht
+      <input name="ppv_photo_keywords" value="{{ s['ppv_photo_keywords'] }}"></label>
+    <label>Nichts Passendes vorhanden (System-Prompt) <span class="info" tabindex="0" data-tip="Wird verwendet, wenn der Fan ausdrücklich ein Video oder Fotos will, davon aber nichts mehr verfügbar ist. Der Bot bietet dann bewusst keinen Ersatz an, sondern vertröstet im Chat. {wunsch} wird ersetzt.">ⓘ</span>
+      <textarea name="ppv_no_match_prompt" rows="3">{{ s['ppv_no_match_prompt'] }}</textarea></label>
     <label>Verkaufston (System-Prompt für PPV-Nachricht)
       <textarea name="ppv_sales_prompt" rows="4">{{ s['ppv_sales_prompt'] }}</textarea></label>
     <label>Gratis-Umleitung (System-Prompt)

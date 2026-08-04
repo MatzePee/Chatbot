@@ -58,6 +58,13 @@ Für PPV wird der Scope <code>read:media</code> benötigt – falls die Ordner l
     <div class="row">
       <label class="chk"><input type="checkbox" name="enabled" {% if f['enabled'] %}checked{% endif %}> Als PPV verkaufen</label>
       <label>Preis ($) <input name="price_dollars" type="number" step="0.01" min="3" value="{{ f['price_cents'] | dollars }}"></label>
+      <label>Medientyp <span class="info" tabindex="0" data-tip="Fragt ein Fan ausdrücklich nach einem Video, kommen nur Video- und gemischte Sets in Frage – und umgekehrt. Ohne konkreten Wunsch zählen alle Sets.">ⓘ</span>
+        <select name="media_kind">
+          {% set mk = f['media_kind'] or 'image' %}
+          <option value="image" {% if mk == 'image' %}selected{% endif %}>Bilder</option>
+          <option value="video" {% if mk == 'video' %}selected{% endif %}>Video</option>
+          <option value="mixed" {% if mk == 'mixed' %}selected{% endif %}>Gemischt</option>
+        </select></label>
     </div>
     <label class="chk"><input type="checkbox" name="request_only" {% if f['request_only'] %}checked{% endif %}> Nur auf explizite Anfrage anbieten</label>
     <label>Ordner-Tags (kommagetrennt)

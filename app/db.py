@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS ppv_folders (
     tags               TEXT DEFAULT '',     -- Ordner-Tags (kommagetrennt)
     preview_media_uuid TEXT,                -- Vorschaubild fuer die PPV-Nachricht
     request_only       INTEGER DEFAULT 0,   -- nur auf explizite Anfrage anbieten
+    media_kind         TEXT DEFAULT 'image',-- 'image' | 'video' | 'mixed' (manuell gepflegt)
     thumbs_json        TEXT,                -- gecachte Vorschaubilder (JSON) fuer die Uebersicht
     thumbs_cached_at   REAL,                -- Zeitpunkt des Thumbnail-Caches
     updated_at         REAL
@@ -267,6 +268,23 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "show me your,pics,foto,fotos,picture,pictures,bilder,ich sehe nichts,kann nichts sehen,"
         "can't see,cant see"
     ),
+    # Wunsch nach einem VIDEO bzw. ausdruecklich nach FOTOS. Steuert, welche
+    # Sets ueberhaupt in Frage kommen - siehe Medientyp auf der PPV-Seite.
+    "ppv_video_keywords": (
+        "video,videos,clip,clips,filmchen,film,movie,vid,vids,bewegtbild,"
+        "vidoe,viedeo,vidio,mach mal ein video,schick mir ein video"
+    ),
+    "ppv_photo_keywords": (
+        "foto,fotos,bild,bilder,pic,pics,picture,pictures,photo,photos,"
+        "selfie,selfies,aufnahme,aufnahmen"
+    ),
+    "ppv_no_match_prompt": (
+        "Der Fan wuenscht sich ausdruecklich {wunsch}, davon ist aktuell aber nichts "
+        "Passendes mehr verfuegbar. Biete NICHTS anderes an und haenge nichts an. "
+        "Geh im Chat kurz und charmant darauf ein, vertroeste ihn ehrlich auf spaeter "
+        "(z.B. dass gerade etwas Neues entsteht) und halte die Stimmung. Erfinde keine "
+        "konkreten Zusagen und nenne keinen Termin."
+    ),
     "ppv_freecontent_keywords": (
         "gratis,kostenlos,umsonst,for free,free content,geschenkt,kostenfrei,free pic,free pics,"
         "ohne bezahlen"
@@ -413,6 +431,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         "ppv_folders": {
             "preview_media_uuid": "TEXT",
             "request_only": "INTEGER DEFAULT 0",
+            "media_kind": "TEXT DEFAULT 'image'",
             "thumbs_json": "TEXT",
             "thumbs_cached_at": "REAL",
         },
@@ -429,6 +448,15 @@ def _migrate(conn: sqlite3.Connection) -> None:
         for col, ddl in cols.items():
             if col not in existing:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+                # Einmaliger Startwert fuer den Medientyp: Sets, die im Namen
+                # oder in den Tags "video" tragen, sind mit hoher Sicherheit
+                # Videos. Das erspart es, alle vorhandenen Sets von Hand
+                # durchzugehen - aendern laesst sich jedes davon jederzeit.
+                if table == "ppv_folders" and col == "media_kind":
+                    conn.execute(
+                        "UPDATE ppv_folders SET media_kind = 'video' "
+                        "WHERE lower(name) LIKE '%video%' OR lower(name) LIKE '%clip%' "
+                        "   OR lower(',' || COALESCE(tags,'') || ',') LIKE '%,video,%'")
     conn.commit()
 
 
