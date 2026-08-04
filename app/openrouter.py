@@ -419,6 +419,90 @@ def classify_message(text: str, notes: str = "") -> dict:
         return {}
 
 
+def confirm_ppv(messages_chrono: list, me_uuid: str, reason: str,
+                set_name: str = "", price_cents: int = 0) -> dict:
+    """Zweitmeinung vor dem Versand eines PPV – MIT Gespraechsverlauf.
+
+    Der normale Klassifikator sieht nur die letzte Nachricht. Ohne Kontext ist
+    "maybe you could show me around yourself" kaum von einer Content-Anfrage zu
+    unterscheiden; mit den vorherigen Nachrichten (Stadtviertel, Kaffee) dagegen
+    sofort. Genau diese Faelle soll die Pruefung abfangen.
+
+    Rueckgabe: {"ok": bool, "grund": str, "geprueft": bool}
+    geprueft=False bedeutet: Pruefung war nicht moeglich (kein Key, Netzfehler).
+    """
+    ergebnis = {"ok": False, "grund": "", "geprueft": False}
+    api_key = db.get_setting("openrouter_api_key", "")
+    if not api_key:
+        ergebnis["grund"] = "kein API-Key"
+        return ergebnis
+
+    model = db.get_setting("classifier_model", "") or db.get_setting(
+        "openrouter_model", "openai/gpt-4o-mini")
+
+    # Verlauf kompakt aufbereiten - nur die letzten Nachrichten, gekuerzt
+    n = int(db.get_setting("ppv_confirm_context_messages", 8) or 8)
+    zeilen = []
+    for m in messages_chrono[-n:]:
+        text = (m.get("text") or "").strip()
+        if not text:
+            continue
+        wer = "Creatorin" if (m.get("sender") or {}).get("uuid", "") == me_uuid else "Fan"
+        zeilen.append(f"{wer}: {text[:300]}")
+    verlauf = "\n".join(zeilen) or "(kein Verlauf)"
+
+    system = (
+        "Du pruefst fuer eine Creatorin auf einer Adult-Plattform, ob es JETZT passend ist, "
+        "dem Fan kostenpflichtigen Content (ein Foto-Set oder Video) anzubieten. "
+        "Du siehst den Gespraechsverlauf. Der Automatik-Regel nach waere ein Angebot faellig; "
+        "du bist die Gegenprobe.\n\n"
+        "Antworte NUR mit kompaktem JSON: {\"ok\": true|false, \"grund\": \"kurze Begruendung\"}\n\n"
+        "ok=false, wenn:\n"
+        "- der Fan gar keinen Content will, sondern ueber etwas anderes spricht "
+        "(Alltag, Reise, Treffen, Gefuehle, Smalltalk)\n"
+        "- eine Formulierung nur zufaellig nach Content klingt "
+        "(z.B. 'show me around' = herumfuehren, 'zeig mir die Stadt')\n"
+        "- der Fan ein reales Treffen, ein Date oder Kontakt ausserhalb der Plattform anspricht\n"
+        "- der Fan gerade emotional belastet, traurig oder verletzlich wirkt\n"
+        "- der Fan sich gerade beschwert, unzufrieden ist oder ueber Geld klagt\n"
+        "- ein Angebot den Gespraechsfluss unangenehm unterbrechen wuerde\n\n"
+        "ok=true, wenn der Fan erkennbar mehr sehen will oder die Stimmung ein Angebot "
+        "natuerlich traegt.\n"
+        "Im Zweifel ok=false - ein Set kann jedem Fan nur EINMAL angeboten werden."
+    )
+    frage = (f"Gespraechsverlauf:\n{verlauf}\n\n"
+             f"Die Automatik wuerde jetzt anbieten. Ausloeser war: {reason}\n"
+             + (f"Geplantes Set: {set_name}\n" if set_name else "")
+             + (f"Preis: ${price_cents/100:.2f}\n" if price_cents else "")
+             + "\nIst ein Angebot jetzt angebracht?")
+
+    import json as _json
+    payload = {"model": model,
+               "messages": [{"role": "system", "content": system},
+                            {"role": "user", "content": frage}],
+               "temperature": 0, "max_tokens": 200}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+               "HTTP-Referer": "http://localhost", "X-Title": "Fanvue Chatbot"}
+    try:
+        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=45)
+        if resp.status_code != 200:
+            ergebnis["grund"] = f"HTTP {resp.status_code}"
+            return ergebnis
+        data = resp.json()
+        _record_cost(data, model, "ppv_confirm")
+        inhalt = _extract_content(data)
+        if inhalt.startswith("```"):
+            inhalt = inhalt.strip("`")
+            inhalt = inhalt[inhalt.find("{"):inhalt.rfind("}") + 1]
+        roh = _json.loads(inhalt)
+        ergebnis["ok"] = bool(roh.get("ok", False))
+        ergebnis["grund"] = str(roh.get("grund", ""))[:300]
+        ergebnis["geprueft"] = True
+    except Exception as exc:  # noqa: BLE001 - Pruefung darf nie den Ablauf sprengen
+        ergebnis["grund"] = f"Prüfung fehlgeschlagen: {exc}"[:200]
+    return ergebnis
+
+
 def parse_tags(text: str) -> list[str]:
     """Wandelt eine LLM-Antwort in eine saubere Tag-Liste (kommagetrennt)."""
     # Zeilenumbrueche und Aufzaehlungszeichen zu Kommas normalisieren

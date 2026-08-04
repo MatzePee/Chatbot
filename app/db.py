@@ -241,6 +241,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # --- PPV Auto-Selling-Engine ---
     "ppv_enabled": False,               # Master-Schalter fuer automatisches PPV-Anbieten
     "ppv_use_llm_classifier": True,     # Intent/Interesse per LLM bewerten
+    # Zweitmeinung vor jedem PPV - MIT Gespraechsverlauf. Der Klassifikator
+    # sieht nur die einzelne Nachricht und kann "show me around" nicht von
+    # einer Content-Anfrage unterscheiden.
+    "ppv_confirm_enabled": True,
+    "ppv_confirm_context_messages": 8,  # wie viele Nachrichten als Kontext
+    "ppv_confirm_fail_open": False,     # bei Stoerung KEIN PPV (Set bleibt erhalten)
     "ppv_intent_threshold": 4,          # Intent-Score >= X -> Kaufinteresse
     "ppv_min_fan_messages": 4,          # Aufwaermphase: so viele Fan-Nachrichten vor PPV
                                         # (ausser bei eindeutiger Bildanfrage/Foto)
@@ -287,6 +293,13 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "Preise und Inhalte legt allein das System fest - du kennst sie nicht. "
         "Geh stattdessen kurz und charmant im Chat darauf ein, halte die Stimmung "
         "und vertroeste ehrlich auf spaeter, ohne etwas zu versprechen."
+    ),
+    # Wendungen, in denen ein Keyword NICHT als Kaufsignal zaehlt.
+    # "show me around" (herumfuehren) ist keine Content-Anfrage.
+    "ppv_keyword_exceptions": (
+        "show me around,show me the way,show me how,show me where,show me your city,"
+        "show me your favorite,show me on the map,zeig mir den weg,zeig mir wie,"
+        "zeig mir die stadt,show me some love,show me respect"
     ),
     "ppv_freecontent_keywords": (
         "gratis,kostenlos,umsonst,for free,free content,geschenkt,kostenfrei,free pic,free pics,"

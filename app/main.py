@@ -301,6 +301,13 @@ def _run_test(message: str, notes: str, img_analysis: Optional[dict] = None) -> 
             folder = ppv_engine.select_set("__TEST__", prefs,
                                            allow_request_only=decision.get("request_unlock", False),
                                            wanted_kind=wanted_kind)
+            if folder and db.get_setting("ppv_confirm_enabled", True):
+                pruef = openrouter.confirm_ppv(hist, "me", decision.get("reason", ""),
+                                               set_name=folder["name"],
+                                               price_cents=folder.get("price_cents", 0))
+                res["confirm"] = pruef
+                if not pruef["ok"]:
+                    folder = None
             if folder:
                 payload = ppv_engine.build_payload(folder)
                 sales = db.get_setting("ppv_sales_prompt", "")
@@ -1381,6 +1388,7 @@ _INT_KEYS = {
     "send_delay_max_seconds", "max_tokens", "history_messages", "queue_context_messages",
     "generation_retries", "generation_retry_delay", "max_reply_chars",
     "draft_recheck_interval_seconds", "draft_max_regen", "update_check_interval_hours",
+    "ppv_confirm_context_messages",
     "ppv_intent_threshold", "ppv_min_fan_messages", "ppv_sexual_streak_trigger", "ppv_cooldown_minutes",
     "ppv_cooldown_outbound", "ppv_cooldown_long_minutes", "ppv_unpurchased_threshold",
     "ppv_max_media_per_set", "ppv_thumb_cache_hours",
@@ -1390,6 +1398,7 @@ _INT_KEYS = {
 }
 _FLOAT_KEYS = {"temperature"}
 _BOOL_KEYS = {"active_hours_enabled", "ppv_enabled", "ppv_use_llm_classifier",
+              "ppv_confirm_enabled", "ppv_confirm_fail_open",
               "anti_ai_enabled", "reactivation_enabled", "incoming_image_enabled",
               "ppv_caption_use_vision", "ppv_block_on_distress", "tip_thanks_enabled",
               "time_context_enabled", "timestamps_in_history", "time_guard_enabled",

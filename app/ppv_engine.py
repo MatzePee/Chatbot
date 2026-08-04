@@ -11,6 +11,7 @@ Bewusst mit moeglichst reinen Funktionen, damit die Logik testbar bleibt.
 from __future__ import annotations
 
 import random
+import re
 from typing import Any, Optional
 
 from . import db, fanvue
@@ -22,8 +23,45 @@ def _kw_list(setting_key: str) -> list[str]:
     return [w.strip().lower() for w in raw.split(",") if w.strip()]
 
 
+_KW_CACHE: dict[str, Any] = {}
+
+
+def _kw_pattern(word: str):
+    """Baut ein Muster mit WORTGRENZEN fuer ein Keyword.
+
+    Frueher wurde schlicht `wort in text` geprueft. Das trifft mitten in
+    anderen Woertern: 'ass' steckt im deutschen 'dass', 'po' in 'Point' und
+    'salope', 'dick' in 'dicke'. Ueber die Haelfte aller Koerperteil-Treffer
+    waren so blosse Wortbestandteile - und loesten trotzdem ein PPV aus.
+
+    Ein angehaengtes Plural-s wird zugelassen ('nipple' trifft 'nipples'),
+    ein vorangehendes Zeichen dagegen nie.
+    """
+    pat = _KW_CACHE.get(word)
+    if pat is None:
+        pat = re.compile(r"(?<!\w)" + re.escape(word) + r"(?:s|es|n)?(?!\w)", re.I)
+        _KW_CACHE[word] = pat
+    return pat
+
+
+def _exceptions() -> list[str]:
+    return [w.strip().lower() for w in
+            str(db.get_setting("ppv_keyword_exceptions", "") or "").split(",") if w.strip()]
+
+
 def _first_hit(text: str, words: list[str]) -> Optional[str]:
-    return next((w for w in words if w and w in text), None)
+    """Erstes Keyword, das als eigenes Wort vorkommt - und nicht in einer
+    harmlosen Wendung steht ('show me around' ist keine Content-Anfrage)."""
+    t = text or ""
+    ausnahmen = _exceptions()
+    for w in words:
+        if not w or not _kw_pattern(w).search(t):
+            continue
+        # Steckt der Treffer in einer bekannten harmlosen Wendung?
+        if any(w in a and a in t.lower() for a in ausnahmen):
+            continue
+        return w
+    return None
 
 
 def _row_request_only(row: Any) -> bool:

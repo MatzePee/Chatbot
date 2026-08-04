@@ -302,6 +302,19 @@
       <input name="ppv_pic_request_keywords" value="{{ s['ppv_pic_request_keywords'] }}"></label>
     <label>Keywords: Gratis-Content (→ freundlich umleiten)
       <input name="ppv_freecontent_keywords" value="{{ s['ppv_freecontent_keywords'] }}"></label>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="ppv_confirm_enabled"
+        {% if s['ppv_confirm_enabled'] %}checked{% endif %}> Zweitmeinung vor jedem PPV
+        <span class="info" tabindex="0" data-tip="Vor dem Versand prüft ein zweites LLM MIT dem Gesprächsverlauf, ob ein Angebot gerade passt. Fängt Fälle ab, die der Klassifikator nicht sehen kann – er bekommt nur die einzelne Nachricht, nicht den Kontext.">ⓘ</span></label>
+      <label class="chk"><input type="checkbox" name="ppv_confirm_fail_open"
+        {% if s['ppv_confirm_fail_open'] %}checked{% endif %}> Bei Störung trotzdem senden
+        <span class="info" tabindex="0" data-tip="Standardmäßig aus: Ist die Prüfung nicht möglich (Timeout), wird KEIN PPV gesendet. Ein Set kann jedem Fan nur einmal angeboten werden – ein verbranntes ist dauerhaft weg.">ⓘ</span></label>
+      <label>Kontext (Nachrichten)
+        <input name="ppv_confirm_context_messages" type="number" min="2" max="30"
+          value="{{ s['ppv_confirm_context_messages'] }}"></label>
+    </div>
+    <label>Ausnahme-Wendungen (Keyword zählt dort NICHT) <span class="info" tabindex="0" data-tip="Kommagetrennt. Enthält die Nachricht eine dieser Wendungen, gilt das darin steckende Keyword nicht als Kaufsignal – z.B. „show me around“ (herumführen).">ⓘ</span>
+      <input name="ppv_keyword_exceptions" value="{{ s['ppv_keyword_exceptions'] }}"></label>
     <label>Keywords: Video gewünscht <span class="info" tabindex="0" data-tip="Trifft eines dieser Wörter, kommen nur Sets mit Medientyp „Video" oder „Gemischt" in Frage. Den Medientyp legst du pro Set auf der PPV-Seite fest.">ⓘ</span>
       <input name="ppv_video_keywords" value="{{ s['ppv_video_keywords'] }}"></label>
     <label>Keywords: Fotos gewünscht

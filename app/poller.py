@@ -212,6 +212,23 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
             folder = ppv_engine.select_set(user_uuid, decision["preferences"],
                                            allow_request_only=decision.get("request_unlock", False),
                                            wanted_kind=wanted_kind)
+            # Zweitmeinung MIT Gespraechsverlauf, bevor wirklich verkauft wird.
+            # Erst an dieser Stelle, damit der Aufruf nur faellt, wenn wirklich
+            # ein Set bereitsteht - und das konkrete Set mitgegeben werden kann.
+            if folder and db.get_setting("ppv_confirm_enabled", True):
+                pruef = openrouter.confirm_ppv(
+                    messages_chrono, me_uuid, decision.get("reason", ""),
+                    set_name=folder["name"], price_cents=folder.get("price_cents", 0))
+                # Bei einer Stoerung bewusst KEIN Verkauf: ein Set kann jedem Fan
+                # nur einmal angeboten werden, ein verbranntes ist dauerhaft weg.
+                if not pruef["ok"] and not (
+                        not pruef["geprueft"] and db.get_setting("ppv_confirm_fail_open", False)):
+                    db.log("info", "generate",
+                           f"PPV abgelehnt durch Zweitmeinung ({handle or user_uuid})",
+                           f"{decision.get('reason', '')} → {pruef['grund']}"
+                           + ("" if pruef["geprueft"] else " (Prüfung war nicht möglich)"))
+                    folder = None          # normal weiterchatten, Set bleibt erhalten
+
             if folder:
                 payload = ppv_engine.build_payload(folder)
                 if payload:

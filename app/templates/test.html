@@ -59,6 +59,14 @@ das Ergebnis, <strong>ohne etwas zu senden</strong> oder den Fan-Status zu ände
       <td>{% if d.get('wanted_kind') == 'video' %}<strong class="green-t">Video</strong>
           {%- elif d.get('wanted_kind') == 'image' %}<strong>Fotos</strong>
           {%- else %}<span class="muted">kein bestimmter Wunsch</span>{% endif %}</td></tr>
+    {% if result.get('confirm') %}
+    {% set cf = result['confirm'] %}
+    <tr><td>Zweitmeinung (mit Verlauf) <span class="info" tabindex="0" data-tip="Ein zweites LLM prüft mit dem Gesprächsverlauf, ob ein Angebot jetzt wirklich passt. Der normale Klassifikator sieht nur die einzelne Nachricht und kann z.B. „show me around“ nicht einordnen.">ⓘ</span></td>
+      <td><strong class="{% if cf['ok'] %}green-t{% else %}red-t{% endif %}">
+        {{ 'zugestimmt' if cf['ok'] else 'ABGELEHNT' }}</strong>
+        {%- if not cf['geprueft'] %} <span class="muted">(Prüfung nicht möglich)</span>{% endif %}
+        {%- if cf['grund'] %}<br><span class="muted small">{{ cf['grund'] }}</span>{% endif %}</td></tr>
+    {% endif %}
     <tr><td>Sexuelle Energie?</td><td>{{ 'ja' if d['sexual_energy'] else 'nein' }}</td></tr>
     <tr><td>Erkannte Vorlieben (Tags)</td><td><code>{{ d['preferences'] | join(', ') if d['preferences'] else '–' }}</code></td></tr>
   </table>
