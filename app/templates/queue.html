@@ -36,6 +36,16 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
   {% if d['guardrail_note'] %}
   <div class="guard">⚠ {{ d['guardrail_note'] }}</div>
   {% endif %}
+  <div class="ppv-bar" data-draft="{{ d['id'] }}">
+    {% if d['is_ppv'] %}
+    <span class="ppv-info">💰 <strong>{{ d['ppv_folder'] }}</strong>
+      · ${{ (d['ppv_price_cents'] or 0)/100 }}</span>
+    <button type="button" class="btn ppv-remove">✗ PPV entfernen</button>
+    {% else %}
+    <button type="button" class="btn ppv-add">💰 PPV hinzufügen</button>
+    {% endif %}
+  </div>
+
   <form method="post" action="/queue/{{ d['id'] }}/approve">
     <textarea name="edited_text" rows="7">{{ d['edited_text'] or d['generated_text'] }}</textarea>
     <div class="draft-actions">
@@ -50,7 +60,57 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
 <div class="card muted">Keine wartenden Freigaben.</div>
 {% endfor %}
 
+<div id="ppv-picker" class="pk-overlay">
+  <div class="pk-box">
+    <div class="pk-head">
+      <strong>PPV auswählen</strong>
+      <input type="search" id="pk-search" placeholder="Nach Titel oder Tag suchen…">
+      <button type="button" class="btn" id="pk-close">✗</button>
+    </div>
+    <label class="chk pk-opt"><input type="checkbox" id="pk-regen" checked>
+      Bildunterschrift passend neu schreiben</label>
+    <div id="pk-list" class="pk-list"><p class="muted">Lade Sets…</p></div>
+  </div>
+</div>
+<div id="pk-zoom" class="pk-zoom"><img alt=""></div>
+
 <style>
+/* --- PPV-Auswahl in der Queue --- */
+.ppv-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.ppv-info { font-size: 13px; background: rgba(109,94,252,.14); border-radius: 6px; padding: 4px 10px; }
+/* Sichtbarkeit über eine Klasse, NICHT über das hidden-Attribut: dessen
+   Browser-Regel [hidden]{display:none} verliert gegen jede eigene
+   display-Angabe, das Overlay stünde dann dauerhaft offen. */
+.pk-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.62);
+  z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+.pk-overlay.open { display: flex; }
+.pk-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  width: min(880px, 100%); max-height: 86vh; display: flex; flex-direction: column; padding: 16px; }
+.pk-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.pk-head input { flex: 1; margin: 0; }
+.pk-opt { font-size: 13px; margin: 0 0 10px; }
+.pk-list { overflow-y: auto; display: grid; gap: 10px; }
+.pk-item { display: flex; gap: 12px; align-items: center; padding: 8px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--panel2); }
+.pk-item.used { opacity: .5; }
+.pk-meta { flex: 1; min-width: 0; }
+.pk-name { font-size: 14px; font-weight: 500; word-break: break-word; }
+.pk-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pk-thumbs { display: flex; gap: 5px; flex: none; }
+.pk-thumbs img { width: 58px; height: 58px; object-fit: cover; border-radius: 6px;
+  display: block; background: var(--panel); cursor: zoom-in; }
+/* Vergroesserung: als eigenes Element am Mauszeiger, damit es nicht vom
+   scrollenden Container abgeschnitten wird. */
+.pk-zoom { display: none; position: fixed; z-index: 300; pointer-events: none;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0,0,0,.6); background: var(--panel); }
+.pk-zoom.show { display: block; }
+.pk-zoom img { display: block; max-width: 44vw; max-height: 72vh; }
+@media (max-width: 560px) {
+  .pk-item { flex-wrap: wrap; }
+  .pk-thumbs img { width: 48px; height: 48px; }
+  .pk-zoom img { max-width: 80vw; }
+}
 .ctx { font-size: 13px; color: var(--muted); margin: 2px 0; padding: 4px 8px;
   border-left: 2px solid var(--border); opacity: .85; }
 .ctx .tag { opacity: .8; }
@@ -62,4 +122,128 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
 .tag.regen { background: rgba(127,127,127,.18); }
 .tag.regen.maxed { background: rgba(220,80,80,.20); }
 </style>
+
+<script>
+(function () {
+  var overlay = document.getElementById('ppv-picker');
+  var list    = document.getElementById('pk-list');
+  var search  = document.getElementById('pk-search');
+  var zoom    = document.getElementById('pk-zoom');
+  var zoomImg = zoom.querySelector('img');
+  var current = null;              // Entwurf, für den gerade ausgewählt wird
+  var cache   = null;              // Set-Liste (einmal pro Seitenaufruf)
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+  // --- Vergrößerung beim Überfahren -------------------------------------
+  function showZoom(src, ev) {
+    zoomImg.src = src; zoom.classList.add('show'); moveZoom(ev);
+  }
+  function moveZoom(ev) {
+    if (!zoom.classList.contains('show')) return;
+    var pad = 16, w = zoom.offsetWidth, h = zoom.offsetHeight;
+    // Am Rand auf die andere Seite kippen, damit nichts abgeschnitten wird
+    var x = ev.clientX + pad, y = ev.clientY + pad;
+    if (x + w > window.innerWidth)  x = ev.clientX - w - pad;
+    if (y + h > window.innerHeight) y = Math.max(pad, window.innerHeight - h - pad);
+    zoom.style.left = x + 'px'; zoom.style.top = y + 'px';
+  }
+  function hideZoom() { zoom.classList.remove('show'); zoomImg.removeAttribute('src'); }
+
+  // --- Vorschaubilder eines Sets nachladen -------------------------------
+  function loadThumbs(box, name) {
+    fetch('/ppv/folder/' + encodeURIComponent(name) + '/thumbs?n=3')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var t = (d && d.thumbs) || [];
+        if (!t.length) { box.innerHTML = '<span class="muted" style="font-size:12px">kein Bild</span>'; return; }
+        box.innerHTML = '';
+        t.forEach(function (item) {
+          var img = document.createElement('img');
+          img.src = item.url; img.loading = 'lazy'; img.alt = '';
+          img.addEventListener('mouseenter', function (e) { showZoom(item.url, e); });
+          img.addEventListener('mousemove', moveZoom);
+          img.addEventListener('mouseleave', hideZoom);
+          box.appendChild(img);
+        });
+      })
+      .catch(function () { box.innerHTML = '<span class="muted" style="font-size:12px">Fehler</span>'; });
+  }
+
+  function render(sets) {
+    var q = (search.value || '').toLowerCase().trim();
+    var shown = sets.filter(function (s) {
+      return !q || s.name.toLowerCase().includes(q) || (s.tags || '').toLowerCase().includes(q);
+    });
+    if (!shown.length) { list.innerHTML = '<p class="muted">Nichts gefunden.</p>'; return; }
+    list.innerHTML = '';
+    shown.forEach(function (s) {
+      var kind = s.media_kind === 'video' ? '🎬 Video' : (s.media_kind === 'mixed' ? 'gemischt' : 'Bilder');
+      var hinweise = [];
+      if (s.purchased) hinweise.push('bereits gekauft');
+      else if (s.offered) hinweise.push('schon angeboten');
+      if (s.request_only) hinweise.push('nur auf Anfrage');
+
+      var el = document.createElement('div');
+      el.className = 'pk-item' + (s.offered || s.purchased ? ' used' : '');
+      el.innerHTML =
+        '<div class="pk-thumbs"><span class="muted" style="font-size:12px">…</span></div>' +
+        '<div class="pk-meta"><div class="pk-name">' + esc(s.name) + '</div>' +
+        '<div class="pk-sub">$' + (s.price_cents / 100).toFixed(2) + ' · ' + kind +
+        (hinweise.length ? ' · ' + esc(hinweise.join(' · ')) : '') + '</div></div>' +
+        '<button type="button" class="btn-primary">Anhängen</button>';
+      el.querySelector('button').addEventListener('click', function () { attach(s.name, el); });
+      list.appendChild(el);
+      loadThumbs(el.querySelector('.pk-thumbs'), s.name);
+    });
+  }
+
+  function open(draftId) {
+    current = draftId;
+    overlay.classList.add('open');
+    search.value = '';
+    if (cache) { render(cache); search.focus(); return; }
+    list.innerHTML = '<p class="muted">Lade Sets…</p>';
+    fetch('/api/ppv-sets?draft_id=' + draftId)
+      .then(function (r) { return r.json(); })
+      .then(function (d) { cache = (d && d.sets) || []; render(cache); search.focus(); })
+      .catch(function () { list.innerHTML = '<p class="muted">Sets konnten nicht geladen werden.</p>'; });
+  }
+  function close() { overlay.classList.remove('open'); hideZoom(); current = null; }
+
+  function attach(name, el) {
+    var btn = el.querySelector('button');
+    btn.disabled = true; btn.textContent = 'Hänge an…';
+    var body = new URLSearchParams({
+      folder: name,
+      regen: document.getElementById('pk-regen').checked ? '1' : '0'
+    });
+    fetch('/queue/' + current + '/ppv/attach', {
+      method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { btn.disabled = false; btn.textContent = 'Anhängen'; alert(d.error || 'Fehlgeschlagen'); return; }
+        location.reload();   // Karte zeigt danach PPV-Leiste und neuen Text
+      })
+      .catch(function () { btn.disabled = false; btn.textContent = 'Anhängen'; });
+  }
+
+  document.querySelectorAll('.ppv-add').forEach(function (b) {
+    b.addEventListener('click', function () { open(b.closest('.ppv-bar').dataset.draft); });
+  });
+  document.querySelectorAll('.ppv-remove').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (!confirm('PPV aus diesem Entwurf entfernen? Der Text bleibt stehen.')) return;
+      b.disabled = true;
+      fetch('/queue/' + b.closest('.ppv-bar').dataset.draft + '/ppv/remove', { method: 'POST' })
+        .then(function () { location.reload(); })
+        .catch(function () { b.disabled = false; });
+    });
+  });
+  document.getElementById('pk-close').addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && overlay.classList.contains('open')) close(); });
+  search.addEventListener('input', function () { if (cache) render(cache); });
+})();
+</script>
 {% endblock %}

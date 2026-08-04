@@ -768,6 +768,93 @@ def save_draft(draft_id: int, edited_text: str = Form("")):
     return RedirectResponse("/queue", status_code=303)
 
 
+@app.get("/api/ppv-sets")
+def api_ppv_sets(draft_id: int = 0):
+    """Aktive PPV-Sets zur Auswahl in der Freigabe-Queue.
+
+    Vorschaubilder werden bewusst NICHT mitgeliefert: die Fanvue-URLs sind
+    kurzlebig und das Laden von 50 Ordnern auf einmal waere langsam. Die
+    Oberflaeche holt sie einzeln und nur fuer sichtbare Sets nach.
+    """
+    offered: set = set()
+    purchased: set = set()
+    if draft_id:
+        d = db.get_draft(draft_id)
+        if d:
+            offered = set(db.ppv_offered_sets(d["user_uuid"])) | db.ppv_offered_folders(d["user_uuid"])
+            purchased = set(db.ppv_purchased_sets(d["user_uuid"]))
+    sets = []
+    for row in db.enabled_ppv_folders():
+        sets.append({
+            "name": row["name"],
+            "price_cents": row["price_cents"],
+            "media_kind": (row["media_kind"] or "image"),
+            "request_only": bool(row["request_only"]),
+            "tags": row["tags"] or "",
+            "offered": row["name"] in offered,
+            "purchased": row["name"] in purchased,
+        })
+    return {"sets": sets}
+
+
+@app.post("/queue/{draft_id}/ppv/attach")
+async def queue_ppv_attach(draft_id: int, request: Request):
+    """Haengt ein PPV-Set an einen wartenden Entwurf."""
+    import json as _json
+    from . import ppv_engine
+    form = await request.form()
+    folder_name = str(form.get("folder", "")).strip()
+    regen = str(form.get("regen", "1")) == "1"
+
+    draft = db.get_draft(draft_id)
+    if not draft or draft["status"] != "pending":
+        return {"ok": False, "error": "Entwurf nicht (mehr) offen."}
+    row = db.get_ppv_folder(folder_name)
+    if not row:
+        return {"ok": False, "error": f"Set '{folder_name}' nicht gefunden."}
+
+    payload = ppv_engine.build_payload({
+        "name": row["name"], "price_cents": row["price_cents"],
+        "preview_media_uuid": row["preview_media_uuid"], "tags": row["tags"] or "",
+    })
+    if not payload:
+        return {"ok": False, "error": "Set enthält keine sendbaren Medien."}
+
+    db.update_draft(
+        draft_id, is_ppv=1, ppv_folder=payload["folder"],
+        ppv_media_uuids=_json.dumps(payload["media_uuids"]),
+        ppv_price_cents=payload["price_cents"],
+        ppv_preview_uuid=payload["preview_uuid"],
+        # Ein angehaengtes PPV soll nicht ungefragt rausgehen - der Mensch hat
+        # es gerade bewusst ausgewaehlt und will den Text sehen.
+        auto_send=0, scheduled_send_at=None,
+    )
+    db.log("info", "ppv", f"PPV '{payload['folder']}' manuell an Entwurf #{draft_id} gehängt",
+           f"{len(payload['media_uuids'])} Medien · ${payload['price_cents']/100:.2f}")
+
+    if regen:
+        # is_ppv steht jetzt auf 1 -> die Neugenerierung schreibt eine
+        # Bildunterschrift statt einer normalen Chat-Antwort.
+        poller.regenerate_draft(draft_id, reason="PPV manuell angehängt", interactive=True)
+    d = db.get_draft(draft_id)
+    return {"ok": True, "folder": payload["folder"],
+            "price_cents": payload["price_cents"],
+            "media": len(payload["media_uuids"]),
+            "text": (d["edited_text"] or d["generated_text"] or "") if d else ""}
+
+
+@app.post("/queue/{draft_id}/ppv/remove")
+def queue_ppv_remove(draft_id: int):
+    """Entfernt das PPV aus einem Entwurf – der Text bleibt stehen."""
+    draft = db.get_draft(draft_id)
+    if not draft:
+        return {"ok": False, "error": "Entwurf nicht gefunden."}
+    db.update_draft(draft_id, is_ppv=0, ppv_folder=None, ppv_media_uuids=None,
+                    ppv_price_cents=None, ppv_preview_uuid=None)
+    db.log("info", "ppv", f"PPV aus Entwurf #{draft_id} entfernt", draft["ppv_folder"] or "")
+    return {"ok": True}
+
+
 @app.post("/queue/{draft_id}/regenerate")
 def regenerate_draft(draft_id: int):
     """Manuelles „Neu generieren“ aus der Queue.
