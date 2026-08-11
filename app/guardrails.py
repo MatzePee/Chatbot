@@ -304,6 +304,19 @@ def looks_like_reasoning(text: str) -> Optional[str]:
     return None
 
 
+# ------------------------------------------------------------ Eckige Klammern
+# In eckigen Klammern steckt bei Modellausgaben nie etwas, das an den Fan soll:
+# Regieanweisungen, Platzhalter, Uhrzeiten, Notizen an sich selbst. Da der
+# Inhalt beliebig ist, wird nicht reparierend geraten, sondern neu generiert.
+_RE_BRACKET = re.compile(r"\[[^\]\n]{0,80}\]|[\[\]]")
+
+
+def finds_brackets(text: str) -> Optional[str]:
+    """Eckige Klammer im Text? Rueckgabe: die Fundstelle."""
+    m = _RE_BRACKET.search(text or "")
+    return m.group(0).strip() if m else None
+
+
 def looks_like_refusal(text: str) -> bool:
     """True, wenn der Text nach einer Modell-Weigerung/Meta-Antwort aussieht."""
     return bool(text and _RE_REFUSAL.search(text))
@@ -390,6 +403,14 @@ def check_outgoing(text: str, has_media: bool = False) -> tuple[str, str | None]
     denk = looks_like_reasoning(text)
     if denk:
         return text, (f"Denkprozess des Modells statt Antwort („{denk}“) – "
+                      f"bitte prüfen (kein Auto-Send)")
+
+    # Eckige Klammern: Reste von Anweisungen, Platzhaltern oder Notizen.
+    # strip_artifacts hat die bekannten Formen (PPV-Tags) schon entfernt -
+    # was jetzt noch dasteht, gehoert nicht in den Chat.
+    klammer = finds_brackets(text)
+    if klammer:
+        return text, (f"Eckige Klammern im Text („{klammer}“) – "
                       f"bitte prüfen (kein Auto-Send)")
 
     # Modell-Weigerung / Meta-Text: darf NIE zum Fan. Wenn eine echte Beispiel-Caption

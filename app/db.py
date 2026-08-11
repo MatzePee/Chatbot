@@ -333,6 +333,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "draft_recheck_enabled": True,      # wartende Drafts regelmaessig pruefen
     "draft_recheck_interval_seconds": 180,   # Pruefabstand (Standard: 3 Minuten)
     "draft_max_regen": 10,              # max. automatische Neugenerierungen pro Draft
+    "bracket_max_regen": 3,             # eigenes Limit bei eckigen Klammern im Text
     "draft_regen_on_stale": True,       # veraltete Drafts automatisch neu erzeugen
                                         # (manuell bearbeitete NIE - dort nur ein Hinweis)
     # --- Veroeffentlichen nach GitHub (Seite /upload) ---

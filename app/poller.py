@@ -1019,7 +1019,22 @@ _REGENERABLE_NOTES = (
     "erfundener plattform",
     "zeit-widerspruch",
     "denkprozess des modells",
+    "eckige klammern",
 )
+
+# Manche Blockaden bekommen ein eigenes, engeres Neuversuch-Limit. Bei eckigen
+# Klammern lohnt langes Wiederholen nicht: liefert das Modell dreimal in Folge
+# Klammern, tut es das mit hoher Wahrscheinlichkeit auch beim zehnten Mal.
+_EIGENE_LIMITS = {"eckige klammern": "bracket_max_regen"}
+
+
+def _max_regen_for(draft: Any) -> int:
+    """Wie viele Neuversuche stehen diesem Entwurf zu?"""
+    note = (draft["guardrail_note"] or "").lower()
+    for kennung, setting in _EIGENE_LIMITS.items():
+        if kennung in note:
+            return int(db.get_setting(setting, 3))
+    return int(db.get_setting("draft_max_regen", 10))
 # Diese Notiz braucht menschliche Augen - nie automatisch neu generieren.
 _HUMAN_ONLY_NOTES = ("eskalations-stichwort",)
 
@@ -1057,8 +1072,9 @@ def _stuck_reason(draft: Any, max_regen: int) -> Optional[str]:
     if any(k in low for k in _MANUAL_ONLY_NOTES):
         return note
     if _is_broken(draft):
-        if (draft["regen_count"] or 0) >= max_regen:
-            return f"{max_regen} automatische Neuversuche ohne Erfolg"
+        limit = _max_regen_for(draft)    # eigener Grenzwert je nach Grund
+        if (draft["regen_count"] or 0) >= limit:
+            return f"{limit} automatische Neuversuche ohne Erfolg"
         return None                      # wird noch wiederholt
     if any(k in low for k in _BLOCKING_NOTES):
         return note                      # blockiert, aber nicht wiederholbar
@@ -1313,7 +1329,9 @@ def recheck_pending_cycle() -> None:
             continue
 
         # --- Fall 2: reparierbar kaputt -> neuen Versuch starten ---
-        if broken and count < max_regen:
+        # Das Limit haengt am Grund: eckige Klammern bekommen nur 3 Versuche.
+        limit = _max_regen_for(draft)
+        if broken and count < limit:
             regenerate_draft(draft_id, reason=f"Auto-Retry: {draft['guardrail_note'] or 'leerer Text'}")
             time.sleep(0.4)
             continue
@@ -1322,7 +1340,7 @@ def recheck_pending_cycle() -> None:
         # Bewusst NICHT nur bei erreichtem Neuversuch-Limit: Blockaden, die gar
         # nicht wiederholt werden (Eskalation, verbotenes Wort, erfundener
         # Preis), erreichen dieses Limit nie und blieben sonst stumm liegen.
-        grund = _stuck_reason(draft, max_regen)
+        grund = _stuck_reason(draft, limit)
         db.update_draft(draft_id, last_check_at=time.time(),
                         **({} if newer else {"stale_note": None}))
         if grund and not draft["notified_at"]:
@@ -1333,7 +1351,7 @@ def recheck_pending_cycle() -> None:
                    f"Draft #{draft_id} ({handle}) hängt fest: {grund}",
                    draft["guardrail_note"] or "")
             try:
-                notify.notify_blocked_draft(db.get_draft(draft_id), max_regen, grund)
+                notify.notify_blocked_draft(db.get_draft(draft_id), limit, grund)
             except Exception as exc:  # noqa: BLE001 - nie den Zyklus abbrechen
                 db.log("error", "notify", "Telegram-Meldung fehlgeschlagen", str(exc))
 

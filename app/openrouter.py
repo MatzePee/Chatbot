@@ -38,12 +38,29 @@ def build_messages(system_prompt: str, history: list[dict[str, Any]], me_uuid: s
     with_stamps = bool(db.get_setting("timestamps_in_history", True))
     now = persona_context.now_local()
 
+    # Zeitliche Einordnung: NUR fuer die letzte Fan-Nachricht, und als Satz im
+    # System-Prompt statt als Marke vor jeder Zeile.
+    #
+    # Frueher stand vor jeder Fan-Nachricht "[vor 2 Std.]". Das Modell hat
+    # dieses Muster schlicht nachgeahmt und seine eigenen Antworten mit
+    # "[gerade eben] ..." begonnen - in den echten Daten die mit Abstand
+    # haeufigste Ursache fuer eckige Klammern im Chat. Eine einzelne Angabe im
+    # System-Prompt liefert dieselbe Information, ohne eine Formatvorlage zu
+    # sein, die zum Nachmachen einlaedt.
+    letzte_marke = ""
     if with_stamps:
-        sys += ("\n\nIm Verlauf stehen vor den Fan-Nachrichten eckige Zeitmarken wie "
-                "[vor 2 Std.] oder [gestern 21:14]. Sie zeigen, wie lange die Nachricht "
-                "her ist. Beruecksichtige sie (z.B. keine Begruessung wie am Morgen, "
-                "wenn die Nachricht von gestern Abend stammt), gib sie aber NIEMALS in "
-                "deiner Antwort aus.")
+        for msg in reversed(history):
+            if (msg.get("sender") or {}).get("uuid", "") == me_uuid:
+                continue
+            if not (msg.get("text") or "").strip():
+                continue
+            letzte_marke = persona_context.relative_time(
+                persona_context.message_timestamp(msg), now)
+            break
+    if letzte_marke:
+        sys += (f"\n\nDie letzte Nachricht des Fans kam: {letzte_marke}. "
+                f"Beruecksichtige das (z.B. keine Morgen-Begruessung auf eine "
+                f"Nachricht von gestern Abend). Nenne diese Angabe nicht.")
 
     # Zeit-/Situationskontext ganz ans Ende - je naeher am Gespraech, desto
     # zuverlaessiger haelt sich das Modell daran.
@@ -59,11 +76,6 @@ def build_messages(system_prompt: str, history: list[dict[str, Any]], me_uuid: s
             continue
         sender_uuid = (msg.get("sender") or {}).get("uuid", "")
         role = "assistant" if sender_uuid == me_uuid else "user"
-        if with_stamps and role == "user":
-            stamp = persona_context.relative_time(
-                persona_context.message_timestamp(msg), now)
-            if stamp:
-                text = f"[{stamp}] {text}"
         messages.append({"role": role, "content": text})
     return messages
 
