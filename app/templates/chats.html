@@ -29,6 +29,7 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
         {% endif %}
         <option value="subscribers" {% if view=='subscribers' %}selected{% endif %}>Alle Abonnenten</option>
         <option value="followers" {% if view=='followers' %}selected{% endif %}>Alle Follower</option>
+        <option value="all" {% if view=='all' %}selected{% endif %}>Alle erfassten Fans ({{ db_total }})</option>
       </select>
     </label>
     <label style="flex:2">Suche
@@ -38,6 +39,16 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
       <a class="btn" href="/chats?view={{ view }}" style="display:block; text-align:center">🔄 Aktualisieren</a>
     </label>
   </div>
+  {% if quelle %}
+  <p class="muted small">Quelle dieser Liste: {{ quelle }}.</p>
+  {% endif %}
+  {% if no_prio1_list %}
+  <div class="card warn">Für <strong>Prio 1</strong> ist keine Fanvue-Liste hinterlegt. Angezeigt wird
+    deshalb der Gruppenfilter <strong>„{{ chat_filter_label }}“</strong> – der zeigt nur die Fans, auf die
+    das gerade zutrifft, und ist oft fast leer, weil der Bot laufend antwortet.
+    <a href="/settings#prio1">Prio-1-Liste in den Einstellungen wählen</a> oder oben
+    <strong>„Alle erfassten Fans ({{ db_total }})“</strong> auswählen.</div>
+  {% endif %}
   <div class="filter-foot">
     <span class="muted small" id="chat-count"></span>
     <form method="post" action="/chats/export-all" class="inline"

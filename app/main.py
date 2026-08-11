@@ -227,7 +227,8 @@ def dashboard(request: Request, sys: str = "", sys_err: str = ""):
     # PPV-Kontingent pro Fan (wie viele aktive Sets noch anbietbar)
     enabled_names = {f["name"] for f in db.enabled_ppv_folders()}
     total_enabled = len(enabled_names)
-    folders = db.offer_folders_by_user()
+    folders = db.offer_folders_by_user(
+        float(db.get_setting("ppv_offer_reset_days", 0) or 0))
     low, exhausted = [], []
     for uuid, sets in folders.items():
         offered_enabled = sets["offered"] & enabled_names
@@ -788,8 +789,11 @@ def api_ppv_sets(draft_id: int = 0):
     if draft_id:
         d = db.get_draft(draft_id)
         if d:
-            offered = set(db.ppv_offered_sets(d["user_uuid"])) | db.ppv_offered_folders(d["user_uuid"])
             purchased = set(db.ppv_purchased_sets(d["user_uuid"]))
+            # abgelaufene Angebote nicht mehr als "angeboten" markieren
+            offered = db.ppv_blocked_sets(
+                d["user_uuid"],
+                float(db.get_setting("ppv_offer_reset_days", 0) or 0)) - purchased
     sets = []
     for row in db.enabled_ppv_folders():
         sets.append({
@@ -966,6 +970,16 @@ def _fetch_list_members(list_uuid: str, cap: int = 5000) -> list[dict]:
     return members
 
 
+_CHAT_FILTER_LABELS = {
+    "unread": "Ungelesen", "not_answered": "Unbeantwortet", "online": "Gerade online",
+    "not_muted": "Nicht stummgeschaltet", "subscribers": "Abonnenten",
+    "recent_subscribers": "Kürzlich abonniert", "followers": "Follower",
+    "on_free_trial": "In Gratis-Testphase", "spenders": "Zahlende Fans",
+    "spent_more_than_50": "High-Spender", "has_tipped": "Haben schon getippt",
+    "": "kein Filter",
+}
+
+
 @app.get("/chats", response_class=HTMLResponse)
 def chats(request: Request, view: str = "group", q: str = "", msg: str = ""):
     ctx = _base_ctx(request)
@@ -991,15 +1005,23 @@ def chats(request: Request, view: str = "group", q: str = "", msg: str = ""):
                             "zeige nur Fans mit bestehender Konversation.")
             return _fetch_group_members(custom_list_id=list_id)
 
+    # Woher stammt die angezeigte Liste? Wird unter dem Dropdown eingeblendet,
+    # damit eine kurze Liste nicht wie ein Fehler aussieht.
+    quelle = ""
     members: list[dict] = []
-    if fanvue.is_connected():
+    if view == "all":
+        quelle = "alle in der Datenbank erfassten Fans"
+    elif fanvue.is_connected():
         try:
             if view == "subscribers":
                 members = _fetch_group_members(filter_="subscribers")
+                quelle = "Fanvue-Gruppe „Abonnenten“"
             elif view == "followers":
                 members = _fetch_group_members(filter_="followers")
+                quelle = "Fanvue-Gruppe „Follower“"
             elif view == "prio2":
                 members = [{**m, "group": "Prio 2"} for m in _members_of(prio2_list)]
+                quelle = f"Fanvue-Liste „{p2_name}“"
             elif view == "both":
                 seen: dict[str, dict] = {}
                 for m in _members_of(prio1_list):
@@ -1008,17 +1030,32 @@ def chats(request: Request, view: str = "group", q: str = "", msg: str = ""):
                     if m["uuid"] not in seen:
                         seen[m["uuid"]] = {**m, "group": "Prio 2"}
                 members = list(seen.values())
+                quelle = f"Fanvue-Listen „{p1_name}“ + „{p2_name}“"
             else:  # prio1 (Standard)
                 if prio1_list:
                     members = [{**m, "group": "Prio 1"} for m in _members_of(prio1_list)]
+                    quelle = f"Fanvue-Liste „{p1_name}“"
                 else:
-                    members = _fetch_group_members(filter_=db.get_setting("chat_filter", "unread"))
+                    # Keine Prio-1-Liste hinterlegt -> es zaehlt der Gruppenfilter
+                    # aus den Einstellungen. Der kann sehr eng sein (z. B.
+                    # "Unbeantwortet" zeigt fast nichts, wenn der Bot mitkommt).
+                    filt = db.get_setting("chat_filter", "unread")
+                    members = _fetch_group_members(filter_=filt)
+                    ctx["no_prio1_list"] = True
+                    ctx["chat_filter_label"] = _CHAT_FILTER_LABELS.get(filt, filt or "kein Filter")
+                    quelle = (f"Gruppenfilter „{ctx['chat_filter_label']}“ "
+                              "(keine Prio-1-Liste hinterlegt)")
         except Exception as exc:  # noqa: BLE001
             ctx["error"] = str(exc)
     if not members:
         # Fallback: bereits erfasste Chats aus der DB
         members = [{"uuid": c["user_uuid"], "handle": c["handle"] or "",
                     "display_name": c["display_name"] or ""} for c in db.list_chats()]
+        if view != "all":
+            quelle = (quelle + " – leer, daher alle erfassten Fans") if quelle \
+                else "alle in der Datenbank erfassten Fans"
+    ctx["quelle"] = quelle
+    ctx["db_total"] = len(db.list_chats())
 
     enriched = []
     insights = _insights_for([m["uuid"] for m in members])
@@ -1071,7 +1108,10 @@ def chat_ppv_page(request: Request, user_uuid: str, synced: str = "", matched: s
 
     offers = db.list_ppv_offers(user_uuid)
     purchased = set(db.ppv_purchased_sets(user_uuid)) | {o["folder"] for o in offers if o["purchased"]}
-    offered = db.ppv_offered_folders(user_uuid) | set(db.ppv_offered_sets(user_uuid))
+    # Nur noch gesperrte Sets gelten als "angeboten" - abgelaufene Angebote
+    # fallen laut Einstellung zurueck auf "nicht angeboten".
+    reset_days = float(db.get_setting("ppv_offer_reset_days", 0) or 0)
+    offered = db.ppv_blocked_sets(user_uuid, reset_days) - purchased
     dates = db.folder_offer_dates(user_uuid)
 
     # Alle verkaufbaren Sets + zusaetzlich bereits angebotene (auch wenn inzwischen deaktiviert)
@@ -1096,6 +1136,8 @@ def chat_ppv_page(request: Request, user_uuid: str, synced: str = "", matched: s
             "price_cents": prices.get(name, 0),
             "status": status,
             "status_value": value,
+            # wurde frueher angeboten, ist aber durch die Frist wieder frei
+            "expired": bool(value == "not_offered" and d.get("offered_at")),
             "offered_at": d.get("offered_at"),
             "purchased_at": d.get("purchased_at"),
         })
@@ -1390,7 +1432,7 @@ _INT_KEYS = {
     "ppv_confirm_context_messages",
     "ppv_intent_threshold", "ppv_min_fan_messages", "ppv_sexual_streak_trigger", "ppv_cooldown_minutes",
     "ppv_cooldown_outbound", "ppv_cooldown_long_minutes", "ppv_unpurchased_threshold",
-    "ppv_max_media_per_set", "ppv_thumb_cache_hours",
+    "ppv_max_media_per_set", "ppv_thumb_cache_hours", "ppv_offer_reset_days",
     "reactivation_inactive_hours", "reactivation_cooldown_days", "reactivation_max_per_cycle",
     "reactivation_delay_min_minutes", "reactivation_delay_max_minutes",
     "prio2_interval_minutes", "prio2_jitter_minutes",

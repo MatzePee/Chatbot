@@ -257,6 +257,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "ppv_unpurchased_threshold": 3,     # nach X ungekauften PPV -> langer Cooldown
     "ppv_caption_use_vision": False,    # PPV-Captions ueber das Vision-Modell/-Key generieren
     "ppv_block_on_distress": True,      # kein PPV, wenn der Fan emotional verletzlich ist
+    # Nach so vielen Tagen darf ein NICHT gekauftes Set demselben Fan erneut
+    # angeboten werden. 0 = nie erneut (bisheriges Verhalten).
+    "ppv_offer_reset_days": 5,
     "ppv_max_media_per_set": 30,        # max. Medien pro PPV-Nachricht
     "ppv_thumb_cache_hours": 6,         # wie lange Vorschaubilder gecacht werden
     "ppv_keywords": (
@@ -890,19 +893,28 @@ def activity_by_user(start: float, end: float) -> dict[str, dict]:
     return out
 
 
-def offer_folders_by_user() -> dict[str, dict]:
-    """Pro Fan: {offered: set(folders), purchased: set(folders)} aus allen ppv_offers."""
+def offer_folders_by_user(reset_days: float = 0) -> dict[str, dict]:
+    """Pro Fan: {offered: set(folders), purchased: set(folders)} aus allen ppv_offers.
+
+    reset_days > 0: Angebote, die aelter als die Frist sind und nicht gekauft
+    wurden, zaehlen nicht mehr als "angeboten" - genau wie in ppv_blocked_sets,
+    damit die Dashboard-Quote zur tatsaechlichen Auswahl passt.
+    """
+    grenze = (time.time() - reset_days * 86400) if reset_days > 0 else None
     out: dict[str, dict] = {}
     with _lock:
         rows = get_conn().execute(
-            "SELECT user_uuid, folder, MAX(purchased) AS p FROM ppv_offers "
-            "GROUP BY user_uuid, folder").fetchall()
+            "SELECT user_uuid, folder, MAX(purchased) AS p, MAX(sent_at) AS ts "
+            "FROM ppv_offers GROUP BY user_uuid, folder").fetchall()
     for r in rows:
+        if not r["folder"]:
+            continue
         slot = out.setdefault(r["user_uuid"], {"offered": set(), "purchased": set()})
-        if r["folder"]:
+        if r["p"]:
+            slot["purchased"].add(r["folder"])
             slot["offered"].add(r["folder"])
-            if r["p"]:
-                slot["purchased"].add(r["folder"])
+        elif grenze is None or (r["ts"] and float(r["ts"]) >= grenze):
+            slot["offered"].add(r["folder"])
     return out
 
 
@@ -1218,6 +1230,34 @@ def set_folder_offers_purchased(user_uuid: str, folder: str, purchased: bool,
             "UPDATE ppv_offers SET purchased = ?, purchased_at = ? WHERE user_uuid = ? AND folder = ?",
             (1 if purchased else 0, purchased_at if purchased else None, user_uuid, folder))
         conn.commit()
+
+
+def ppv_blocked_sets(user_uuid: str, reset_days: float = 0) -> set:
+    """Sets, die diesem Fan gerade NICHT (erneut) angeboten werden duerfen.
+
+    reset_days > 0: Ein Angebot sperrt nur so lange. Danach darf dasselbe Set
+    noch einmal geschickt werden - der Fan hat es damals nicht gekauft, ein
+    zweiter Anlauf nach einigen Tagen ist also legitim.
+
+    GEKAUFTE Sets bleiben immer gesperrt: dafuer hat der Fan bezahlt, das
+    duerfte er kein zweites Mal angeboten bekommen.
+
+    Ohne Zeitangaben (Alt-Eintraege aus offered_sets ohne passenden Datensatz
+    in ppv_offers) gilt das Angebot als alt und damit als abgelaufen - andernfalls
+    blieben diese Sets fuer immer gesperrt und die Einstellung waere wirkungslos.
+    """
+    gekauft = set(ppv_purchased_sets(user_uuid))
+    daten = folder_offer_dates(user_uuid)
+    gekauft |= {f for f, d in daten.items() if d.get("purchased_at")}
+
+    if reset_days <= 0:
+        return (gekauft | set(ppv_offered_sets(user_uuid))
+                | ppv_offered_folders(user_uuid))
+
+    grenze = time.time() - reset_days * 86400
+    frisch = {f for f, d in daten.items()
+              if d.get("offered_at") and float(d["offered_at"]) >= grenze}
+    return gekauft | frisch
 
 
 def ppv_offered_folders(user_uuid: str) -> set:

@@ -290,12 +290,14 @@ def select_set(user_uuid: str, preferences: list[str],
     """Waehlt ein noch nicht angebotenes/gekauftes, aktives PPV-Set.
     'Nur auf Anfrage'-Sets nur, wenn allow_request_only (explizite Anfrage).
     wanted_kind ('video'/'image') schraenkt auf den gewuenschten Medientyp ein."""
-    # "angeboten" aus beiden Quellen: State-Liste UND tatsaechliche Angebots-Datensaetze
-    offered = set(db.ppv_offered_sets(user_uuid)) | db.ppv_offered_folders(user_uuid)
-    purchased = set(db.ppv_purchased_sets(user_uuid))
+    # Gesperrte Sets: gekaufte dauerhaft, angebotene nur fuer die eingestellte
+    # Frist (ppv_offer_reset_days). Danach darf ein nicht gekauftes Set noch
+    # einmal geschickt werden.
+    gesperrt = db.ppv_blocked_sets(
+        user_uuid, float(db.get_setting("ppv_offer_reset_days", 0) or 0))
     candidates = []
     for row in db.enabled_ppv_folders():
-        if row["name"] in offered or row["name"] in purchased:
+        if row["name"] in gesperrt:
             continue
         # "Nur auf Anfrage"-Sets nur bei expliziter Aufforderung
         if not allow_request_only and _row_request_only(row):

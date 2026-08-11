@@ -36,7 +36,7 @@
 
   <h2 class="grp">Verbindung &amp; Schlüssel</h2>
   <p class="muted grp-desc">Zugangsdaten für Fanvue, OpenRouter und die Bildanalyse.</p>
-  <details class="card sect" open>
+  <details class="card sect">
     <summary>Fanvue OAuth</summary>
     <label>Client-ID <input name="fanvue_client_id" value="{{ s['fanvue_client_id'] }}"></label>
     <label>Client-Secret <input name="fanvue_client_secret" type="password" value="{{ s['fanvue_client_secret'] }}"></label>
@@ -211,7 +211,7 @@
       <label>Ende (Std) <input name="active_hour_end" type="number" min="0" max="23" value="{{ s['active_hour_end'] }}"></label>
     </div>
   </details>
-  <details class="card sect">
+  <details class="card sect" id="prio1">
     <summary>Prio 1 – aktive Fans (schnell)</summary>
     <p class="muted small">Diese Gruppe wird im normalen Poll-Intervall (oben) bearbeitet – für aktive Käufer, die schnelle Antworten bekommen sollen.</p>
     <div class="row">
@@ -296,6 +296,9 @@
       <label>Aufwärmphase: min. Fan-Nachrichten vor PPV <input name="ppv_min_fan_messages" type="number" min="0" value="{{ s['ppv_min_fan_messages'] }}"></label>
       <label>Sexuelle Nachrichten in Folge → Trigger <input name="ppv_sexual_streak_trigger" type="number" value="{{ s['ppv_sexual_streak_trigger'] }}"></label>
       <label>Max. Medien pro Set <input name="ppv_max_media_per_set" type="number" value="{{ s['ppv_max_media_per_set'] }}"></label>
+      <label>Angebot zurücksetzen nach (Tagen) <span class="info" tabindex="0" data-tip="Ein Set, das einem Fan angeboten, aber NICHT gekauft wurde, gilt nach so vielen Tagen wieder als „nicht angeboten“ und darf erneut geschickt werden. Gekaufte Sets bleiben dauerhaft gesperrt. 0 = nie erneut anbieten.">ⓘ</span>
+        <input name="ppv_offer_reset_days" type="number" min="0" max="365"
+          value="{{ s['ppv_offer_reset_days'] }}"></label>
       <label>Vorschaubild-Cache (Std) <input name="ppv_thumb_cache_hours" type="number" value="{{ s['ppv_thumb_cache_hours'] }}"></label>
     </div>
     <div class="row">
@@ -498,6 +501,17 @@
     var d = e.target.closest('details.sect');
     if (d) d.open = true;
   }, true);
+
+  // /settings#prio1 -> genau diesen Abschnitt aufklappen und anspringen
+  function openHash() {
+    if (!location.hash) return;
+    var t = document.querySelector(location.hash);
+    if (!t) return;
+    var d = t.matches('details.sect') ? t : t.closest('details.sect');
+    if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); }
+  }
+  openHash();
+  window.addEventListener('hashchange', openHash);
 })();
 </script>
 {% endblock %}

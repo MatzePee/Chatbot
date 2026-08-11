@@ -72,6 +72,7 @@
         <td>
           {% if t['status'] == 'gekauft' %}<span class="pill bought">✓ gekauft</span>
           {% elif t['status'] == 'angeboten' %}<span class="pill offered">angeboten</span>
+          {% elif t['expired'] %}<span class="pill none" title="Angebotsfrist abgelaufen – darf erneut angeboten werden">nicht angeboten <span class="muted">(Frist abgelaufen)</span></span>
           {% else %}<span class="pill none">nicht angeboten</span>{% endif %}
         </td>
         <td class="muted small">
