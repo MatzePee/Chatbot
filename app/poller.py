@@ -95,9 +95,48 @@ def poll_cycle(custom_list_id=_UNSET) -> None:
         time.sleep(0.4)
 
 
+def _check_alert_keywords(user_uuid: str, handle: str, display_name: str,
+                          last_msg: dict, chat) -> None:
+    """Meldet eine eingehende Fan-Nachricht per Telegram, wenn sie eines der
+    frei konfigurierten Stichwoerter enthaelt (AI, KI, Fake, Scam, Betrug ...).
+
+    Reine Information - der Bot antwortet ganz normal weiter.
+
+    Gemeldet wird jede Nachricht genau einmal: last_alert_uuid haelt fest, bis
+    wohin gemeldet wurde. Ein eigener Merker, weil last_inbound_uuid schon
+    gesetzt sein kann, bevor wir hier ankommen.
+    """
+    if not db.get_setting("alert_keywords_enabled", True):
+        return
+    msg_uuid = last_msg.get("uuid") or ""
+    if chat is not None and (chat["last_alert_uuid"] or "") == msg_uuid:
+        return
+    text = (last_msg.get("text") or "").strip()
+    try:
+        treffer = guardrails.find_alert_keywords(text)
+        if treffer:
+            notify.notify_keyword_hit(
+                handle, display_name or handle or user_uuid, treffer, text)
+    except Exception as exc:  # noqa: BLE001
+        # Ein Fehler beim Melden darf die Antwort des Bots niemals verhindern
+        db.log("warn", "notify", f"Stichwort-Pruefung fehlgeschlagen: {exc}", text[:200])
+    if msg_uuid:
+        db.update_chat(user_uuid, last_alert_uuid=msg_uuid)
+
+
 def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) -> None:
     chat = db.get_chat(user_uuid)
     if chat and not chat["bot_enabled"]:
+        # Bot aus: trotzdem auf Stichwoerter schauen. Gerade Chats, die man
+        # abgeschaltet hat, sind die, in denen ein Betrugsvorwurf faellt.
+        if db.get_setting("alert_keywords_enabled", True):
+            try:
+                res = fanvue.list_messages(user_uuid, size=5, mark_as_read=False)
+                msgs = res.get("data", [])
+                if msgs and (msgs[0].get("sender") or {}).get("uuid", "") != me_uuid:
+                    _check_alert_keywords(user_uuid, handle, display_name, msgs[0], chat)
+            except Exception:  # noqa: BLE001
+                pass
         return
     # Offener Draft? Normalerweise nicht doppelt generieren. Ausnahme: eine noch nicht
     # gesendete, geplante REAKTIVIERUNG wird verworfen, sobald der Fan selbst schreibt
@@ -131,6 +170,9 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
     if last_sender == me_uuid:
         return
     last_uuid = last_msg.get("uuid")
+    # Stichwort-Alarm VOR dem Verarbeitet-Abbruch: die Meldung soll auch dann
+    # rausgehen, wenn zu dieser Nachricht schon geantwortet wurde.
+    _check_alert_keywords(user_uuid, handle, display_name, last_msg, chat)
     if chat and chat["last_inbound_uuid"] == last_uuid:
         return  # schon verarbeitet
 

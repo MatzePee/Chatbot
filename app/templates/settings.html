@@ -403,6 +403,22 @@
       <button type="button" class="btn" id="tg-test">📨 Testnachricht senden</button>
     </div>
     <p id="tg-out" class="muted" style="margin-top:8px"></p>
+
+    <hr>
+    <h3>Stichwort-Alarm auf eingehende Nachrichten</h3>
+    <p class="muted small">Schreibt ein Fan eines dieser Wörter, bekommst du die <strong>komplette
+    Nachricht</strong> per Telegram. Der Bot antwortet trotzdem ganz normal weiter – das ist reine
+    Information. Jede Nachricht wird genau einmal gemeldet.</p>
+    <label class="chk"><input type="checkbox" name="alert_keywords_enabled"
+      {% if s['alert_keywords_enabled'] %}checked{% endif %}> Stichwort-Alarm aktiv</label>
+    <label>Stichwörter <span class="info" tabindex="0" data-tip="Komma- oder zeilenweise getrennt. Groß-/Kleinschreibung egal. Es wird nur auf ganze Wörter geprüft – „KI“ trifft also nicht in „Kirsche“, „AI“ nicht in „again“. Angehängte Endungen (Fakes, Betrugs) treffen mit; Formen mit Umlaut wie „Betrüger“ brauchen einen eigenen Eintrag. Mehrwortige Einträge wie „kein echter mensch“ funktionieren auch.">ⓘ</span>
+      <textarea name="alert_keywords" rows="3"
+        placeholder="AI, KI, Fake, Scam, Betrug">{{ s['alert_keywords'] }}</textarea></label>
+    <div class="draft-actions" style="margin-top:8px">
+      <input id="kw-probe" type="text" style="flex:2" placeholder="Beispieltext zum Ausprobieren, z. B. „bist du eine KI?“">
+      <button type="button" class="btn" id="kw-test">🔎 Liste ausprobieren</button>
+    </div>
+    <p id="kw-out" class="muted" style="margin-top:8px"></p>
   </details>
   <details class="card sect">
     <summary>Updates</summary>
@@ -444,6 +460,32 @@
       post('/settings/telegram-test',
            {chat_id: document.querySelector('[name=telegram_chat_id]').value})
         .then(function (d) { out.textContent = (d.ok ? '✅ ' : '⚠ ') + d.msg; });
+    });
+  })();
+  </script>
+  <script>
+  (function () {
+    // Stichwort-Liste ausprobieren - prueft die Liste im Feld, also auch
+    // ungespeicherte Aenderungen.
+    var btn = document.getElementById('kw-test'), out = document.getElementById('kw-out');
+    if (!btn || !out) return;
+    btn.addEventListener('click', function () {
+      var body = new URLSearchParams({
+        keywords: document.querySelector('[name=alert_keywords]').value,
+        text: document.getElementById('kw-probe').value
+      });
+      out.textContent = 'Prüfe…';
+      fetch('/settings/keyword-test', {method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.hits && d.hits.length) {
+            out.textContent = '🔔 Treffer: ' + d.hits.join(', ') + ' – dafür käme eine Telegram-Meldung.';
+          } else {
+            out.textContent = '– kein Treffer (' + d.count + ' Stichwörter geprüft), keine Meldung.';
+          }
+        })
+        .catch(function (e) { out.textContent = 'Fehler: ' + e; });
     });
   })();
   </script>

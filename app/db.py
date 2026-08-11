@@ -356,6 +356,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "telegram_bot_token": "",           # von @BotFather
     "telegram_chat_id": "",             # eigene Chat-ID (per Knopfdruck ermittelbar)
     "app_base_url": "",                 # z.B. http://192.168.20.16:8000 - fuer Links in Meldungen
+    # --- Stichwort-Alarm auf eingehende Fan-Nachrichten ---
+    # Kommagetrennt oder zeilenweise. Trifft nur auf ganze Woerter, sonst
+    # steckte "KI" in "Kirsche" und "AI" in "again".
+    "alert_keywords_enabled": True,
+    "alert_keywords": "AI, KI, Fake, Scam, Betrug",
     # Persona / System-Prompt
     "system_prompt": (
         "Du bist die Chat-Persona einer Creatorin auf Fanvue. Antworte kurz, "
@@ -464,6 +469,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
         "chats": {
             "last_inbound_at": "REAL",
             "last_reactivation_at": "REAL",
+            # Bis zu welcher Nachricht der Stichwort-Alarm schon gemeldet hat.
+            # Getrennt von last_inbound_uuid, damit eine Meldung auch dann
+            # genau einmal rausgeht, wenn der Chat mehrfach durchlaufen wird.
+            "last_alert_uuid": "TEXT",
         },
     }
     for table, cols in wanted.items():

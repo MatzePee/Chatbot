@@ -1373,6 +1373,28 @@ async def settings_telegram_chatid(request: Request):
         return {"ok": False, "msg": str(exc)}
 
 
+@app.post("/settings/keyword-test")
+async def settings_keyword_test(request: Request):
+    """Probiert die Stichwort-Liste an einem Beispieltext aus.
+
+    Nutzt die Liste aus dem Formular, damit man schon vor dem Speichern sieht,
+    ob ein Wort wirklich trifft - und ob es faelschlich in harmlosen Woertern
+    steckt.
+    """
+    from . import guardrails
+    form = await request.form()
+    text = str(form.get("text", ""))
+    roh = str(form.get("keywords", ""))
+    worte, gesehen = [], set()
+    for teil in roh.replace("\n", ",").split(","):
+        w = teil.strip()
+        if w and w.lower() not in gesehen:
+            gesehen.add(w.lower())
+            worte.append(w)
+    hits = [w for w in worte if guardrails._alert_pattern(w).search(text)]
+    return {"ok": True, "hits": hits, "count": len(worte)}
+
+
 @app.post("/settings/time-preview")
 async def settings_time_preview(request: Request):
     """Live-Vorschau des Zeitkontext-Blocks.
@@ -1444,7 +1466,8 @@ _BOOL_KEYS = {"active_hours_enabled", "ppv_enabled", "ppv_use_llm_classifier",
               "ppv_caption_use_vision", "ppv_block_on_distress", "tip_thanks_enabled",
               "time_context_enabled", "timestamps_in_history", "time_guard_enabled",
               "draft_recheck_enabled", "draft_regen_on_stale", "telegram_enabled",
-              "update_check_enabled", "update_notify_telegram"}
+              "update_check_enabled", "update_notify_telegram",
+              "alert_keywords_enabled"}
 
 
 @app.post("/settings")

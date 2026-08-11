@@ -476,3 +476,90 @@ def incoming_needs_escalation(text: str) -> str | None:
         if kw in lowered:
             return kw
     return None
+
+
+# ------------------------------------------------ Stichwort-Alarm (Telegram)
+_ALERT_CACHE: dict[str, "re.Pattern"] = {}
+
+
+_APO = "'’ʼ´`"     # gerade und typografische Apostrophe
+
+
+def _alert_pattern(word: str):
+    """Muster mit WORTGRENZEN fuer ein Alarm-Stichwort.
+
+    Wortgrenzen sind Pflicht, nicht Kosmetik: 'KI' steckt in 'Kirsche', 'Kind'
+    und 'skinny', 'AI' in 'again', 'said', 'wait' und 'email'. Eine schlichte
+    Teilstring-Suche traf an echten Nachrichten 3186 statt 285 Mal.
+
+    Der Apostroph zaehlt dabei als Wortbestandteil. Ohne das war das
+    franzoesische "j'ai" / "t'ai" die mit Abstand haeufigste Fehlmeldung: das
+    Apostrophzeichen ist kein Wortzeichen, also stand "ai" formal frei.
+
+    Ein angehaengtes Plural-/Genitiv-s wird nur bei Woertern ab vier Zeichen
+    zugelassen ('fake' trifft 'fakes'). Bei kurzen Kuerzeln waere es
+    gefaehrlich - 'KI' + 'n' ergaebe 'kin', 'AI' + 's' das franzoesische 'ais'.
+
+    Mehrwortige Eintraege ('kein echter mensch') funktionieren ebenfalls,
+    dazwischen ist beliebiger Leerraum erlaubt.
+    """
+    pat = _ALERT_CACHE.get(word)
+    if pat is None:
+        teile = [re.escape(t) for t in word.split()]
+        rumpf = r"\s+".join(teile)
+        suffix = r"(?:s|es|n|er|ern)?" if len(word) >= 4 else ""
+        pat = re.compile(rf"(?<![\w{_APO}]){rumpf}{suffix}(?![\w{_APO}])", re.I)
+        _ALERT_CACHE[word] = pat
+    return pat
+
+
+# Franzoesische Elisionen. "j'ai", "n'ai", "t'ai" werden von Fans haeufig ohne
+# Apostroph getippt ("j ai mal partout") - dann steht "ai" formal als eigenes
+# Wort da und der Apostroph-Schutz greift nicht. Bei zweibuchstabigen Kuerzeln
+# wie AI/KI ist das die letzte verbliebene Fehlerquelle; laengere Stichwoerter
+# sind davon nicht betroffen.
+# Dazu die Pronomen, nach denen im Franzoesischen "ai" (avoir) steht:
+# "je ai", "lui ai demande", "les ai". Alle davon sind im Englischen keine
+# Woerter, ein englisches "... on AI" wird also nicht mit unterdrueckt.
+_FR_ELISION = {"j", "n", "t", "l", "m", "d", "c", "s", "qu", "en", "y",
+               "je", "lui", "les", "leur", "nous", "vous"}
+
+
+def _is_french_elision(text: str, start: int) -> bool:
+    """Steht direkt vor dem Treffer ein franzoesisches Elisionswort?"""
+    davor = text[:start].rstrip()
+    if not davor or davor[-1].isspace():
+        return False
+    wort = re.split(r"[^\w]+", davor)[-1] if davor else ""
+    return wort.lower() in _FR_ELISION
+
+
+def alert_keywords() -> list[str]:
+    """Die konfigurierte Wortliste. Komma UND Zeilenumbruch trennen."""
+    raw = str(db.get_setting("alert_keywords", "") or "")
+    worte = []
+    for teil in raw.replace("\n", ",").split(","):
+        w = teil.strip()
+        if w and w.lower() not in [x.lower() for x in worte]:
+            worte.append(w)
+    return worte
+
+
+def find_alert_keywords(text: str) -> list[str]:
+    """Alle Alarm-Stichwoerter, die in der Fan-Nachricht vorkommen.
+
+    Gibt die Woerter so zurueck, wie sie in den Einstellungen stehen - damit
+    die Telegram-Meldung genau das zeigt, was eingetragen wurde.
+    """
+    t = text or ""
+    if not t.strip():
+        return []
+    gefunden = []
+    for w in alert_keywords():
+        kurz = len(w) <= 2
+        for m in _alert_pattern(w).finditer(t):
+            if kurz and _is_french_elision(t, m.start()):
+                continue        # "j ai", "n ai" - kein Hinweis auf KI
+            gefunden.append(w)
+            break
+    return gefunden

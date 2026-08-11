@@ -19,6 +19,7 @@ geschluckt - ein nicht erreichbares Telegram darf den Poller nie aufhalten.
 from __future__ import annotations
 
 import html
+from urllib.parse import quote
 import time
 from typing import Any, Optional
 
@@ -121,6 +122,51 @@ def _queue_link() -> str:
 
 def _esc(value: Any, limit: int = 200) -> str:
     return html.escape(str(value or "")[:limit])
+
+
+def _chat_link(handle: str) -> str:
+    """Link auf die Subs-Seite, vorgefiltert auf diesen Fan.
+
+    Die Suche der Subs-Seite wird beim Laden angewandt, der Fan steht also
+    sofort da - mit allen Knoepfen (PPV-Status, Reaktivierung, Einstellungen).
+    """
+    base = str(db.get_setting("app_base_url", "") or "").strip().rstrip("/")
+    if not base:
+        return ""
+    ziel = f"{base}/chats?view=all"
+    if handle:
+        ziel += f"&q={quote(handle)}"
+    return f"\n\n👉 {html.escape(ziel)}"
+
+
+def notify_keyword_hit(handle: str, who: str, treffer: list[str], text: str) -> bool:
+    """Meldet eine eingehende Fan-Nachricht mit einem Alarm-Stichwort.
+
+    Der Bot antwortet trotzdem ganz normal weiter - das hier ist reine
+    Information, damit du mitbekommst, wenn jemand von KI, Fake oder Betrug
+    schreibt.
+
+    Die Nachricht wird VOLLSTAENDIG mitgeschickt (Telegram-Limit 4096 Zeichen,
+    daher grosszuegig gekappt), damit du nicht erst die Oberflaeche oeffnen
+    musst, um den Zusammenhang zu verstehen.
+    """
+    if not db.get_setting("telegram_enabled", False) or not is_configured():
+        return False
+
+    worte = ", ".join(_esc(w, 40) for w in treffer) or "?"
+    lines = [
+        "🔎 <b>Stichwort in einer Fan-Nachricht</b>",
+        "",
+        f"👤 <b>{_esc(who, 80)}</b>",
+        f"🔑 Treffer: <b>{worte}</b>",
+        "",
+        f"💬 {_esc(text, 3000)}",
+    ]
+    ok = send("\n".join(lines) + _chat_link(handle))
+    if ok:
+        db.log("info", "notify",
+               f"Telegram: Stichwort {', '.join(treffer)} bei {who}", text[:300])
+    return ok
 
 
 def notify_blocked_draft(draft: Any, max_regen: int, grund: str = "") -> bool:
