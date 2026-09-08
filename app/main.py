@@ -399,13 +399,8 @@ def _safe_filename(s: str) -> str:
     return s or "chat"
 
 
-def _write_chat_export(user_uuid: str, handle: str, display: str, me_uuid: str) -> tuple[str, int]:
-    """Holt den Chatverlauf und schreibt ihn als Markdown nach exports/. Rueckgabe: (Pfad, Anzahl)."""
-    os.makedirs(EXPORT_DIR, exist_ok=True)
-    msgs = fanvue.full_message_history(user_uuid)
-    lines = [f"# Chat mit {display or handle or user_uuid} (@{handle})",
-             f"UUID: {user_uuid}",
-             f"Exportiert: {datetime.now().strftime('%d.%m.%Y %H:%M')} · {len(msgs)} Nachrichten", ""]
+def _export_lines_from_api(msgs: list, me_uuid: str) -> list[str]:
+    zeilen = []
     for m in msgs:
         sender = (m.get("sender") or {}).get("uuid", "")
         who = "Creator" if sender == me_uuid else "Fan"
@@ -422,27 +417,85 @@ def _write_chat_export(user_uuid: str, handle: str, display: str, me_uuid: str) 
         if m.get("hasMedia"):
             tags.append(str(m.get("mediaType") or "media"))
         tagstr = f" [{', '.join(tags)}]" if tags else ""
-        lines.append(f"- {ts} **{who}**{tagstr}: {text}")
+        zeilen.append(f"- {ts} **{who}**{tagstr}: {text}")
+    return zeilen
+
+
+def _export_lines_from_db(user_uuid: str) -> list[str]:
+    """Ausweichquelle: die lokal mitgeschriebenen Nachrichten."""
+    zeilen = []
+    for r in db.messages_chronological(user_uuid):
+        who = "Fan" if r["direction"] == "in" else "Creator"
+        stamp = r["sent_at"] or r["seen_at"]
+        ts = datetime.fromtimestamp(stamp).strftime("%Y-%m-%d %H:%M") if stamp else ""
+        tags = []
+        # "SINGLE_RECIPIENT" steht an JEDER normalen Nachricht und macht den
+        # Export nur unleserlich - interessant sind die Ausnahmen (z.B. TIP).
+        if r["msg_type"] and str(r["msg_type"]).upper() not in ("SINGLE_RECIPIENT", "MESSAGE"):
+            tags.append(str(r["msg_type"]))
+        if r["has_media"]:
+            tags.append("media")
+        tagstr = f" [{', '.join(tags)}]" if tags else ""
+        text = (r["text"] or "").replace("\n", " ").strip()
+        zeilen.append(f"- {ts} **{who}**{tagstr}: {text}")
+    return zeilen
+
+
+def _write_chat_export(user_uuid: str, handle: str, display: str, me_uuid: str) -> tuple[str, int]:
+    """Holt den Chatverlauf und schreibt ihn als Markdown nach exports/. Rueckgabe: (Pfad, Anzahl).
+
+    Erst ueber die Fanvue-API (vollstaendig), bei einem Ausfall aus der lokalen
+    messages-Tabelle. Fanvue antwortet zeitweise mit 503; ein Export, der dann
+    gar nichts liefert, ist unnoetig - die Nachrichten liegen ja groesstenteils
+    schon hier. Die Quelle steht im Kopf der Datei, damit niemand einen
+    unvollstaendigen Auszug fuer den ganzen Verlauf haelt.
+    """
+    os.makedirs(EXPORT_DIR, exist_ok=True)
+    quelle = "Fanvue-API (vollständiger Verlauf)"
+    try:
+        msgs = fanvue.full_message_history(user_uuid)
+        koerper = _export_lines_from_api(msgs, me_uuid)
+    except Exception as exc:  # noqa: BLE001 - Ausweichquelle statt Abbruch
+        koerper = _export_lines_from_db(user_uuid)
+        if not koerper:
+            raise
+        quelle = (f"lokal mitgeschrieben – Fanvue war nicht erreichbar ({str(exc)[:120]}). "
+                  f"Kann unvollständig sein.")
+        db.log("warn", "system",
+               f"Chat-Export aus lokalem Verlauf ({handle or user_uuid})", str(exc)[:200])
+    lines = [f"# Chat mit {display or handle or user_uuid} (@{handle})",
+             f"UUID: {user_uuid}",
+             f"Quelle: {quelle}",
+             f"Exportiert: {datetime.now().strftime('%d.%m.%Y %H:%M')} · "
+             f"{len(koerper)} Nachrichten", ""] + koerper
     path = os.path.join(EXPORT_DIR, _safe_filename(handle or user_uuid) + ".md")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))
-    return path, len(msgs)
+    return path, len(koerper)
 
 
 @app.post("/chats/{user_uuid}/export")
-def chat_export(user_uuid: str):
+def chat_export(user_uuid: str, back: str = Form("")):
+    """Einen einzelnen Chatverlauf nach exports/ schreiben.
+
+    `back` gesetzt = der Knopf kam von der Subs-Liste, dann geht es auch dorthin
+    zurueck. Ohne `back` bleibt es beim alten Weg ueber die PPV-Unterseite.
+    """
     from urllib.parse import quote as _q
-    if not fanvue.is_connected():
-        return RedirectResponse(f"/chats/{user_uuid}/ppv?err={_q('Nicht verbunden')}", status_code=303)
-    me_uuid = fanvue.account_uuid()
+    me_uuid = fanvue.account_uuid() if fanvue.is_connected() else ""
     chat = db.get_chat(user_uuid)
     try:
         path, n = _write_chat_export(user_uuid, chat["handle"] if chat else "",
                                      chat["display_name"] if chat else "", me_uuid)
         db.log("info", "system", f"Chat exportiert: {os.path.basename(path)} ({n} Nachrichten)")
+        if back:
+            return _chats_back(back, f"Chat exportiert: exports/{os.path.basename(path)} "
+                                     f"({n} Nachrichten)")
         return RedirectResponse(f"/chats/{user_uuid}/ppv?exported={n}", status_code=303)
     except Exception as exc:  # noqa: BLE001
         db.log("error", "system", "Chat-Export fehlgeschlagen", str(exc))
+        if back:
+            return _chats_back(back, f"Export fehlgeschlagen: {str(exc)[:150]}")
         return RedirectResponse(f"/chats/{user_uuid}/ppv?err={_q(str(exc)[:200])}", status_code=303)
 
 
@@ -1670,11 +1723,20 @@ def settings_page(request: Request):
     # Eigene Fanvue-Listen live laden (nur wenn verbunden)
     ctx["custom_lists"] = []
     ctx["custom_lists_error"] = None
+    # Vault-Ordner fuer die Auswahlfelder (Danke-Bild, Reaktivierungs-Selfies).
+    # Leer lassen, wenn Fanvue nicht erreichbar ist - die Vorlage zeigt dann ein
+    # Textfeld, damit ein bereits gesetzter Ordner nicht beim Speichern verloren geht.
+    ctx["vault_folders"] = []
     if fanvue.is_connected():
         try:
             ctx["custom_lists"] = fanvue.list_custom_lists()
         except Exception as exc:  # noqa: BLE001
             ctx["custom_lists_error"] = str(exc)
+        try:
+            ctx["vault_folders"] = sorted(
+                {str(f.get("name") or "") for f in fanvue.list_vault_folders() if f.get("name")})
+        except Exception:  # noqa: BLE001 - Auswahlfeld ist Komfort, kein Muss
+            ctx["vault_folders"] = []
     return templates.TemplateResponse("settings.html", ctx)
 
 

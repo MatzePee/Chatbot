@@ -203,14 +203,28 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
     incoming_text = (last_msg.get("text") or "").strip()
     has_photo = (bool(last_msg.get("hasMedia")) and last_msg.get("mediaType") == "image"
                  and last_sender != me_uuid)
-    # Trinkgeld? Fanvue markiert Tips mit type == "TIP" (Betrag in pricing.USD.price, Cent)
-    is_tip = str(last_msg.get("type") or "").upper() == "TIP"
+    # Trinkgeld? Fanvue markiert Tips mit type == "TIP" (Betrag in pricing.USD.price, Cent).
+    # ALLE seit der letzten Verarbeitung neu hinzugekommenen Fan-Nachrichten
+    # ansehen, nicht nur die letzte: wer erst ein Trinkgeld schickt und dann noch
+    # etwas schreibt, bekam bisher gar keinen Dank - der Tip war dann nicht mehr
+    # die letzte Nachricht. Genau das ist der Grund, warum der Dank "manchmal
+    # ausbleibt". Mehrere Tips in einem Schwung werden zusammengezaehlt.
+    neue_nachrichten = messages_chrono
+    if chat and chat["last_inbound_uuid"]:
+        for i, m in enumerate(messages_chrono):
+            if m.get("uuid") == chat["last_inbound_uuid"]:
+                neue_nachrichten = messages_chrono[i + 1:]
+                break
+    tips = [m for m in neue_nachrichten
+            if str(m.get("type") or "").upper() == "TIP"
+            and (m.get("sender") or {}).get("uuid", "") != me_uuid]
+    is_tip = bool(tips)
     tip_cents = 0
-    if is_tip:
+    for m in tips:
         try:
-            tip_cents = int(((last_msg.get("pricing") or {}).get("USD") or {}).get("price") or 0)
+            tip_cents += int(((m.get("pricing") or {}).get("USD") or {}).get("price") or 0)
         except (TypeError, ValueError):
-            tip_cents = 0
+            pass
     # Zeitstempel der letzten Fan-Nachricht (fuer die proaktive Reaktivierung)
     db.update_chat(user_uuid, last_inbound_at=time.time())
     # Der Fan ist wieder da: die Serie unbeantworteter Anschreiben ist beendet.
@@ -250,13 +264,32 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
     explicit_image = bool(img_analysis and (img_analysis.get("nude") or img_analysis.get("penis")))
 
     # --- Trinkgeld: sich bedanken (kein PPV, kein Verkauf) ---
+    tip_media: list[str] = []
     if is_tip and db.get_setting("tip_thanks_enabled", True):
         thanks = db.get_setting("tip_thanks_prompt", "")
         amount = f" von ${tip_cents/100:.2f}" if tip_cents else ""
+        # Optionales Dankeschoen-Bild. GRATIS-Anhang, kein PPV - wer gerade
+        # Trinkgeld gegeben hat, bekommt kein Angebot zurueck.
+        ordner = (db.get_setting("tip_thanks_folder", "") or "").strip()
+        if ordner:
+            tip_media = _reactivation_media(ordner, user_uuid, zweck="Trinkgeld-Dank")
+        mehrfach = (f" ({len(tips)} Trinkgelder auf einmal)" if len(tips) > 1 else "")
         system_prompt = system_prompt + (
-            f"\n\nWICHTIG: Der Fan hat dir gerade ein TRINKGELD{amount} geschickt. "
+            f"\n\nWICHTIG: Der Fan hat dir gerade ein TRINKGELD{amount}{mehrfach} geschickt. "
             f"Bedanke dich warm, persoenlich und in deinem Stil dafuer. Kein Verkauf, "
-            f"kein Angebot, keine Gegenfrage nach mehr Geld. {thanks}")
+            f"kein Angebot, keine Gegenfrage nach mehr Geld. "
+            # Ohne diesen Zusatz greift das Modell zur immer gleichen Dankesformel,
+            # sobald sie ein paar Mal im mitgelieferten Verlauf steht - es ahmt
+            # dann sich selbst nach. Regelmaessige Trinkgeldgeber bekommen so
+            # woertlich denselben Satz, was schnell nach Automat klingt.
+            f"Formuliere den Dank JEDES MAL anders: verwende KEINE Wendung, die "
+            f"weiter oben im Verlauf schon als Dank vorkommt, und beziehe dich auf "
+            f"etwas Konkretes aus eurem Gespraech statt auf eine Standardfloskel. "
+            + ("An dieser Nachricht haengt ausserdem ein BILD von dir als kleines "
+               "Geschenk. Erwaehne es beilaeufig und natuerlich (z.B. 'hier, nur "
+               "fuer dich'), preise es NICHT an und nenne KEINEN Preis. "
+               if tip_media else "")
+            + f"{thanks}")
 
     # --- PPV Auto-Selling ---
     if db.get_setting("ppv_enabled", False) and not is_tip:
@@ -363,7 +396,7 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
                str(exc))
         return
 
-    clean_text, note = guardrails.check_outgoing(generated, has_media=False)
+    clean_text, note = guardrails.check_outgoing(generated, has_media=bool(tip_media))
     mode = _effective_mode(chat)
 
     # Entscheiden: Auto-Send oder manuelle Freigabe?
@@ -395,6 +428,8 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
         guardrail_note=guardrail_note,
         model=db.get_setting("openrouter_model", ""),
         inbound_uuid=last_uuid,
+        # is_ppv bleibt 0 -> das Bild geht gratis mit raus.
+        ppv_media_uuids=json.dumps(tip_media) if tip_media else None,
     )
     db.update_chat(user_uuid, last_inbound_uuid=last_uuid)
     db.log("info", "generate",
@@ -744,8 +779,10 @@ def _send_draft(draft_id: int) -> bool:
             state = db.get_ppv_state(user_uuid)
             db.update_ppv_state(user_uuid,
                                 outbound_since_ppv=(state["outbound_since_ppv"] or 0) + 1)
-            # Reaktivierungs-Selfies merken, damit kein Bild doppelt geschickt wird
-            if media and _is_reactivation(draft):
+            # Gratis verschickte Bilder merken, damit kein Bild doppelt geht.
+            # Frueher nur fuer Reaktivierungen - gilt genauso fuer das
+            # Dankeschoen-Bild beim Trinkgeld.
+            if media:
                 db.add_reactivation_sent(user_uuid, media)
             db.log("info", "send", f"Gesendet an {draft['handle'] or user_uuid}", text[:200])
         return True
@@ -997,10 +1034,15 @@ def reactivation_cycle() -> None:
         time.sleep(0.4)
 
 
-def _reactivation_media(folder: str, user_uuid: str) -> list[str]:
+def _reactivation_media(folder: str, user_uuid: str, zweck: str = "Reaktivierung") -> list[str]:
     """Waehlt EIN Selfie aus dem Ordner, das dieser Fan noch NICHT bekommen hat.
     Sind alle Bilder des Ordners schon geschickt, wird kein Bild angehaengt (nur Text),
-    damit sich kein Bild wiederholt."""
+    damit sich kein Bild wiederholt.
+
+    Wird auch fuer den Trinkgeld-Dank benutzt. Die Merkliste (reactivation_sent) ist
+    bewusst dieselbe: sie beantwortet die Frage "welches Bild hat dieser Fan schon
+    von uns bekommen" - und die gilt unabhaengig vom Anlass.
+    """
     if not folder:
         return []
     try:
@@ -1014,7 +1056,7 @@ def _reactivation_media(folder: str, user_uuid: str) -> list[str]:
     if not remaining:
         if imgs:
             db.log("info", "generate",
-                   f"Reaktivierung: alle {len(imgs)} Selfies aus '{folder}' schon geschickt "
+                   f"{zweck}: alle {len(imgs)} Bilder aus '{folder}' schon geschickt "
                    f"an {user_uuid} -> nur Text", "")
         return []
     return [random.choice(remaining)]

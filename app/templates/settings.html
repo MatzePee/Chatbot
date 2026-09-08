@@ -164,6 +164,21 @@
     <label class="chk"><input type="checkbox" name="tip_thanks_enabled" {% if s['tip_thanks_enabled'] %}checked{% endif %}> Bei einem Trinkgeld automatisch bedanken <span class="info" tabindex="0" data-tip="Erkennt Trinkgelder (Fanvue-Nachrichten vom Typ TIP) und lässt den Bot sich dafür bedanken – ohne Verkauf oder Gegenfrage. Der Betrag wird, falls verfügbar, mit einbezogen.">ⓘ</span></label>
     <label>Dank-Prompt (Stil der Trinkgeld-Antwort)
       <textarea name="tip_thanks_prompt" rows="2">{{ s['tip_thanks_prompt'] }}</textarea></label>
+    <label>Bild zum Dank aus Vault-Ordner <span class="info" tabindex="0" data-tip="Hängt an die Dankesnachricht ein Bild aus diesem Ordner an – gratis, nicht als PPV. Es wird jedem Fan nur EINMAL geschickt; sind alle Bilder des Ordners bei ihm durch, geht der Dank wieder als reiner Text raus. Leer = nie ein Bild.">ⓘ</span>
+      {# Auswahlliste nur, wenn die Ordner geladen werden konnten. Sonst ein
+         Textfeld: ein leeres Auswahlfeld wuerde beim Speichern einen bereits
+         gesetzten Ordner stillschweigend loeschen. #}
+      {% if vault_folders %}
+      <select name="tip_thanks_folder">
+        <option value="">— kein Bild, nur Text —</option>
+        {% for f in vault_folders %}<option value="{{ f }}" {% if s['tip_thanks_folder'] == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
+        {% if s['tip_thanks_folder'] and s['tip_thanks_folder'] not in vault_folders %}<option value="{{ s['tip_thanks_folder'] }}" selected>{{ s['tip_thanks_folder'] }} — nicht mehr im Vault</option>{% endif %}
+      </select>
+      {% else %}
+      <input name="tip_thanks_folder" value="{{ s['tip_thanks_folder'] }}"
+             placeholder="Ordnername (Fanvue gerade nicht erreichbar)">
+      {% endif %}</label>
+    <p class="muted small">Das Bild geht <strong>gratis</strong> mit, nie als PPV – wer gerade Trinkgeld gegeben hat, soll kein Angebot zurückbekommen. Jeder Fan bekommt jedes Bild höchstens einmal; dieselbe Merkliste gilt auch für die Reaktivierungs-Selfies.</p>
   </details>
 
   <h2 class="grp">Betrieb</h2>
@@ -366,7 +381,15 @@
       <label>Sende-Delay max (Min) <span class="info" tabindex="0" data-tip="Obergrenze der zufälligen Wartezeit vor dem Senden (nur Auto-Modus). Der Bot wartet eine zufällige Zeit zwischen min und max. Standard 45.">ⓘ</span> <input name="reactivation_delay_max_minutes" type="number" min="0" value="{{ s['reactivation_delay_max_minutes'] }}"></label>
     </div>
     <label>Vault-Ordner mit Selfies (optional – leer = nur Text)
-      <input name="reactivation_folder" value="{{ s['reactivation_folder'] }}" placeholder="z.B. Reaktivierung_Selfies"></label>
+      {% if vault_folders %}
+      <select name="reactivation_folder">
+        <option value="">— kein Bild, nur Text —</option>
+        {% for f in vault_folders %}<option value="{{ f }}" {% if s['reactivation_folder'] == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
+        {% if s['reactivation_folder'] and s['reactivation_folder'] not in vault_folders %}<option value="{{ s['reactivation_folder'] }}" selected>{{ s['reactivation_folder'] }} — nicht mehr im Vault</option>{% endif %}
+      </select>
+      {% else %}
+      <input name="reactivation_folder" value="{{ s['reactivation_folder'] }}" placeholder="z.B. Reaktivierung_Selfies">
+      {% endif %}</label>
     <label>Reaktivierungs-Prompt
       <textarea name="reactivation_prompt" rows="3">{{ s['reactivation_prompt'] }}</textarea></label>
     <p class="muted small">Reaktivierungen knüpfen an euer letztes Chat-Thema an (persönlich), laufen im gewählten Modus (Freigabe/Auto) und respektieren die aktiven Zeiten. Im Auto-Modus wird zufällig 15–45 Min (einstellbar) gewartet; bei „Freigabe" landen sie sofort in der Queue.</p>

@@ -138,6 +138,14 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
       <span>Conversion <strong>{{ '%.0f' | format(s['conversion']) }}%</strong></span>
       <span>Umsatz <strong>${{ s['revenue_cents'] | dollars }}</strong></span>
       <a class="btn" href="/chats/{{ c['uuid'] }}/ppv">PPV-Status verwalten →</a>
+      {# Einzelexport direkt hier: der Sammelexport ueber alle Fans laeuft
+         minutenlang und faellt bei jedem Fanvue-503 aus. Fuer "zeig mir genau
+         diesen einen Chat" ist das der falsche Weg. #}
+      <form method="post" action="/chats/{{ c['uuid'] }}/export" class="inline">
+        <input type="hidden" name="back" value="{{ backq }}">
+        <button class="btn"
+                title="Schreibt den Verlauf dieses Fans als Markdown nach exports/. Bei einem Fanvue-Ausfall wird der lokal mitgeschriebene Verlauf genommen.">⬇ Chat exportieren</button>
+      </form>
       <form method="post" action="/chats/{{ c['uuid'] }}/reactivate" class="inline"
             onsubmit="return confirm('Reaktivierungs-Nachricht für {{ (c['display_name'] or c['handle'] or 'diesen Fan') | e }} erstellen? Sie landet in der Freigabe-Queue.');">
         <input type="hidden" name="handle" value="{{ c['handle'] }}">

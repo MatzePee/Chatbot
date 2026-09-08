@@ -488,6 +488,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "Klinge echt geruehrt und verspielt, nicht floskelhaft. Halte es kurz (1-2 Saetze) "
         "und beziehe dich ruhig auf die Stimmung eures Chats."
     ),
+    # Vault-Ordner, aus dem als Dank ein Bild mitgeschickt wird. Leer = nur Text.
+    # Gratis-Anhang, kein PPV: der Fan hat gerade bezahlt, ihm dafuer etwas zu
+    # verkaufen waere genau der falsche Moment.
+    "tip_thanks_folder": "",
     # --- Proaktive Reaktivierung stiller Fans ---
     "reactivation_enabled": False,
     "reactivation_inactive_hours": 14,   # ab wie vielen STUNDEN Stille reaktivieren
