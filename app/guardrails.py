@@ -349,6 +349,18 @@ def finds_brackets(text: str) -> Optional[str]:
     return m.group(0).strip() if m else None
 
 
+# Enthaelt die Antwort ueberhaupt einen Dank? Bewusst grob und mehrsprachig -
+# es geht nur um die Frage "kommt Dank vor", nicht um dessen Qualitaet.
+_RE_THANKS = re.compile(
+    r"\b(?:thank(?:s|ed|ing)?|thx|thnx|danke\w*|bedank\w*|merci|gracias|grazie|"
+    r"grateful|appreciate\w*)\b", re.I)
+
+
+def mentions_thanks(text: str) -> bool:
+    """True, wenn irgendeine Form von Dank vorkommt."""
+    return bool(text and _RE_THANKS.search(text))
+
+
 def looks_like_refusal(text: str) -> bool:
     """True, wenn der Text nach einer Modell-Weigerung/Meta-Antwort aussieht."""
     return bool(text and _RE_REFUSAL.search(text))

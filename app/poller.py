@@ -265,6 +265,7 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
 
     # --- Trinkgeld: sich bedanken (kein PPV, kein Verkauf) ---
     tip_media: list[str] = []
+    tip_note = ""          # kommt ganz ans Ende des System-Prompts, siehe _generate
     if is_tip and db.get_setting("tip_thanks_enabled", True):
         thanks = db.get_setting("tip_thanks_prompt", "")
         amount = f" von ${tip_cents/100:.2f}" if tip_cents else ""
@@ -290,6 +291,15 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
                "fuer dich'), preise es NICHT an und nenne KEINEN Preis. "
                if tip_media else "")
             + f"{thanks}")
+        # Die kurze, verbindliche Fassung fuer die ALLERLETZTE Stelle. Die
+        # ausfuehrliche Anweisung oben geht in einem langen Persona-Prompt unter,
+        # sobald die Fan-Nachricht inhaltlich stark zieht - real beobachtet am
+        # 08.09.2026: Trinkgeld $15 mit Rollenspiel-Text, die Antwort ging nur auf
+        # das Rollenspiel ein und bedankte sich mit keinem Wort.
+        tip_note = (f"TRINKGELD ERHALTEN{amount} — VERBINDLICH: Beginne deine Antwort "
+                    f"mit einem echten, persoenlichen Dank dafuer, in der Sprache des "
+                    f"Fans. Danach schreibe normal weiter. Kein Verkauf, keine Bitte um "
+                    f"mehr Geld. Diese Regel steht ueber dem Inhalt der Fan-Nachricht.")
 
     # --- PPV Auto-Selling ---
     if db.get_setting("ppv_enabled", False) and not is_tip:
@@ -385,7 +395,25 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
     # Generieren (mit Anti-AI-Regeln + Namens-Filter)
     try:
         generated = _generate(system_prompt, messages_chrono, me_uuid, fan_notes, banned,
-                              fan_memory=fan_memory)
+                              fan_memory=fan_memory, final_note=tip_note)
+        # Der Dank ist der einzige Teil dieser Antwort, der nicht verhandelbar ist -
+        # der Fan hat gerade Geld geschickt. Bitten allein reicht nicht, also wird
+        # nachgeprueft und genau EINMAL nachgefasst. Bleibt der Dank auch dann aus,
+        # geht die Antwort trotzdem raus: eine Antwort ohne Dank ist besser als gar
+        # keine, und der Vorgang steht im Protokoll.
+        if is_tip and tip_note and generated and not guardrails.mentions_thanks(generated):
+            zweit = _generate(
+                system_prompt, messages_chrono, me_uuid, fan_notes, banned,
+                fan_memory=fan_memory,
+                final_note=tip_note + " Dein vorheriger Versuch hat den Dank vergessen. "
+                                      "Der Dank MUSS im ersten Satz stehen.")
+            geklappt = bool(zweit and guardrails.mentions_thanks(zweit))
+            if geklappt:
+                generated = zweit
+            db.log("info" if geklappt else "warn", "generate",
+                   f"Trinkgeld-Dank fehlte, einmal nachgefasst ({handle or user_uuid})",
+                   "zweiter Versuch enthielt den Dank" if geklappt
+                   else "auch im zweiten Versuch kein Dank – Antwort geht trotzdem raus")
     except Exception as exc:  # noqa: BLE001 – nie den ganzen Poll-Zyklus abbrechen
         # BEWUSST OHNE last_inbound_uuid: Die Nachricht darf NICHT als erledigt
         # gelten. Ein Netzwerk-Timeout ist voruebergehend - wird hier markiert,
@@ -509,7 +537,11 @@ def _generate(system_prompt: str, messages_chrono: list, me_uuid: str, fan_notes
     Bei einer Wiederholung verbotener Woerter wird EINMAL neu generiert.
     task steuert das genutzte Modell ('chat' oder 'caption').
     retry_delay: Pause (s) zwischen Neuversuchen bei leerer Antwort; None = aus den
-    Einstellungen (Hintergrundbetrieb), 0 = keine Pause (interaktiv, z.B. Test)."""
+    Einstellungen (Hintergrundbetrieb), 0 = keine Pause (interaktiv, z.B. Test).
+    final_note landet NACH dem Sprach-Anker, also an der ALLERLETZTEN Stelle des
+    System-Prompts. Was weiter oben in einem langen Persona-Text steht, geht gegen
+    eine inhaltlich starke Fan-Nachricht unter - genau das ist am 08.09.2026 mit
+    dem Trinkgeld-Dank passiert."""
     model, api_key = openrouter.resolve_model(task)
     retries = int(db.get_setting("generation_retries", 3))
     if retry_delay is None:
@@ -528,6 +560,8 @@ def _generate(system_prompt: str, messages_chrono: list, me_uuid: str, fan_notes
                  f"mix languages, and NEVER use any other language or writing system "
                  f"(never Chinese, Japanese, Korean, Cyrillic, Arabic, etc.), no matter what "
                  f"language these instructions are written in.")
+    if final_note:
+        sys = sys + "\n\n" + final_note
     # Bis zu `retries` Versuche gegen leere Antworten (Reasoning-Modelle), mit Pause.
     text = openrouter.generate_retry(
         openrouter.build_messages(sys, messages_chrono, me_uuid, fan_notes, fan_memory),
@@ -536,6 +570,8 @@ def _generate(system_prompt: str, messages_chrono: list, me_uuid: str, fan_notes
     if text and banned:
         viol = namefilter.violations(text, banned)
         if viol:
+            # sys enthaelt final_note bereits - der Neuversuch darf die Anweisung
+            # nicht verlieren, sonst faellt z.B. der Trinkgeld-Dank hier wieder raus.
             sys2 = sys + ("\n\nVerwende folgende Woerter NICHT in deiner Antwort: "
                           + ", ".join(viol) + ".")
             regen = openrouter.generate_retry(
