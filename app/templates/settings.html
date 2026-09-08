@@ -413,6 +413,18 @@
       <label>Einlesen: Pause je Block (Sek.) <span class="info" tabindex="0" data-tip="Pause zwischen zwei Blöcken. Verhindert, dass ein langer Chat den laufenden Betrieb ausbremst oder in ein Rate-Limit läuft.">ⓘ</span>
         <input name="memory_backfill_delay" type="number" min="0" step="0.5" value="{{ s['memory_backfill_delay'] }}"></label>
     </div>
+    <div class="row">
+      <label>Einlesen: automatisch <span class="info" tabindex="0" data-tip="„Automatisch“ liest den Verlauf eines Fans genau EINMAL ein – beim nächsten Mal, wenn er schreibt. Die Antwort auf diese Nachricht wartet nicht darauf, das Einlesen läuft im Hintergrund. Fans mit zu wenigen Nachrichten werden übersprungen, Fehlschläge nicht automatisch wiederholt. Erst einschalten, wenn die Verdichtung an einzelnen Fans geprüft ist.">ⓘ</span>
+        <select name="memory_backfill_auto">
+          <option value="off" {% if s['memory_backfill_auto'] == 'off' %}selected{% endif %}>aus</option>
+          <option value="manual" {% if s['memory_backfill_auto'] == 'manual' %}selected{% endif %}>nur von Hand</option>
+          <option value="auto" {% if s['memory_backfill_auto'] == 'auto' %}selected{% endif %}>automatisch beim Schreiben</option>
+        </select></label>
+      <label>Einlesen: max. Nachrichten je Fan <span class="info" tabindex="0" data-tip="Deckel für einen Durchlauf: die jüngsten N Nachrichten, beide Seiten des Gesprächs. Nach Anzahl statt nach Zeitraum, weil ein Zeitfenster ausgerechnet bei Rückkehrern leer wäre. Bei 600 und 80 Nachrichten je Block sind das höchstens 8 LLM-Aufrufe pro Fan. 0 = kein Deckel.">ⓘ</span>
+        <input name="memory_backfill_max_messages" type="number" min="0" value="{{ s['memory_backfill_max_messages'] }}"></label>
+      <label>Einlesen: max. Läufe je Stunde <span class="info" tabindex="0" data-tip="Bremse für die Automatik. Ohne sie können an einem guten Tag Dutzende zurückkehrende Fans gleichzeitig Kosten auslösen. Gilt nicht für den Knopf am einzelnen Fan.">ⓘ</span>
+        <input name="memory_backfill_per_hour" type="number" min="0" value="{{ s['memory_backfill_per_hour'] }}"></label>
+    </div>
     <label class="chk"><input type="checkbox" name="memory_reactivation_use_loops" {% if s['memory_reactivation_use_loops'] %}checked{% endif %}> Offene Fäden in der Reaktivierung nutzen <span class="info" tabindex="0" data-tip="Die Reaktivierung knüpft dann konkret an ein offenes Thema an („Wie war das Gespräch am Montag?“) statt allgemein ans letzte Chat-Thema.">ⓘ</span></label>
     <p class="muted small"><strong>Zwei Schichten:</strong> Das <strong>Langzeitgedächtnis</strong> hält Stichworte in festen Fächern (Name, Alter, Herkunft, Beruf, Familie, Vorlieben, Grenzen, Sonstiges) und verfällt nicht. Das <strong>Kurzzeitgedächtnis</strong> hält datierte Gesprächsnotizen der letzten Wochen und verfällt nach Alter und Anzahl. Beim Verdichten hebt das Modell alles Dauerhafte aus der Notiz nach oben – was es übersieht, kannst du pro Notiz mit „↑ merken" selbst hochstufen.</p>
     <p class="muted small"><strong>Einzeln testen:</strong> Unter <a href="/chats">Subs</a> → „🧠 Gedächtnis" hat jeder Fan einen eigenen Schalter <em>Standard / An / Aus</em>. „An" wirkt auch dann, wenn das Gedächtnis global aus ist – so lässt sich die Funktion an ein paar Fans erproben, ohne sie für alle scharfzuschalten.</p>

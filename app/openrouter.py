@@ -657,7 +657,15 @@ def consolidate_memory(current: dict, new_messages: list[dict],
         "genannt hat.\n"
         "10. Rein sexuelle Rollenspiel-Inhalte gehoeren NICHT ins Gedaechtnis - nur echte "
         "Vorlieben, die fuer spaetere Gespraeche zaehlen.\n"
-        "11. Schreibe die Eintraege in der Sprache, in der der Fan schreibt."
+        "11. Schreibe die Eintraege in der Sprache, in der der Fan schreibt.\n"
+        # Beobachtet am 08.09.2026: das Modell setzte woertliche Rede in
+        # Anfuehrungszeichen mitten in einen Wert ("er nennt sie "Kitten"") -
+        # damit war die ganze Antwort kein gueltiges JSON mehr und ein ganzer
+        # Block fiel aus. Der Riegel dagegen ist response_format unten, die
+        # Regel hier ist der Guertel dazu.
+        "12. Antworte ausschliesslich mit gueltigem JSON. Verwende in den Werten "
+        "KEINE doppelten Anfuehrungszeichen - schreibe woertliche Rede ohne "
+        "Anfuehrungszeichen oder mit einfachen."
     )
     user_content = (
         "BISHERIGER STAND:\n" + _json.dumps(bestand, ensure_ascii=False)
@@ -670,11 +678,29 @@ def consolidate_memory(current: dict, new_messages: list[dict],
             {"role": "user", "content": user_content[:12000]},
         ],
         "temperature": 0,
-        "max_tokens": 900,
+        # 2000 statt 900: das Modell gibt JEDES MAL den vollstaendigen Stand
+        # zurueck - 11 Faecher Langzeit plus Kurzzeitnotizen -, nicht nur die
+        # Ergaenzung. Bei einem gewachsenen Gedaechtnis reichte das alte Budget
+        # dafuer nicht mehr, die Antwort brach mittendrin ab und war kein
+        # gueltiges JSON mehr.
+        "max_tokens": 2000,
+        # Denkprozess aus, genau wie bei generate(). Ein Reasoning-Modell
+        # verbraucht das Budget sonst fuer Ueberlegungen und liefert content = ""
+        # - das war die Ursache der gehaeuften Meldung "Verdichtung
+        # fehlgeschlagen: Expecting value: line 1 column 1 (char 0)". Beim
+        # Einlesen faellt es besonders auf, weil dort Dutzende Aufrufe
+        # hintereinander laufen.
+        "reasoning": {"effort": "none", "exclude": True},
+        # Zwingt das Modell zu syntaktisch gueltigem JSON. Ohne das reicht ein
+        # einziges nicht maskiertes Anfuehrungszeichen im Text, um einen ganzen
+        # Block zu verlieren - der Parser bricht ab, und die Nachrichten dieses
+        # Blocks sind fuer das Gedaechtnis weg.
+        "response_format": {"type": "json_object"},
         "usage": {"include": True},
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
                "HTTP-Referer": "http://localhost", "X-Title": "Fanvue Chatbot"}
+    roh = ""      # fuer die Fehlermeldung, siehe unten
     try:
         resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
         if resp.status_code != 200:
@@ -684,6 +710,30 @@ def consolidate_memory(current: dict, new_messages: list[dict],
         full = resp.json()
         _record_cost(full, model, "memory")
         content = _extract_content(full).strip()
+        roh = content
+        if not content:
+            # Ohne diese Meldung ist ein Fehlschlag nicht zu diagnostizieren:
+            # "kein JSON" verraet nicht, ob das Modell abgelehnt hat, das
+            # Token-Budget aufgebraucht war oder gar nichts zurueckkam.
+            wahl = ((full.get("choices") or [{}])[0]) or {}
+            grund = str(wahl.get("finish_reason") or "") + " " + str(
+                wahl.get("native_finish_reason") or "")
+            detail = (f"finish_reason={wahl.get('finish_reason')} "
+                      f"native={wahl.get('native_finish_reason')} "
+                      f"completion_tokens="
+                      f"{((full.get('usage') or {}).get('completion_tokens'))} "
+                      f"model={model}")
+            if "content_filter" in grund:
+                # Bewusst nur "info": bei diesem Chatbot filtert der Anbieter
+                # gelegentlich einen Block weg, das ist erwartet und nicht zu
+                # beheben. Verloren geht nur dieser eine Block, der bisherige
+                # Stand bleibt unangetastet. Als Warnung wuerde es die
+                # Aktivitaetsliste fuellen und echte Fehler verdecken.
+                db.log("info", "memory",
+                       "Verdichtung: Block vom Anbieter gefiltert (übersprungen)", detail)
+            else:
+                db.log("warn", "memory", "Verdichtung: leere Antwort vom Modell", detail)
+            return {}
         if content.startswith("```"):
             content = content.strip("`")
         if "{" in content:
@@ -703,5 +753,15 @@ def consolidate_memory(current: dict, new_messages: list[dict],
             return {}
         return out
     except Exception as exc:  # noqa: BLE001 - nie den Aufrufer mitreissen
-        db.log("warn", "memory", "Verdichtung fehlgeschlagen", str(exc)[:300])
+        # Den Anfang der Antwort mitloggen: bei einem Parser-Fehler ist genau
+        # das die einzige Spur, an der sich erkennen laesst, was das Modell
+        # stattdessen geschickt hat.
+        # Bei einem Parser-Fehler ist die FEHLERSTELLE aufschlussreicher als der
+        # Anfang der Antwort - dort steht, woran sich das JSON verschluckt hat.
+        stelle = ""
+        pos = getattr(exc, "pos", None)
+        if isinstance(pos, int) and roh:
+            stelle = f" | um Zeichen {pos}: {roh[max(0, pos - 90):pos + 60]!r}"
+        db.log("warn", "memory", "Verdichtung fehlgeschlagen",
+               f"{str(exc)[:200]} | Antwort begann mit: {roh[:150]!r}{stelle}")
         return {}

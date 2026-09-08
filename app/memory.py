@@ -728,6 +728,56 @@ _backfill_state: dict[str, Any] = {
 }
 
 
+def _set_backfill_state(user_uuid: str, state: str, note: str = "") -> None:
+    """Merker je Fan in der chats-Zeile.
+
+    Eigene Spalte statt chat_memory.last_msg_id: die setzt auch das normale
+    Verdichten: ein nie eingelesener Chat saehe damit faelschlich fertig aus.
+    Zustaende: '' noch nie · queued · running · done · skipped · error.
+    """
+    felder: dict[str, Any] = {"backfill_state": state, "backfill_note": (note or "")[:300]}
+    if state in ("done", "skipped", "error"):
+        felder["backfill_at"] = time.time()
+    try:
+        db.update_chat(user_uuid, **felder)
+    except Exception:  # noqa: BLE001 - der Merker darf einen Lauf nie stoppen
+        pass
+
+
+def reset_stale_backfills() -> int:
+    """Beim Start haengengebliebene Laeufe freigeben (Warteschlange war nur im RAM)."""
+    try:
+        n = db.reset_running_backfills()
+    except Exception:  # noqa: BLE001
+        return 0
+    if n:
+        db.log("info", "memory", f"{n} unterbrochene Einlese-Laeufe zurueckgesetzt", "")
+    return n
+
+
+def maybe_auto_backfill(user_uuid: str, name: str = "") -> None:
+    """Prueft bei einer neuen Fan-Nachricht, ob dieser Verlauf noch fehlt.
+
+    Laeuft im Antwortpfad des Pollers und darf deshalb NICHTS tun, das dauert:
+    die Pruefung ist ein Feld aus der ohnehin geladenen Chat-Zeile, das Einlesen
+    selbst uebernimmt der Hintergrund-Arbeiter. Die Antwort an den Fan geht
+    also sofort raus, der Verlauf wirkt ab der uebernaechsten Nachricht.
+
+    Genau einmal je Fan: jeder Zustand ausser '' blockt. 'error' ebenfalls -
+    bei einem kaputten Token liefe sonst jede eingehende Nachricht erneut ins
+    Messer. Ein Fehlschlag wird von Hand nachgeholt.
+    """
+    if str(db.get_setting("memory_backfill_auto", "manual") or "manual") != "auto":
+        return
+    try:
+        chat = db.get_chat(user_uuid)
+        if chat is None or (chat["backfill_state"] or "").strip():
+            return
+    except (KeyError, IndexError, TypeError):
+        return
+    start_backfill(user_uuid, name, auto=True)
+
+
 def backfill_status() -> dict[str, Any]:
     st = dict(_backfill_state)
     with _backfill_lock:
@@ -736,7 +786,7 @@ def backfill_status() -> dict[str, Any]:
     return st
 
 
-def start_backfill(user_uuid: str, name: str = "") -> tuple[bool, str]:
+def start_backfill(user_uuid: str, name: str = "", auto: bool = False) -> tuple[bool, str]:
     """Reiht einen Fan zum Einlesen ein und startet bei Bedarf den Arbeiter.
 
     Bewusst EIN Arbeiter fuer alle: mehrere gleichzeitige Durchlaeufe wuerden
@@ -750,12 +800,20 @@ def start_backfill(user_uuid: str, name: str = "") -> tuple[bool, str]:
         return (False, "Einstellung 'Chatverlauf lokal mitschreiben' ist ausgeschaltet")
     if not db.get_setting("openrouter_api_key", ""):
         return (False, "kein OpenRouter-API-Key hinterlegt")
+    if auto:
+        # Nur fuer den Automatikpfad. Der Handknopf soll ausdruecklich auch dann
+        # gehen, wenn das Gedaechtnis global aus ist - genau dafuer ist er da.
+        if not enabled_for(db.get_chat(user_uuid)):
+            return (False, "Gedächtnis für diesen Fan aus")
+        grenze = int(db.get_setting("memory_backfill_per_hour", 10) or 0)
+        if grenze and db.backfills_since(time.time() - 3600) >= grenze:
+            return (False, f"Stundengrenze erreicht ({grenze})")
     with _backfill_lock:
         if _backfill_state.get("user_uuid") == user_uuid and _backfill_state.get("running"):
             return (False, "läuft bereits für diesen Fan")
         if any(e["user_uuid"] == user_uuid for e in _backfill_queue):
             return (False, "steht bereits in der Warteschlange")
-        _backfill_queue.append({"user_uuid": user_uuid, "name": name})
+        _backfill_queue.append({"user_uuid": user_uuid, "name": name, "auto": auto})
         position = len(_backfill_queue)
         frisch = _backfill_thread is None or not _backfill_thread.is_alive()
         if frisch:
@@ -768,6 +826,7 @@ def start_backfill(user_uuid: str, name: str = "") -> tuple[bool, str]:
             _backfill_thread = threading.Thread(target=_backfill_worker, daemon=True,
                                                 name="memory-backfill")
             _backfill_thread.start()
+    _set_backfill_state(user_uuid, "queued")
     db.log("info", "memory", f"Chat einlesen angestoßen: {name or user_uuid[:8]}",
            "sofort" if position == 1 else f"Warteschlange Platz {position}")
     return (True, "läuft – Fortschritt oben auf der Seite" if position == 1
@@ -781,9 +840,11 @@ def _backfill_worker() -> None:
                 return
             auftrag = _backfill_queue.pop(0)
         try:
-            _backfill_one(auftrag["user_uuid"], auftrag.get("name", ""))
+            _backfill_one(auftrag["user_uuid"], auftrag.get("name", ""),
+                          auto=bool(auftrag.get("auto")))
         except Exception as exc:  # noqa: BLE001 - ein kaputter Fan darf die
             # Warteschlange nicht anhalten
+            _set_backfill_state(auftrag["user_uuid"], "error", str(exc))
             _backfill_state.update(running=False, error=str(exc)[:300],
                                    last_error=str(exc)[:300],
                                    last_error_name=auftrag.get("name", ""),
@@ -797,9 +858,14 @@ def _fetch_all_messages(user_uuid: str, me_uuid: str) -> int:
     """Phase 1: kompletten Verlauf seitenweise in die lokale Tabelle holen."""
     from . import fanvue
     max_pages = int(db.get_setting("memory_backfill_max_pages", 60) or 60)
+    # Fanvue liefert die NEUESTE Seite zuerst. Sobald der Deckel voll ist, haben
+    # wir also genau die juengsten N beisammen und koennen aufhoeren - statt bis
+    # zu 60 Seiten fuer Material zu holen, das die Verdichtung ohnehin abschneidet.
+    deckel = int(db.get_setting("memory_backfill_max_messages", 600) or 0)
     size = 100
     seite = 1
     gesamt = 0
+    gesehen = 0
     while seite <= max_pages:
         try:
             res = fanvue.list_messages(user_uuid, size=size, mark_as_read=False, page=seite)
@@ -813,7 +879,10 @@ def _fetch_all_messages(user_uuid: str, me_uuid: str) -> int:
         daten = res.get("data", []) or []
         # API liefert neueste zuerst
         gesamt += store_history(user_uuid, list(reversed(daten)), me_uuid)
+        gesehen += len(daten)
         _backfill_state.update(fetched=gesamt, pages=seite)
+        if deckel and gesehen >= deckel:
+            break
         if not (res.get("pagination") or {}).get("hasMore"):
             break
         seite += 1
@@ -821,15 +890,28 @@ def _fetch_all_messages(user_uuid: str, me_uuid: str) -> int:
     return gesamt
 
 
-def _backfill_one(user_uuid: str, name: str = "") -> None:
+def _backfill_one(user_uuid: str, name: str = "", auto: bool = False) -> None:
     from . import fanvue
     beginn = time.time()
     _backfill_state.update(running=True, user_uuid=user_uuid, name=name or user_uuid[:8],
                            phase="holen", fetched=0, pages=0, chunks_done=0,
                            chunks_total=0, error=None, note="", cost=0.0, finished_at=0.0)
     try:
+        _set_backfill_state(user_uuid, "running")
         me_uuid = fanvue.account_uuid()
         neu = _fetch_all_messages(user_uuid, me_uuid)
+
+        # Schwelle ERST JETZT pruefen, nicht vor dem Holen: fan_message_count
+        # zaehlt nur, was lokal liegt. Ein Rueckkehrer, der seit Jahren dabei
+        # ist, hat lokal vielleicht drei Nachrichten und bei Fanvue neunhundert.
+        # Nur fuer die Automatik - der Handknopf soll auch kurze Chats einlesen.
+        min_fan = int(db.get_setting("memory_min_fan_messages", 5) or 0)
+        if auto and min_fan and db.fan_message_count(user_uuid) < min_fan:
+            _set_backfill_state(user_uuid, "skipped", "zu wenige Fan-Nachrichten")
+            _backfill_state.update(running=False, phase="fertig",
+                                   note="zu wenige Fan-Nachrichten – übersprungen",
+                                   finished_at=time.time())
+            return
 
         # --- Phase 2: verdichten --------------------------------------------
         _backfill_state["phase"] = "verdichten"
@@ -839,10 +921,22 @@ def _backfill_one(user_uuid: str, name: str = "") -> None:
         # die aeltesten Nachrichten die hoechsten ids (Fanvue liefert die
         # neueste Seite zuerst). Nach id sortiert liefe die Verdichtung
         # rueckwaerts durch die Geschichte und endete beim aeltesten Stand.
-        rows = db.messages_chronological(user_uuid)
+        # Marke VOR dem Verdichten festhalten. Sie ist die hoechste zu diesem
+        # Zeitpunkt vergebene id, also liegen alle gleich gelesenen Zeilen
+        # darunter - und alles, was der Poller waehrend des Laufs mitschreibt,
+        # darueber und bleibt faellig. Erst am Ende zu lesen war der Fehler:
+        # dann galten genau die Nachrichten, die das Einlesen ausgeloest haben,
+        # als verdichtet, ohne es je gewesen zu sein.
+        marke = db.last_message_id(user_uuid)
+        # Deckel: nur die JUENGSTEN N Nachrichten, beide Seiten des Gespraechs.
+        # Ohne die eigene Seite ist ein "ja, genau!" des Fans wertlos.
+        deckel = int(db.get_setting("memory_backfill_max_messages", 600) or 0)
+        rows = db.messages_tail_chronological(user_uuid, deckel)
         rows = [r for r in rows if (r["text"] or "").strip()]
         if not rows:
-            _backfill_state.update(running=False, note="keine Nachrichten mit Text",
+            _set_backfill_state(user_uuid, "skipped", "keine Nachrichten mit Text")
+            _backfill_state.update(running=False, phase="fertig",
+                                   note="keine Nachrichten mit Text",
                                    finished_at=time.time())
             return
 
@@ -875,16 +969,26 @@ def _backfill_one(user_uuid: str, name: str = "") -> None:
         # steht nach dem Einlesen ohnehin in der Langzeitschicht.
         verfallen = prune_short(mem)
 
-        # Fuer den laufenden Betrieb zaehlt die hoechste vergebene id: alles
-        # danach ist wirklich neu. rows[-1] waere die chronologisch juengste
-        # Nachricht - die kann eine kleine id haben (siehe oben).
-        save(user_uuid, mem, reset_dirty=True, last_msg_id=db.last_message_id(user_uuid))
+        # Nur bis zur oben gemerkten Marke vorruecken, NICHT bis zum jetzigen
+        # Hoechstwert. rows[-1] taugt dafuer ebenfalls nicht: das ist die
+        # chronologisch juengste Nachricht, und die kann eine kleine id haben.
+        # dirty_count wird neu gezaehlt statt genullt - was waehrend des Laufs
+        # hereinkam, muss faellig bleiben.
+        save(user_uuid, mem, last_msg_id=marke)
+        offen = db.resync_memory_dirty(user_uuid, marke)
 
         kosten = db.api_cost_between(beginn, time.time() + 1, category="memory")
         note = (f"{len(rows)} Nachrichten in {len(bloecke)} Blöcken, "
                 f"{neu} neu geholt"
                 + (f", {fehler} Block/Blöcke ohne Ergebnis" if fehler else "")
-                + (f", {verfallen} veraltete Notizen verworfen" if verfallen else ""))
+                + (f", {verfallen} veraltete Notizen verworfen" if verfallen else "")
+                + (f", {offen} neue Nachricht(en) bleiben fällig" if offen else ""))
+        # Hat die Mehrheit der Bloecke nichts geliefert, ist der Verlauf NICHT
+        # eingelesen. Ihn als "done" zu fuehren wuerde den Fan dauerhaft von der
+        # Automatik ausschliessen, obwohl fast nichts angekommen ist - der Lauf
+        # bleibt sichtbar und laesst sich nach der Ursache von Hand wiederholen.
+        misslungen = fehler * 2 > len(bloecke)
+        _set_backfill_state(user_uuid, "error" if misslungen else "done", note)
         _backfill_state.update(running=False, phase="fertig", note=note,
                                cost=round(kosten, 4), finished_at=time.time())
         db.add_memory_log(user_uuid, "backfill", "", note,

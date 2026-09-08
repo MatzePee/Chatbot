@@ -513,7 +513,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # gepflegt werden, ohne dass die automatische Verdichtung laeuft - und
     # umgekehrt kann verdichtet werden, ohne dass es in den Prompt geht.
     "messages_store_enabled": True,      # Chatverlauf lokal mitschreiben (Phase 0)
-    "messages_retention_days": 90,       # danach werden Rohnachrichten geloescht
+    # 365 statt 90: seit das Einlesen ganze Verlaeufe holt, wuerde der
+    # taegliche Aufraeumlauf die frisch geholte Grundlage sofort wieder
+    # loeschen - und ein Wiederholungslauf muesste alles neu bezahlen.
+    "messages_retention_days": 365,      # danach werden Rohnachrichten geloescht
     "memory_enabled": False,             # HAUPTSCHALTER: Gedaechtnis in den Prompt geben
     "memory_consolidate_enabled": False, # HAUPTSCHALTER: automatische Verdichtung per LLM
     "memory_model": "openai/gpt-5.6-luna",  # leer = Chat-Modell; guenstiges Modell genuegt
@@ -536,6 +539,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "memory_backfill_max_pages": 60,     # 60 x 100 = bis zu 6000 Nachrichten je Fan
     "memory_backfill_chunk": 80,         # Nachrichten je LLM-Aufruf beim Einlesen
     "memory_backfill_delay": 1.0,        # Pause zwischen den Bloecken (Sek.)
+    # Deckel nach ANZAHL, nicht nach Zeitraum: ein Zeitfenster ist
+    # ausgerechnet bei den Rueckkehrern leer - wer nach vier Monaten wieder
+    # schreibt, hat im letzten Monat nichts geschrieben.
+    "memory_backfill_max_messages": 600, # nur die juengsten N, beide Seiten
+    "memory_backfill_auto": "manual",    # off | manual | auto
+    "memory_backfill_per_hour": 10,      # Automatik: hoechstens so viele je Stunde
     "memory_loop_max_age_days": 30,      # aeltere offene Faeden nach dem Einlesen verwerfen
 }
 
@@ -586,6 +595,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
             # Getrennt von last_inbound_uuid, damit eine Meldung auch dann
             # genau einmal rausgeht, wenn der Chat mehrfach durchlaufen wird.
             "last_alert_uuid": "TEXT",
+            # Verlauf-Einlesen je Fan: '' = noch nie, sonst queued/running/
+            # done/skipped/error. Bewusst eine EIGENE Spalte:
+            # chat_memory.last_msg_id setzt auch das normale Verdichten, ein
+            # nie eingelesener Chat saehe damit faelschlich fertig aus.
+            "backfill_state": "TEXT DEFAULT ''",
+            "backfill_at": "REAL",
+            "backfill_note": "TEXT",
         },
     }
     for table, cols in wanted.items():
@@ -620,6 +636,19 @@ def _migrate(conn: sqlite3.Connection) -> None:
     # Code mehr gelesen, steht aber weiter in der Oberflaeche-Datenbank und
     # laesst glauben, sie sei wirksam - wirksam ist reactivation_inactive_hours.
     conn.execute("DELETE FROM settings WHERE key = 'reactivation_inactive_days'")
+    # Einmalige Anhebung der Aufbewahrung (siehe DEFAULT_SETTINGS). Der neue
+    # Standard allein genuegt nicht: init_db schreibt Standardwerte nur, wenn der
+    # Schluessel fehlt. Angehoben wird ausschliesslich der unveraenderte alte
+    # Wert 90 - eine selbst gesetzte Zahl bleibt stehen. Der Merker sorgt dafuer,
+    # dass das genau einmal passiert und eine spaetere Senkung nicht ueberschrieben wird.
+    if conn.execute("SELECT 1 FROM settings WHERE key = 'retention_bumped_v15'").fetchone() is None:
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key = 'messages_retention_days'").fetchone()
+        if row is not None and str(row[0]).strip() in ("90", "90.0"):
+            conn.execute("UPDATE settings SET value = ? WHERE key = 'messages_retention_days'",
+                         (json.dumps(365),))
+        conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('retention_bumped_v15', ?)",
+                     (json.dumps(True),))
     conn.commit()
 
 
@@ -1543,6 +1572,93 @@ def messages_chronological(user_uuid: str, limit: int = 100000) -> list[sqlite3.
             (user_uuid, int(limit))).fetchall()
 
 
+def messages_tail_chronological(user_uuid: str, limit: int) -> list[sqlite3.Row]:
+    """Die JUENGSTEN `limit` Nachrichten, zurueckgegeben in echter Zeitreihenfolge.
+
+    messages_chronological() schneidet am falschen Ende ab: es sortiert aufsteigend
+    und setzt das LIMIT dahinter, liefert also die AELTESTEN N. Fuer den Deckel
+    beim Einlesen braucht es das Gegenteil - innen absteigend holen, aussen drehen.
+    limit <= 0 heisst: kein Deckel.
+    """
+    if limit <= 0:
+        return messages_chronological(user_uuid)
+    with _lock:
+        return get_conn().execute(
+            "SELECT * FROM (SELECT * FROM messages WHERE user_uuid = ? "
+            "  ORDER BY COALESCE(sent_at, seen_at) DESC, id DESC LIMIT ?) "
+            "ORDER BY COALESCE(sent_at, seen_at) ASC, id ASC",
+            (user_uuid, int(limit))).fetchall()
+
+
+def fan_message_counts(uuids: list[str]) -> dict[str, int]:
+    """Anzahl gespeicherter FAN-Nachrichten je Fan, fuer alle auf einmal.
+
+    Je Fan einzeln zu zaehlen waere auf einer vollen Subs-Seite ein Dutzend
+    Abfragen mehr - dieselbe Ueberlegung wie bei _insights_for und get_many.
+    """
+    if not uuids:
+        return {}
+    out: dict[str, int] = {}
+    with _lock:
+        conn = get_conn()
+        for i in range(0, len(uuids), 400):          # Grenze fuer Platzhalter
+            teil = uuids[i:i + 400]
+            marks = ",".join("?" for _ in teil)
+            for row in conn.execute(
+                    f"SELECT user_uuid, COUNT(*) AS n FROM messages "
+                    f"WHERE direction = 'in' AND user_uuid IN ({marks}) "
+                    f"GROUP BY user_uuid", teil):
+                out[row["user_uuid"]] = int(row["n"])
+    return out
+
+
+def backfills_since(ts: float) -> int:
+    """Wie viele Verlaeufe seit `ts` eingelesen wurden - Bremse fuer die Automatik.
+
+    Bewusst aus der Tabelle statt aus einem Zaehler im Arbeitsspeicher: ein
+    Neustart darf die Stundenbremse nicht auf null zuruecksetzen.
+    """
+    with _lock:
+        row = get_conn().execute(
+            "SELECT COUNT(*) AS n FROM chats WHERE COALESCE(backfill_at, 0) > ?",
+            (float(ts),)).fetchone()
+    return int((row["n"] if row else 0) or 0)
+
+
+def reset_running_backfills() -> int:
+    """Beim Start haengengebliebene Laeufe freigeben.
+
+    Die Warteschlange lebt nur im Arbeitsspeicher. Ohne das steckt ein Fan nach
+    einem Absturz oder Neustart fuer immer auf 'running' und wird nie eingelesen.
+    """
+    with _lock:
+        conn = get_conn()
+        before = conn.total_changes
+        conn.execute("UPDATE chats SET backfill_state = '' "
+                     "WHERE backfill_state IN ('queued', 'running')")
+        conn.commit()
+        return conn.total_changes - before
+
+
+def resync_memory_dirty(user_uuid: str, last_msg_id: int) -> int:
+    """Setzt den Zaehler auf die Fan-Nachrichten NACH `last_msg_id`.
+
+    Hart auf 0 zu setzen waere falsch: waehrend eines langen Einlesens schreibt
+    der Poller weiter mit, und genau diese Nachrichten muessen faellig bleiben.
+    """
+    with _lock:
+        conn = get_conn()
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM messages WHERE user_uuid = ? "
+            "AND direction = 'in' AND id > ?", (user_uuid, int(last_msg_id))).fetchone()
+        n = int((row["n"] if row else 0) or 0)
+        jetzt = time.time()
+        conn.execute("UPDATE chat_memory SET dirty_count = ?, last_run_at = ?, "
+                     "updated_at = ? WHERE user_uuid = ?", (n, jetzt, jetzt, user_uuid))
+        conn.commit()
+        return n
+
+
 def last_message_id(user_uuid: str) -> int:
     with _lock:
         row = get_conn().execute(
@@ -1658,6 +1774,10 @@ def memory_candidates(now: float, min_interval_seconds: float, limit: int) -> li
             # Ein Fan, der ausdruecklich auf 'off' steht, kostet auch keinen
             # Verdichtungs-Aufruf.
             "AND COALESCE(c.memory_mode, '') <> 'off' "
+            # Waehrend ein Verlauf eingelesen wird, darf die normale Verdichtung
+            # denselben Fan nicht anfassen: beide schreiben ueber save() in
+            # chat_memory, der Letzte gewinnt - einer der beiden Staende waere weg.
+            "AND COALESCE(c.backfill_state, '') NOT IN ('queued', 'running') "
             "ORDER BY COALESCE(m.last_run_at, 0) ASC LIMIT ?",
             (now - min_interval_seconds, int(limit)),
         ).fetchall()

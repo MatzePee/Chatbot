@@ -109,12 +109,24 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
       <span class="pill">{{ c['mode_override'] or 'global' }}</span>
     </div>
   </div>
-  {% if c['insight'] %}
+  {# Die Zeile erscheint auch ohne Kaufdaten, sobald Nachrichten vorliegen -
+     sonst faellt die Nachrichtenzahl bei genau den Fans weg, bei denen sie am
+     interessantesten ist: denen, die viel schreiben und nichts kaufen. #}
+  {% if c['insight'] or c['msg_count'] %}
   <div class="insight-line small muted">
+    {% if c['insight'] %}
     💰 Gesamt <strong class="green-t">${{ c['insight']['total_cents'] | dollars }}</strong>
     · Größter Kauf ${{ c['insight']['max_cents'] | dollars }}
     {% if c['insight']['last_purchase'] %}· letzter Kauf {{ c['insight']['last_purchase'] | fdate }}{% endif %}
-    {% if c['insight']['auto_renew'] %}· 🔁 Auto-Verlängerung{% endif %}
+    {% endif %}
+    {% if c['msg_count'] %}{% if c['insight'] %} · {% endif %}<span
+      title="Nachrichten dieses Fans, die lokal gespeichert sind. Nicht zwingend alles, was er je geschrieben hat: gezählt wird ab dem Zeitpunkt, an dem „Chatverlauf mitschreiben“ lief. Nach „Ganzen Chat einlesen“ springt die Zahl hoch.">💬 {{ c['msg_count'] }}</span>{% endif %}
+    {% if c['backfill_state'] == 'queued' %} · <span title="Der Verlauf steht zum Einlesen in der Warteschlange.">📥 wartet</span>
+    {% elif c['backfill_state'] == 'running' %} · <span title="Der Verlauf wird gerade eingelesen.">📥 läuft</span>
+    {% elif c['backfill_state'] == 'error' %} · <span class="red-t" title="Einlesen fehlgeschlagen oder größtenteils ohne Ergebnis – kein automatischer neuer Versuch, von Hand nachholen. {{ c['backfill_note'] }}">📥 Fehler</span>
+    {% elif c['backfill_state'] == 'done' %} · <span class="green-t" title="Verlauf eingelesen am {{ c['backfill_at'] | ts }} – {{ c['backfill_note'] }}">📥 eingelesen</span>
+    {% elif c['backfill_state'] == 'skipped' %} · <span title="Übersprungen am {{ c['backfill_at'] | ts }} – {{ c['backfill_note'] }}">📥 übersprungen</span>{% endif %}
+    {% if c['insight'] and c['insight']['auto_renew'] %} · 🔁 Auto-Verlängerung{% endif %}
   </div>
   {% endif %}
 

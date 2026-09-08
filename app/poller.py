@@ -185,6 +185,13 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
     # Genau das ist der Zaehler, an dem die Verdichtung faellig wird.
     memory.mark_dirty(user_uuid)
 
+    # Fehlt der alte Verlauf dieses Fans noch im Gedaechtnis? Dann jetzt
+    # einreihen - genau einmal je Fan. Der Aufruf kehrt sofort zurueck (er
+    # schaut nur in ein Feld der ohnehin geladenen Chat-Zeile), das Einlesen
+    # selbst laeuft im Hintergrund. Die Antwort auf DIESE Nachricht wartet also
+    # nicht darauf; der Verlauf wirkt ab der uebernaechsten.
+    memory.maybe_auto_backfill(user_uuid, display_name or handle or "")
+
     # Neue Fan-Nachricht liegt vor -> eine noch eingeplante Reaktivierung verwerfen,
     # damit nicht kurz danach doch noch ein "wo bist du?" rausgeht.
     if reactivation_to_cancel is not None:
@@ -1643,6 +1650,8 @@ def start() -> None:
         return
     _stop.clear()
     _start_thread()
+    # Laeufe, die ein Neustart mitten im Einlesen erwischt hat, wieder freigeben.
+    memory.reset_stale_backfills()
     if not (_watchdog and _watchdog.is_alive()):
         _watchdog = threading.Thread(target=_watchdog_loop, name="fanvue-watchdog",
                                      daemon=True)

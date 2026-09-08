@@ -1253,6 +1253,9 @@ def chats(request: Request, view: str = "subscribers", q: str = "", msg: str = "
     # waere bei langen Listen spuerbar - _insights_for macht es aus demselben
     # Grund genauso.
     memories = memory.get_many([m["uuid"] for m in members])
+    # Ebenso die Zahl der gespeicherten Fan-Nachrichten - eine Abfrage statt
+    # einer je Karte.
+    msg_counts = db.fan_message_counts([m["uuid"] for m in members])
     memory_on = bool(db.get_setting("memory_enabled", False))
     for m in members:
         db.upsert_chat(m["uuid"], m["handle"], m["display_name"])
@@ -1272,6 +1275,12 @@ def chats(request: Request, view: str = "subscribers", q: str = "", msg: str = "
             "memory_active": memory.enabled_for(row),
             "memory_long": memory.by_category(memories.get(m["uuid"]) or {}),
             "stats": db.ppv_offer_stats(m["uuid"]),
+            # Nur was lokal gespeichert ist - der Wert springt nach einem
+            # Einlesen hoch und zeigt damit nebenbei, ob es schon gelaufen ist.
+            "msg_count": msg_counts.get(m["uuid"], 0),
+            "backfill_state": ((row["backfill_state"] if row else "") or ""),
+            "backfill_at": (row["backfill_at"] if row else None),
+            "backfill_note": ((row["backfill_note"] if row else "") or ""),
             "insight": insights.get(m["uuid"]),
             "group": m.get("group", ""),
             "last_inbound_uuid": (row["last_inbound_uuid"] if row else "") or "",
@@ -1785,6 +1794,7 @@ _INT_KEYS = {
     "memory_short_max_age_days",
     "messages_retention_days", "chats_cache_seconds",
     "memory_backfill_max_pages", "memory_backfill_chunk", "memory_loop_max_age_days",
+    "memory_backfill_max_messages", "memory_backfill_per_hour",
 }
 _FLOAT_KEYS = {"temperature", "memory_backfill_delay"}
 _BOOL_KEYS = {"active_hours_enabled", "ppv_enabled", "ppv_use_llm_classifier",
