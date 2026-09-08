@@ -143,7 +143,11 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
         <input type="hidden" name="handle" value="{{ c['handle'] }}">
         <input type="hidden" name="display_name" value="{{ c['display_name'] }}">
         <input type="hidden" name="back" value="{{ backq }}">
-        <button class="btn">💬 Reaktivierung auslösen</button>
+        {# Bei abgeschaltetem Bot gar nicht erst anbieten - der Server weist es
+           ohnehin ab, aber ein Knopf, der nur eine Fehlermeldung erzeugt, ist
+           schlechter als ein sichtbar gesperrter. #}
+        <button class="btn" {% if not c['bot_enabled'] %}disabled
+                title="Bot ist für diesen Fan aus"{% endif %}>💬 Reaktivierung auslösen</button>
       </form>
       <form method="post" action="/chats/{{ c['uuid'] }}/reset-inbound" class="inline"
             onsubmit="return confirm('Verarbeitungsmarke für {{ (c['display_name'] or c['handle'] or 'diesen Fan') | e }} zurücksetzen?\n\nDer Bot greift die letzte Fan-Nachricht dann beim nächsten Durchlauf wieder auf und beantwortet sie.');">

@@ -1450,7 +1450,12 @@ def ppv_reset_offered(user_uuid: str):
 
 
 @app.post("/chats/{user_uuid}/update")
-def update_chat_route(user_uuid: str, bot_enabled: str = Form("on"),
+def update_chat_route(user_uuid: str, bot_enabled: str = Form(""),
+                      # Ein NICHT angehaktes Kaestchen schickt der Browser gar
+                      # nicht mit - das Feld fehlt dann im Formular. Mit "on" als
+                      # Vorgabewert kam beim Abhaken also derselbe Wert an wie
+                      # beim Anhaken, und der Bot schaltete sich sofort wieder
+                      # ein. Vorgabe muss leer sein: fehlt das Feld, ist es aus.
                       mode_override: str = Form(""), persona_override: str = Form(""),
                       notes: str = Form(""), back: str = Form("")):
     db.update_chat(
@@ -1635,6 +1640,12 @@ def reactivate_now_route(user_uuid: str, handle: str = Form(""), display_name: s
         return _chats_back(back, "Es gibt bereits einen offenen Entwurf für diesen Fan")
     db.upsert_chat(user_uuid, handle, display_name)
     chat = db.get_chat(user_uuid)
+    # "Bot aus" muss auch die Handausloesung sperren. Der automatische Lauf
+    # filtert bot_enabled schon in der Abfrage (db.due_reactivation_chats);
+    # ohne diese Sperre waere der Knopf das Schlupfloch, durch das ein
+    # stillgelegter Chat doch wieder angeschrieben wird.
+    if chat is not None and not chat["bot_enabled"]:
+        return _chats_back(back, "Bot ist für diesen Fan aus – keine Reaktivierung erstellt")
     me_uuid = fanvue.account_uuid()
     folder = (db.get_setting("reactivation_folder", "") or "").strip()
     try:
