@@ -89,7 +89,12 @@
   <p class="muted grp-desc">Wer die Persona ist, wie und wann sie antwortet.</p>
   <details class="card sect">
     <summary>Persona / System-Prompt</summary>
-    <textarea name="system_prompt" rows="5">{{ s['system_prompt'] }}</textarea>
+    {# Die Persona ist der laengste Text der ganzen Oberflaeche und wird am
+       haeufigsten ueberarbeitet - mit 5 Zeilen schreibt man darin durch einen
+       Schlitz. Hoehe an die Fensterhoehe gekoppelt, damit es auf einem grossen
+       Bildschirm auch gross ist; ziehen laesst es sich weiterhin (resize: vertical). #}
+    <textarea name="system_prompt" rows="24"
+      style="min-height:60vh; line-height:1.5">{{ s['system_prompt'] }}</textarea>
   </details>
   <details class="card sect">
     <summary>Zeit &amp; Tagesrhythmus</summary>
