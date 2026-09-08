@@ -304,6 +304,38 @@ def looks_like_reasoning(text: str) -> Optional[str]:
     return None
 
 
+# -------------------------------------------------- Rohausgabe des Modells
+# Am 08.09.2026 ging an einen Fan das hier raus:
+#   <|begin_of_sentence|><html><body><div class="ppv-placeholder-container">
+# Zwei Dinge, die beide NIE im Chat landen duerfen:
+#   1. Steuertokens der Chat-Vorlage. DeepSeek schreibt sie mit FULLWIDTH-Strich
+#      (U+FF5C) und U+2581 statt Leerzeichen - eine reine ASCII-Suche greift
+#      daneben, deshalb sind beide Varianten drin.
+#   2. HTML/Markup. Bewusst eine feste Liste von Tag-Namen statt "<irgendwas>":
+#      "<3" ist im Flirtchat ein Herz und darf nicht blockieren.
+_RE_MODEL_TOKEN = re.compile(r"<\s*[|｜][^<>\n]{0,80}?[|｜]\s*>")
+_RE_MARKUP = re.compile(
+    r"</?\s*(?:html|head|body|div|span|table|tr|td|th|ul|ol|li|script|style|"
+    r"iframe|section|article|header|footer|form|input|button|img|br|hr|h[1-6]|p|a)"
+    r"\b[^>]*>"
+    r"|<!\s*doctype\b[^>]*>"
+    r"|\bclass\s*=\s*[\"'][^\"']*[\"']",
+    re.I)
+
+
+def finds_model_artifacts(text: str) -> Optional[str]:
+    """Steuertoken oder HTML-Markup im Text? Rueckgabe: die Fundstelle.
+
+    Nicht reparierend raten: was hier auftaucht, ist kaputte Modellausgabe und
+    keine Nachricht, aus der sich noch etwas retten liesse.
+    """
+    for rx in (_RE_MODEL_TOKEN, _RE_MARKUP):
+        m = rx.search(text or "")
+        if m:
+            return m.group(0).strip()[:80]
+    return None
+
+
 # ------------------------------------------------------------ Eckige Klammern
 # In eckigen Klammern steckt bei Modellausgaben nie etwas, das an den Fan soll:
 # Regieanweisungen, Platzhalter, Uhrzeiten, Notizen an sich selbst. Da der
@@ -366,6 +398,10 @@ def strip_artifacts(text: str) -> str:
     statt dass die Engine das Medium tatsaechlich anhaengt."""
     if not text:
         return text
+    # Steuertokens raus, bevor irgendetwas anderes greift: "Hey du! <|end|>"
+    # ist nach dem Entfernen eine voellig normale Nachricht. Bleibt danach nichts
+    # uebrig, faengt check_outgoing das als "Leere Antwort" ab.
+    text = _RE_MODEL_TOKEN.sub("", text)
     text = _RE_PPV_TAG.sub("", text)
     text = _RE_STAGE.sub("", text)
     text = _RE_ASTERISK.sub("", text)
@@ -398,6 +434,14 @@ def check_outgoing(text: str, has_media: bool = False) -> tuple[str, str | None]
     text = strip_artifacts(strip_think_blocks((text or "").strip()))
     if not text:
         return text, "Leere Antwort vom Modell"
+
+    # Rohausgabe des Modells (HTML, Markup, Reste der Chat-Vorlage): ganz vorne
+    # geprueft, weil es der eindeutigste Totalausfall ist. Nicht heilbar, aber
+    # durch eine Neugenerierung meist beim naechsten Versuch weg.
+    roh = finds_model_artifacts(text)
+    if roh:
+        return text, (f"Rohausgabe des Modells erkannt („{roh}“) – "
+                      f"bitte prüfen (kein Auto-Send)")
 
     # Ausgeplauderter Denkprozess: darf NIE zum Fan. Neu generieren lassen.
     denk = looks_like_reasoning(text)

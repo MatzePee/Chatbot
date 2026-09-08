@@ -685,6 +685,22 @@ def _send_draft(draft_id: int) -> bool:
     if not text:
         db.update_draft(draft_id, status="failed", error="Leerer Text")
         return False
+    # Letzte Sperre vor dem Absenden. Die Guardrails pruefen beim ERZEUGEN - hier
+    # steht der Text, der tatsaechlich rausgeht, egal auf welchem Weg er
+    # entstanden ist (Freigabe von Hand, aelterer Entwurf aus der Zeit vor dieser
+    # Pruefung, Handkorrektur). Genau so ging am 08.09.2026 ein
+    # "<|begin_of_sentence|><html>..." an einen Fan.
+    # Nicht auf "failed" setzen: zurueck in die Warteschlange mit Notiz, dann
+    # holt der normale Neuversuch eine brauchbare Antwort nach.
+    roh = guardrails.finds_model_artifacts(text)
+    if roh:
+        db.update_draft(draft_id, status="pending",
+                        guardrail_note=f"Rohausgabe des Modells erkannt („{roh}“) – "
+                                       f"beim Senden abgefangen (kein Auto-Send)")
+        db.log("error", "send",
+               f"Senden blockiert: Rohausgabe des Modells "
+               f"({draft['handle'] or draft['user_uuid']})", roh)
+        return False
     user_uuid = draft["user_uuid"]
     is_ppv = bool(draft["is_ppv"])
     try:
@@ -1165,6 +1181,7 @@ _REGENERABLE_NOTES = (
     "zeit-widerspruch",
     "denkprozess des modells",
     "eckige klammern",
+    "rohausgabe des modells",
 )
 
 # Manche Blockaden bekommen ein eigenes, engeres Neuversuch-Limit. Bei eckigen
