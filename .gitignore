@@ -17,3 +17,6 @@ exports/
 # --- Samba/SMB-Share: Platzhalter fuer geloeschte Dateien.
 # Ohne diesen Eintrag bricht `git add -A` mit "unable to index file" ab. ---
 .smbdelete*
+
+# Ablage fuer Dateien, die auf dem SMB-Share nicht geloescht werden koennen
+_to_delete/

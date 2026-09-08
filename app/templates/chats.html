@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Subs</h1>
-<p class="muted">Prio 1 (<strong>{{ p1_name }}</strong>) wird schnell bearbeitet, Prio 2 (<strong>{{ p2_name }}</strong>)
-seltener (spart Tokens). Über das Dropdown wählst du die Ansicht – auch beide Gruppen gleichzeitig.
-Die Gruppen-Zuordnung erfolgt über deine Fanvue-Listen (in den Einstellungen).</p>
+<p class="muted">Standardmäßig siehst du <strong>alle Abonnenten</strong>, alphabetisch und
+{{ per_page }} pro Seite. Über die Dropdowns wechselst du Ansicht und Sortierung – „Aktueller Chat"
+stellt die Fans nach oben, die zuletzt geschrieben haben. Prio 1 (<strong>{{ p1_name }}</strong>) wird
+schnell bearbeitet, Prio 2 (<strong>{{ p2_name }}</strong>) seltener; die Zuordnung erfolgt über deine
+Fanvue-Listen (in den Einstellungen). Die Fan-Liste wird nach dem ersten Laden kurz
+zwischengespeichert, damit Blättern und Sortieren ohne Wartezeit gehen.</p>
 
 {% if error %}
 <div class="card warn">Liste konnte nicht geladen werden: {{ error }} – zeige stattdessen erfasste Chats.</div>
@@ -19,28 +22,43 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
 {% endif %}
 
 <div class="card">
-  <div class="row">
+  <form method="get" action="/chats" class="row" id="chat-filter">
     <label>Ansicht
-      <select id="view-select" onchange="location.href='/chats?view='+this.value">
+      <select name="view" onchange="window.pageLoadStart&&window.pageLoadStart(); this.form.submit()">
+        <option value="subscribers" {% if view=='subscribers' %}selected{% endif %}>Alle Abonnenten</option>
         <option value="prio1" {% if view in ['prio1','group'] %}selected{% endif %}>Prio 1 ({{ p1_name }})</option>
         {% if has_prio2 %}
         <option value="prio2" {% if view=='prio2' %}selected{% endif %}>Prio 2 ({{ p2_name }})</option>
         <option value="both" {% if view=='both' %}selected{% endif %}>Beide Gruppen</option>
         {% endif %}
-        <option value="subscribers" {% if view=='subscribers' %}selected{% endif %}>Alle Abonnenten</option>
         <option value="followers" {% if view=='followers' %}selected{% endif %}>Alle Follower</option>
         <option value="all" {% if view=='all' %}selected{% endif %}>Alle erfassten Fans ({{ db_total }})</option>
       </select>
     </label>
+    <label>Sortierung
+      <select name="sort" onchange="window.pageLoadStart&&window.pageLoadStart(); this.form.submit()">
+        <option value="name" {% if sort=='name' %}selected{% endif %}>Alphabetisch</option>
+        <option value="chat" {% if sort=='chat' %}selected{% endif %}>Aktueller Chat</option>
+      </select>
+    </label>
     <label style="flex:2">Suche
-      <input id="chat-search" type="text" placeholder="🔍 Nach Anzeigename oder @username suchen…" autocomplete="off" value="{{ q }}">
+      <input id="chat-search" name="q" type="text"
+             placeholder="🔍 Nach Anzeigename oder @username suchen…" autocomplete="off" value="{{ q }}">
     </label>
     <label>&nbsp;
-      <a class="btn" href="/chats?view={{ view }}" style="display:block; text-align:center">🔄 Aktualisieren</a>
+      <button class="btn" style="display:block; width:100%">🔎 Anwenden</button>
     </label>
-  </div>
+    <label>&nbsp;
+      <a class="btn" style="display:block; text-align:center"
+         href="/chats?view={{ view }}&sort={{ sort }}&q={{ q | urlencode }}&refresh=1"
+         title="Fan-Liste frisch von Fanvue holen (dauert ein paar Sekunden)">🔄 Neu laden</a>
+    </label>
+  </form>
   {% if quelle %}
-  <p class="muted small">Quelle dieser Liste: {{ quelle }}.</p>
+  <p class="muted small">Quelle dieser Liste: {{ quelle }}.{% if cache_age is not none and cache_age > 3 %}
+    Stand von vor {% if cache_age < 90 %}{{ cache_age }} Sek.{% else %}{{ (cache_age / 60) | round | int }} Min.{% endif %}{% if cache_busy %}
+    – <span class="cache-hint">wird gerade im Hintergrund aktualisiert…</span>{% else %}
+    – „Neu laden" holt sie frisch von Fanvue.{% endif %}{% endif %}</p>
   {% endif %}
   {% if no_prio1_list %}
   <div class="card warn">Für <strong>Prio 1</strong> ist keine Fanvue-Liste hinterlegt. Angezeigt wird
@@ -49,14 +67,28 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
     <a href="/settings#prio1">Prio-1-Liste in den Einstellungen wählen</a> oder oben
     <strong>„Alle erfassten Fans ({{ db_total }})“</strong> auswählen.</div>
   {% endif %}
+  {% if pages > 1 %}
+  <nav class="pager">
+    <a class="btn{% if page <= 1 %} off{% endif %}"
+       {% if page > 1 %}href="/chats?view={{ view }}&sort={{ sort }}&q={{ q | urlencode }}&page={{ page - 1 }}"{% endif %}>← Zurück</a>
+    <span class="muted small">Seite {{ page }} von {{ pages }}</span>
+    <a class="btn{% if page >= pages %} off{% endif %}"
+       {% if page < pages %}href="/chats?view={{ view }}&sort={{ sort }}&q={{ q | urlencode }}&page={{ page + 1 }}"{% endif %}>Weiter →</a>
+  </nav>
+  {% endif %}
   <div class="filter-foot">
-    <span class="muted small" id="chat-count"></span>
+    <span class="muted small" id="chat-count">
+      {% if total %}{{ von }}–{{ bis }} von {{ total }} Fans{% else %}Keine Fans{% endif %}
+      {% if q %} · Suche „{{ q }}"{% endif %}
+      · {% if sort=='chat' %}nach letztem Chat{% else %}alphabetisch{% endif %}
+    </span>
     <form method="post" action="/chats/export-all" class="inline"
           onsubmit="return confirm('Alle Chats dieser Gruppe exportieren? Das läuft im Hintergrund und kann bei vielen Fans dauern.');">
       <button class="btn">⬇ Alle Chats exportieren</button>
     </form>
   </div>
   <div class="muted small" id="export-status"></div>
+  <div class="small" id="backfill-status"></div>
 </div>
 
 {% for c in chats %}
@@ -98,12 +130,12 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
             onsubmit="return confirm('Reaktivierungs-Nachricht für {{ (c['display_name'] or c['handle'] or 'diesen Fan') | e }} erstellen? Sie landet in der Freigabe-Queue.');">
         <input type="hidden" name="handle" value="{{ c['handle'] }}">
         <input type="hidden" name="display_name" value="{{ c['display_name'] }}">
-        <input type="hidden" name="view" value="{{ view }}">
+        <input type="hidden" name="back" value="{{ backq }}">
         <button class="btn">💬 Reaktivierung auslösen</button>
       </form>
       <form method="post" action="/chats/{{ c['uuid'] }}/reset-inbound" class="inline"
             onsubmit="return confirm('Verarbeitungsmarke für {{ (c['display_name'] or c['handle'] or 'diesen Fan') | e }} zurücksetzen?\n\nDer Bot greift die letzte Fan-Nachricht dann beim nächsten Durchlauf wieder auf und beantwortet sie.');">
-        <input type="hidden" name="view" value="{{ view }}">
+        <input type="hidden" name="back" value="{{ backq }}">
         <button class="btn{% if c['waiting'] %}-primary{% endif %}"
                 title="Setzt last_inbound_uuid zurück – die letzte Fan-Nachricht wird erneut beantwortet"
                 {% if not c['last_inbound_uuid'] %}disabled{% endif %}>
@@ -163,13 +195,200 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
     </div>
     {% endif %}
     <p class="small muted" style="margin-top:8px">Fanvues automatische Notizen sind über die API nicht abrufbar –
-    nutze dafür das Feld „Notizen / Gedächtnis" unter „Einstellungen".</p>
+    nutze dafür das Feld „Notizen" unter „Einstellungen" oder den Block „Gedächtnis".</p>
   </details>
   {% endif %}
+
+  {% set mem = c['memory'] %}
+  <details class="settings mem-box" data-uuid="{{ c['uuid'] }}">
+    <summary>🧠 Gedächtnis
+      {% if c['memory_mode'] == 'on' %}<em class="mem-pill on">an</em>
+      {% elif c['memory_mode'] == 'off' %}<em class="mem-pill off">aus</em>
+      {% elif not c['memory_active'] %}<em class="mem-pill">global aus</em>{% endif %}
+      <span class="mem-live"></span></summary>
+
+    <div class="mem-head">
+      <span class="small muted">
+        {% if mem and mem['last_run_at'] %}zuletzt verdichtet: {{ mem['last_run_at'] | ts }}
+        {% else %}noch nie automatisch verdichtet{% endif %}
+        {% if mem and mem['dirty_count'] %} · {{ mem['dirty_count'] }} neue Nachricht(en) offen{% endif %}
+      </span>
+      {# Beide Knoepfe sind bewusst IMMER bedienbar. Sie haengen NICHT am
+         Schalter "Automatisch verdichten": genau mit ihnen soll man ja vor dem
+         Einschalten pruefen, ob die Verdichtung brauchbare Ergebnisse liefert. #}
+      <span class="inline">
+        <form method="post" action="/chats/{{ c['uuid'] }}/memory/run" class="inline">
+          <input type="hidden" name="back" value="{{ backq }}">
+          <button class="btn" title="Verdichtet nur die Nachrichten seit der letzten Aktualisierung">
+            ↻ Neue Nachrichten</button>
+        </form>
+        <form method="post" action="/chats/{{ c['uuid'] }}/memory/backfill" class="inline"
+              onsubmit="return confirm('Kompletten Chatverlauf von {{ (c['display_name'] or c['handle'] or 'diesem Fan') | e }} einlesen?\n\nDas holt ALLE Nachrichten aus Fanvue und verdichtet sie blockweise. Bei einem sehr langen Chat dauert das einige Minuten und kostet ein paar Cent. Läuft im Hintergrund – der Fortschritt steht oben auf der Seite.');">
+          <input type="hidden" name="back" value="{{ backq }}">
+          <input type="hidden" name="name" value="{{ c['display_name'] or c['handle'] }}">
+          <button class="btn"
+                  title="Holt den gesamten Verlauf aus Fanvue und baut daraus das Gedächtnis auf">
+            📥 Ganzen Chat einlesen</button>
+        </form>
+      </span>
+    </div>
+
+    {# Dreistufiger Schalter je Fan. Genau dafuer da, die Funktion erst an ein
+       paar Fans zu haengen, bevor sie fuer alle laeuft. #}
+    <form method="post" action="/chats/{{ c['uuid'] }}/memory/mode" class="mem-mode">
+      <input type="hidden" name="back" value="{{ backq }}">
+      <span class="small muted">Für diesen Fan:</span>
+      <button name="mode" value=""    class="btn{% if not c['memory_mode'] %} sel{% endif %}"
+              title="Folgt der globalen Einstellung">Standard</button>
+      <button name="mode" value="on"  class="btn{% if c['memory_mode'] == 'on' %} sel{% endif %}"
+              title="Gedächtnis für diesen Fan immer an – auch wenn es global aus ist">An</button>
+      <button name="mode" value="off" class="btn{% if c['memory_mode'] == 'off' %} sel{% endif %}"
+              title="Gedächtnis für diesen Fan nie verwenden">Aus</button>
+    </form>
+
+    {% if c['memory_mode'] == 'off' %}
+    <p class="mem-warn">Für diesen Fan ausgeschaltet: nichts wird verdichtet und nichts geht
+      an das Modell. Vorhandene Einträge bleiben erhalten.</p>
+    {% elif not c['memory_active'] %}
+    <p class="mem-warn">Das Gedächtnis ist global ausgeschaltet: Einträge werden gespeichert und
+      hier angezeigt, aber <strong>nicht</strong> an das Modell übergeben.
+      Für einen Test genügt oben <strong>An</strong> – dafür muss global nichts geändert werden.
+      <a href="/settings#memory">Oder global einschalten</a></p>
+    {% elif not memory_on %}
+    <p class="mem-ok">Für diesen Fan eingeschaltet, obwohl das Gedächtnis global aus ist –
+      der Block geht bei diesem Fan mit ins Modell.</p>
+    {% endif %}
+
+    {% macro mem_del(uuid, layer, idx) %}
+    <form method="post" action="/chats/{{ uuid }}/memory/delete" class="inline mem-x">
+      <input type="hidden" name="layer" value="{{ layer }}">
+      <input type="hidden" name="index" value="{{ idx }}">
+      <input type="hidden" name="back" value="{{ backq }}">
+      <button class="linkbtn" title="Eintrag löschen">✕</button>
+    </form>
+    {% endmacro %}
+
+    <div class="mem-sec">
+      <h4>Langzeitgedächtnis <span class="small muted">— bleibt dauerhaft</span></h4>
+      {% if c['memory_long'] %}
+      <ul class="mem-list mem-long">
+        {% for key, label, items in c['memory_long'] %}
+        <li class="mem-cat">
+          <strong class="mem-catname">{{ label }}</strong>
+          <ul class="mem-list">
+            {% for e in items %}
+            <li>
+              <span>{{ e['v'] }}</span>
+              <span class="mem-meta">
+                {% if e['src'] == 'manual' %}<em class="mem-tag">Hand</em>{% endif %}
+                {{ mem_del(c['uuid'], 'long', e['_i']) }}
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="small muted">Noch nichts über diesen Fan gespeichert.</p>{% endif %}
+      <form method="post" action="/chats/{{ c['uuid'] }}/memory/add" class="mem-add">
+        <input type="hidden" name="layer" value="long">
+        <input type="hidden" name="back" value="{{ backq }}">
+        <select name="category" title="Fach, in das der Eintrag gehört">
+          {% for key, label in memory_categories %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" name="value" class="mem-value"
+               placeholder="Stichwort, z.B. Elektriker · Hund Bruno · 42">
+        <button class="btn">+</button>
+      </form>
+    </div>
+
+    <div class="mem-sec">
+      <h4>Kurzzeitgedächtnis
+        <span class="small muted">— letzte Gespräche, verfällt nach
+          {{ memory_short_max_age_days }} Tagen oder {{ memory_max_short }} Notizen</span></h4>
+      {% if mem and mem['short'] %}
+      <ul class="mem-list">
+        {% for e in mem['short'] | reverse %}
+        {% set idx = mem['short'] | length - loop.index %}
+        <li{% if e['open'] %} class="mem-open"{% endif %}>
+          <span>
+            <strong class="mem-date">{{ e['d'] }}</strong> {{ e['v'] }}
+            {% if e['open'] %}<em class="mem-due">offen{% if e['due'] %}, fällig {{ e['due'] }}{% endif %}</em>{% endif %}
+          </span>
+          <span class="mem-meta">
+            {% if e['src'] == 'manual' %}<em class="mem-tag">Hand</em>{% endif %}
+            {% if e['open'] %}
+            <form method="post" action="/chats/{{ c['uuid'] }}/memory/close" class="inline mem-x">
+              <input type="hidden" name="index" value="{{ idx }}">
+              <input type="hidden" name="back" value="{{ backq }}">
+              <button class="linkbtn" title="Faden als erledigt markieren">erledigt</button>
+            </form>
+            {% endif %}
+            {# Rettungsknopf: was dauerhaft zaehlt, muss hoch, bevor die Notiz
+               verfaellt. Das Modell uebersieht das gelegentlich. #}
+            <form method="post" action="/chats/{{ c['uuid'] }}/memory/promote" class="inline mem-x">
+              <input type="hidden" name="index" value="{{ idx }}">
+              <input type="hidden" name="back" value="{{ backq }}">
+              <select name="category" title="In welches Fach?">
+                {% for key, label in memory_categories %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+              <button class="linkbtn" title="Dauerhaft ins Langzeitgedächtnis übernehmen">↑ merken</button>
+            </form>
+            {{ mem_del(c['uuid'], 'short', idx) }}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="small muted">Noch keine Gesprächsnotizen.</p>{% endif %}
+      <form method="post" action="/chats/{{ c['uuid'] }}/memory/add" class="mem-add">
+        <input type="hidden" name="layer" value="short">
+        <input type="hidden" name="back" value="{{ backq }}">
+        <input type="text" name="value" class="mem-value"
+               placeholder="z.B. Vorstellungsgespräch am Montag">
+        <span class="mem-due-field">
+          <label><input type="checkbox" name="is_open" value="1"> offener Faden</label>
+          <input type="date" name="due" title="optionale Fälligkeit">
+        </span>
+        <button class="btn" title="Notiz hinzufügen">+</button>
+      </form>
+    </div>
+
+    <details class="mem-raw">
+      <summary>Was der Bot davon sieht
+        ({{ c['memory_block'] | length }} / {{ memory_max_chars }} Zeichen)</summary>
+      {% if c['memory_block'] %}
+      <pre>{{ c['memory_block'] }}</pre>
+      {% else %}
+      <p class="small muted">Nichts – für diesen Fan gibt es noch kein Gedächtnis.</p>
+      {% endif %}
+    </details>
+
+    <form method="post" action="/chats/{{ c['uuid'] }}/memory/clear" class="inline"
+          onsubmit="return confirm('Gedächtnis, Protokoll UND gespeicherte Nachrichten für {{ (c['display_name'] or c['handle'] or 'diesen Fan') | e }} unwiderruflich löschen?');">
+      <input type="hidden" name="back" value="{{ backq }}">
+      <button class="linkbtn danger">Gedächtnis dieses Fans löschen</button>
+    </form>
+  </details>
 </div>
 {% else %}
-<div class="card muted">Keine Fans in dieser Gruppe gefunden. Prüfe die Chat-Gruppe/Liste in den <a href="/settings">Einstellungen</a>.</div>
+<div class="card muted">{% if q %}Keine Treffer für „{{ q }}".
+  <a href="/chats?view={{ view }}&sort={{ sort }}">Suche zurücksetzen</a>{% else %}Keine Fans in dieser Gruppe
+  gefunden. Prüfe die Chat-Gruppe/Liste in den <a href="/settings">Einstellungen</a>.{% endif %}</div>
 {% endfor %}
+
+{% if pages > 1 %}
+<nav class="pager pager-bottom">
+  <a class="btn{% if page <= 1 %} off{% endif %}"
+     {% if page > 1 %}href="/chats?view={{ view }}&sort={{ sort }}&q={{ q | urlencode }}&page={{ page - 1 }}"{% endif %}>← Zurück</a>
+  <span class="muted small">Seite {{ page }} von {{ pages }} · {{ von }}–{{ bis }} von {{ total }}</span>
+  <a class="btn{% if page >= pages %} off{% endif %}"
+     {% if page < pages %}href="/chats?view={{ view }}&sort={{ sort }}&q={{ q | urlencode }}&page={{ page + 1 }}"{% endif %}>Weiter →</a>
+</nav>
+{% endif %}
 
 <style>
 #chat-search { width: 100%; }
@@ -186,27 +405,143 @@ details.settings summary { cursor: pointer; color: var(--muted); font-size: 14px
 .ins-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px 16px; margin-top: 6px; }
 .ins-grid > div { font-size: 15px; }
 .filter-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; }
+.pager { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.pager-bottom { border-top: none; margin: 4px 0 24px; }
+.pager .btn.off { opacity: .35; pointer-events: none; }
 .inline { display: inline-flex; gap: 6px; align-items: center; }
 details.settings[open] summary { margin-bottom: 10px; }
 .waiting-hint { font-size: 12.5px; margin: 8px 0 0; padding: 6px 10px; border-radius: 6px;
   background: rgba(217,164,65,.14); border-left: 3px solid #d9a441; color: var(--text); }
+/* --- Gedächtnis --- */
+.mem-head { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 6px; }
+.mem-warn { font-size: 12.5px; margin: 4px 0 10px; padding: 6px 10px; border-radius: 6px;
+  background: rgba(217,164,65,.14); border-left: 3px solid #d9a441; }
+.mem-sec { margin-top: 12px; }
+.mem-sec h4 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; }
+.mem-list { list-style: none; margin: 0; padding: 0; }
+.mem-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.mem-meta { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
+.mem-tag { font-size: 11px; color: var(--muted); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0 6px; font-style: normal; }
+.mem-date { color: var(--muted); font-weight: 600; margin-right: 4px; }
+.mem-due { font-size: 12px; color: var(--muted); font-style: normal; }
+/* Global gilt `input { width: 100% }`. In einer Flex-Zeile beansprucht das
+   Datumsfeld damit die volle Breite und das Textfeld schrumpft auf null - genau
+   das ist hier passiert. Beide Felder brauchen deshalb ausdrueckliche Breiten. */
+.mem-add { display: flex; gap: 8px; margin-top: 6px; align-items: center; flex-wrap: wrap; }
+.mem-add .mem-value { flex: 1 1 240px; min-width: 0; width: auto; margin-top: 0; }
+.mem-due-field { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.mem-due-field label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.mem-due-field input[type=date] { width: auto; min-width: 8.5em; margin-top: 0; }
+.mem-add .btn { flex: 0 0 auto; padding-left: 14px; padding-right: 14px; }
+.mem-x { display: inline; }
+.linkbtn { background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 12px; padding: 0 2px; }
+.linkbtn:hover { color: var(--text); }
+.linkbtn.danger { margin-top: 14px; }
+.linkbtn.danger:hover { color: #e06c6c; }
+/* Schalter je Fan (Standard / An / Aus) */
+.mem-mode { display: flex; align-items: center; gap: 6px; margin: 2px 0 10px; flex-wrap: wrap; }
+.mem-mode .btn { padding: 2px 12px; font-size: 12.5px; }
+.mem-mode .btn.sel { border-color: var(--green); color: var(--green); font-weight: 600; }
+.mem-pill { font-size: 11px; font-style: normal; padding: 1px 8px; border-radius: 9px;
+  border: 1px solid var(--border); color: var(--muted); margin-left: 6px; }
+.mem-pill.on { color: var(--green); border-color: var(--green); }
+.mem-pill.off { color: #e06c6c; border-color: #e06c6c; }
+.mem-ok { font-size: 12.5px; margin: 4px 0 10px; padding: 6px 10px; border-radius: 6px;
+  background: rgba(90,180,120,.12); border-left: 3px solid var(--green); }
+/* Langzeit: Faecher als Zwischenueberschrift, Werte eingerueckt darunter */
+.mem-long > li.mem-cat { display: block; border-bottom: none; padding: 6px 0 0; }
+.mem-catname { font-size: 11.5px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .04em; }
+.mem-cat > .mem-list { margin-left: 10px; }
+/* Offener Faden faellt in der Kurzzeitliste auf */
+.mem-open { border-left: 2px solid #d9a441; padding-left: 8px !important; }
+.mem-meta select { width: auto; margin-top: 0; font-size: 11.5px; padding: 1px 4px; }
+.mem-add select { width: auto; margin-top: 0; flex: 0 0 auto; }
+.mem-raw { margin-top: 12px; }
+.mem-raw summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+#backfill-status:not(:empty) { margin-top: 8px; padding: 6px 10px; border-radius: 6px;
+  background: var(--panel2); border-left: 3px solid var(--border); }
+#backfill-status.running { border-left-color: #d9a441; }
+#backfill-status.ok-t { border-left-color: var(--green, #3ecf8e); }
+#backfill-status.err { border-left-color: #e06c6c; }
+.mem-live { font-size: 12px; color: var(--muted); }
+.mem-live.on { color: #d9a441; }
+.err-t { color: #e06c6c; }
+.mem-raw pre { white-space: pre-wrap; font-size: 12.5px; background: var(--panel2);
+  border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin: 6px 0 0; }
 </style>
 <script>
 (function () {
-  const box = document.getElementById('chat-search');
-  const cards = Array.from(document.querySelectorAll('.chat-card'));
-  const counter = document.getElementById('chat-count');
-  function apply() {
-    const q = (box.value || '').trim().toLowerCase();
-    let shown = 0;
-    for (const c of cards) {
-      const ok = !q || (c.dataset.search || '').includes(q);
-      c.style.display = ok ? '' : 'none';
-      if (ok) shown++;
-    }
-    counter.textContent = shown + ' von ' + cards.length + ' Fans';
+  // Die Suche laeuft serverseitig ueber ALLE Fans, nicht nur ueber die
+  // sichtbare Seite - Enter schickt das Filter-Formular ab.
+
+  /* Fortschritt beim Einlesen ganzer Chats. Nur solange etwas laeuft wird
+     nachgefragt - im Ruhezustand kostet die Seite keine Abfragen. */
+  const bf = document.getElementById('backfill-status');
+  /* Den betroffenen Fan zusaetzlich an seiner eigenen Karte markieren - bei
+     10 Karten pro Seite sucht man sonst, welcher gerade dran ist. */
+  function markiere(j) {
+    document.querySelectorAll('.mem-box').forEach(function (box) {
+      const feld = box.querySelector('.mem-live');
+      if (!feld) return;
+      if (j.running && j.user_uuid === box.dataset.uuid) {
+        feld.textContent = j.phase === 'holen'
+          ? '· wird eingelesen (' + (j.fetched || 0) + ' Nachrichten)'
+          : '· wird verdichtet (' + (j.chunks_done || 0) + '/' + (j.chunks_total || 0) + ')';
+        feld.className = 'mem-live on';
+      } else {
+        feld.textContent = ''; feld.className = 'mem-live';
+      }
+    });
   }
-  if (box) { box.addEventListener('input', apply); apply(); }
+  async function pollBackfill(einmal) {
+    if (!bf) return;
+    try {
+      const r = await fetch('/chats/memory/backfill-status');
+      const j = await r.json();
+      markiere(j);
+      if (j.running) {
+        let t = '📥 ' + (j.name || 'Chat') + ': ';
+        if (j.phase === 'holen') {
+          t += 'Nachrichten werden geholt… ' + (j.fetched || 0) + ' gespeichert (Seite ' + (j.pages || 0) + ')';
+        } else if (j.phase === 'verdichten') {
+          t += 'verdichten… Block ' + (j.chunks_done || 0) + ' von ' + (j.chunks_total || 0);
+          if (j.chunks_total) t += ' (' + Math.round(100 * j.chunks_done / j.chunks_total) + ' %)';
+        } else {
+          t += 'wird vorbereitet…';
+        }
+        if (j.queued) t += ' · ' + j.queued + ' weitere in der Warteschlange';
+        bf.textContent = t;
+        bf.className = 'small running';
+        setTimeout(pollBackfill, 1500);
+      } else if (j.queued) {
+        bf.textContent = '📥 ' + j.queued + ' Chat(s) in der Warteschlange…';
+        bf.className = 'small running';
+        setTimeout(pollBackfill, 1500);
+      } else if (j.error) {
+        bf.textContent = '⚠ Einlesen fehlgeschlagen (' + (j.name || '?') + '): ' + j.error;
+        bf.className = 'small err';
+      } else if (j.finished_at && (Date.now() / 1000 - j.finished_at) < 600) {
+        bf.innerHTML = '✓ <strong>' + (j.name || 'Chat') + '</strong> eingelesen – '
+          + (j.note || '') + (j.cost ? ' · $' + Number(j.cost).toFixed(3) : '')
+          + ' · <a href="' + location.href + '">Seite neu laden</a>, um das Ergebnis zu sehen'
+          + (j.last_error ? '<br><span class="err-t">Zuvor fehlgeschlagen ('
+             + (j.last_error_name || '?') + '): ' + j.last_error + '</span>' : '');
+        bf.className = 'small ok-t';
+      } else if (j.last_error) {
+        bf.textContent = '⚠ Zuletzt fehlgeschlagen (' + (j.last_error_name || '?') + '): '
+          + j.last_error;
+        bf.className = 'small err';
+      } else { bf.textContent = ''; bf.className = 'small'; }
+    } catch (e) {}
+  }
+  pollBackfill(true);
 
   // Export-Fortschritt anzeigen
   const es = document.getElementById('export-status');

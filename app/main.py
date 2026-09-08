@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import csv_import, db, default_docs, fanvue, openrouter, poller
+from . import csv_import, db, default_docs, fanvue, memory, openrouter, poller
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
@@ -888,11 +888,32 @@ def regenerate_draft(draft_id: int):
 
 # --------------------------------------------------------------------- Chats
 def _fetch_group_members(filter_: str = "", custom_list_id: str = "", cap: int = 5000) -> list[dict]:
-    """Chats einer Chat-Gruppe (Filter) live aus Fanvue laden (nur Konversationen)."""
+    """Chats einer Chat-Gruppe (Filter) aus Fanvue laden (nur Konversationen)."""
+    return _cached(f"group:{filter_}:{custom_list_id}:{cap}",
+                   lambda: _fetch_group_members_live(filter_, custom_list_id, cap))
+
+
+def _fetch_group_members_live(filter_: str = "", custom_list_id: str = "",
+                              cap: int = 5000) -> list[dict]:
     members: list[dict] = []
     page = 1
+    # Groessere Seiten = halb so viele Aufrufe. Mag die API die Groesse nicht,
+    # wird beim ersten Fehlschlag dauerhaft auf 50 zurueckgeschaltet.
+    size = _CHAT_PAGE_SIZE[0]
     while page <= 120 and len(members) < cap:
-        res = fanvue.list_chats(filter_=filter_, size=50, page=page, custom_list_id=custom_list_id)
+        try:
+            res = fanvue.list_chats(filter_=filter_, size=size, page=page,
+                                    custom_list_id=custom_list_id)
+        except fanvue.FanvueError as exc:
+            # Nur zuruecknehmen, wenn die API die SEITENGROESSE ablehnt.
+            # Bei 401/403/429/5xx liegt es an etwas anderem - das muss
+            # durchschlagen, sonst verschleiert ein Rueckfall den echten Fehler.
+            if size == 50 or exc.status not in (400, 413, 422):
+                raise
+            db.log("info", "system", "Fanvue mag Seitengroesse 100 nicht – nutze 50", "")
+            _CHAT_PAGE_SIZE[0] = size = 50
+            continue
+        res = res if isinstance(res, dict) else {}
         for entry in res.get("data", []):
             u = entry.get("user", {})
             if u.get("uuid"):
@@ -954,8 +975,127 @@ def _insights_for(uuids: list[str], ttl: float = 600) -> dict[str, dict]:
     return result
 
 
+# Fanvue liefert Chat-/Mitgliederlisten nur seitenweise (50 pro Aufruf). Bei 600+
+# Fans sind das gut ein Dutzend nacheinander laufender HTTP-Aufrufe - genau das
+# macht die Subs-Seite langsam. Weil sich die Liste selbst zwischen zwei Klicks
+# praktisch nie aendert, wird sie kurz zwischengespeichert: Ansicht wechseln,
+# blaettern, sortieren und Formulare abschicken laufen dann ohne einen einzigen
+# API-Aufruf. Der Knopf "Neu laden" leert den Zwischenspeicher.
+_CHAT_PAGE_SIZE = [100]      # veraenderlich: faellt bei Bedarf auf 50 zurueck
+_list_cache: dict[str, dict] = {}
+_cache_lock = threading.Lock()
+_cache_inflight: set[str] = set()
+# Alter der Listen, die DIESE Anfrage benutzt hat. Thread-lokal, weil mehrere
+# Seitenaufrufe gleichzeitig laufen koennen und sonst das Alter einer fremden
+# Ansicht gemeldet wuerde.
+_cache_seen = threading.local()
+
+
+def _seen() -> dict[str, float]:
+    if not hasattr(_cache_seen, "ages"):
+        _cache_seen.ages = {}
+    return _cache_seen.ages
+
+
+def _cache_ttl() -> float:
+    try:
+        return float(db.get_setting("chats_cache_seconds", 120) or 0)
+    except (TypeError, ValueError):
+        return 120.0
+
+
+def _cache_store(key: str, data: list[dict]) -> None:
+    _list_cache[key] = {"ts": time.time(), "data": list(data)}
+    try:
+        db.set_api_cache(key, data)
+    except Exception as exc:  # noqa: BLE001 - Zwischenspeichern darf nie stoeren
+        db.log("warn", "system", "Fan-Liste nicht zwischenspeicherbar", str(exc))
+
+
+def _cache_refresh_async(key: str, loader) -> None:
+    """Liste im Hintergrund erneuern. Der Aufrufer wartet nicht darauf.
+
+    Pro Schluessel laeuft hoechstens ein Durchlauf: sonst starten drei schnelle
+    Klicks drei parallele Serien von API-Aufrufen.
+    """
+    with _cache_lock:
+        if key in _cache_inflight:
+            return
+        _cache_inflight.add(key)
+
+    def lauf() -> None:
+        try:
+            _cache_store(key, loader())
+        except Exception as exc:  # noqa: BLE001 - Hintergrund darf nie hochkommen
+            db.log("warn", "system", "Fan-Liste konnte nicht aktualisiert werden", str(exc))
+        finally:
+            with _cache_lock:
+                _cache_inflight.discard(key)
+
+    threading.Thread(target=lauf, daemon=True, name="fanlist-refresh").start()
+
+
+def _cached(key: str, loader) -> list[dict]:
+    """Liste aus dem Zwischenspeicher, sonst holen.
+
+    Wichtig ist der mittlere Fall: liegt etwas vor, das zu alt ist, wird es
+    TROTZDEM sofort ausgeliefert und nur im Hintergrund erneuert. Die Seite
+    wartet also nie auf Fanvue - hoechstens beim allerersten Aufruf, wenn noch
+    gar nichts da ist. Eine ein, zwei Minuten alte Fan-Liste ist hier
+    unproblematisch: es geht um Namen, nicht um Betraege.
+    """
+    ttl = _cache_ttl()
+    if ttl <= 0:
+        return loader()
+
+    eintrag = _list_cache.get(key)
+    if eintrag is None:
+        gespeichert = db.get_api_cache(key)          # ueberlebt den Neustart
+        if gespeichert is not None and isinstance(gespeichert["data"], list):
+            eintrag = {"ts": gespeichert["updated_at"], "data": gespeichert["data"]}
+            _list_cache[key] = eintrag
+
+    if eintrag is not None:
+        alter = time.time() - eintrag["ts"]
+        _seen()[key] = alter
+        if alter >= ttl:
+            _cache_refresh_async(key, loader)
+        return list(eintrag["data"])
+
+    # Nichts vorhanden - einmal blockierend holen (nur beim allerersten Mal)
+    data = loader()
+    _cache_store(key, data)
+    _seen()[key] = 0.0
+    return data
+
+
+def _cache_clear() -> None:
+    _list_cache.clear()
+    _seen().clear()
+    try:
+        db.clear_api_cache("group:")
+        db.clear_api_cache("list:")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _cache_age() -> Optional[float]:
+    """Alter der aeltesten Liste, die diese Antwort benutzt hat."""
+    ages = _seen()
+    return max(ages.values()) if ages else None
+
+
+def _cache_busy() -> bool:
+    with _cache_lock:
+        return bool(_cache_inflight)
+
+
 def _fetch_list_members(list_uuid: str, cap: int = 5000) -> list[dict]:
     """ALLE Mitglieder einer Custom List (auch ohne bestehenden Chat)."""
+    return _cached(f"list:{list_uuid}:{cap}", lambda: _fetch_list_members_live(list_uuid, cap))
+
+
+def _fetch_list_members_live(list_uuid: str, cap: int = 5000) -> list[dict]:
     members: list[dict] = []
     page = 1
     while page <= 120 and len(members) < cap:
@@ -980,8 +1120,18 @@ _CHAT_FILTER_LABELS = {
 }
 
 
+# Wie viele Fan-Karten pro Seite. Jede Karte kostet DB-Abfragen (PPV-Statistik,
+# Gedaechtnis, Insights) - ohne Seiten wuerden bei 600+ Fans alle auf einmal
+# aufgebaut, und die Seite braeuchte spuerbar lange.
+CHATS_PER_PAGE = 10
+
+
 @app.get("/chats", response_class=HTMLResponse)
-def chats(request: Request, view: str = "group", q: str = "", msg: str = ""):
+def chats(request: Request, view: str = "subscribers", q: str = "", msg: str = "",
+          page: int = 1, sort: str = "name", refresh: int = 0):
+    _seen().clear()
+    if refresh:
+        _cache_clear()
     ctx = _base_ctx(request)
     ctx["error"] = None
     ctx["q"] = q
@@ -991,6 +1141,7 @@ def chats(request: Request, view: str = "group", q: str = "", msg: str = ""):
     p1_name = db.get_setting("chat_custom_list_name", "") or "Prio 1"
     p2_name = db.get_setting("prio2_custom_list_name", "") or "Prio 2"
     ctx["view"] = view
+    ctx["sort"] = sort if sort in ("name", "chat") else "name"
     ctx["p1_name"] = p1_name
     ctx["p2_name"] = p2_name
     ctx["has_prio2"] = bool(prio2_list)
@@ -1057,8 +1208,52 @@ def chats(request: Request, view: str = "group", q: str = "", msg: str = ""):
     ctx["quelle"] = quelle
     ctx["db_total"] = len(db.list_chats())
 
+    # --- Suche serverseitig -------------------------------------------------
+    # Frueher filterte JavaScript die fertige Liste im Browser. Mit Seiten waere
+    # das wertlos: gesucht wuerde nur in den 10 gerade sichtbaren Fans.
+    such = (q or "").strip().lower()
+    if such:
+        members = [m for m in members
+                   if such in (m.get("display_name") or "").lower()
+                   or such in (m.get("handle") or "").lower()]
+
+    # --- Sortierung ---------------------------------------------------------
+    if ctx["sort"] == "chat":
+        # Zuletzt geschrieben zuerst; wer nie geschrieben hat, ganz nach hinten.
+        letzte = db.last_inbound_map()
+        members.sort(key=lambda m: (-(letzte.get(m["uuid"]) or 0),
+                                    (m.get("display_name") or m.get("handle") or "").lower()))
+    else:
+        members.sort(key=lambda m: ((m.get("display_name") or m.get("handle") or "~").lower(),
+                                    (m.get("handle") or "").lower()))
+
+    # --- Seiten -------------------------------------------------------------
+    gesamt = len(members)
+    seiten = max(1, (gesamt + CHATS_PER_PAGE - 1) // CHATS_PER_PAGE)
+    page = max(1, min(int(page or 1), seiten))
+    members = members[(page - 1) * CHATS_PER_PAGE: page * CHATS_PER_PAGE]
+    ctx["page"] = page
+    ctx["pages"] = seiten
+    ctx["total"] = gesamt
+    ctx["per_page"] = CHATS_PER_PAGE
+    ctx["von"] = 0 if not gesamt else (page - 1) * CHATS_PER_PAGE + 1
+    ctx["bis"] = min(page * CHATS_PER_PAGE, gesamt)
+    # Rueckweg fuer alle Formulare auf der Seite: nach einer Aktion landet man
+    # wieder in derselben Ansicht, Sortierung, Suche und auf derselben Seite -
+    # sonst wirft einen jede Kleinigkeit zurueck auf Seite 1.
+    ctx["backq"] = (f"view={_q(view)}&sort={_q(ctx['sort'])}"
+                    f"&q={_q(q or '')}&page={page}")
+    alter = _cache_age()
+    ctx["cache_age"] = int(alter) if alter is not None else None
+    ctx["cache_busy"] = _cache_busy()
+
     enriched = []
     insights = _insights_for([m["uuid"] for m in members])
+    # Gedaechtnis fuer ALLE Fans in EINER Abfrage. Pro Fan-Karte einzeln zu lesen
+    # waere bei langen Listen spuerbar - _insights_for macht es aus demselben
+    # Grund genauso.
+    memories = memory.get_many([m["uuid"] for m in members])
+    memory_on = bool(db.get_setting("memory_enabled", False))
     for m in members:
         db.upsert_chat(m["uuid"], m["handle"], m["display_name"])
         row = db.get_chat(m["uuid"])
@@ -1070,6 +1265,12 @@ def chats(request: Request, view: str = "group", q: str = "", msg: str = ""):
             "mode_override": (row["mode_override"] if row else "") or "",
             "persona_override": (row["persona_override"] if row else "") or "",
             "notes": (row["notes"] if row else "") or "",
+            "memory": memories.get(m["uuid"]),
+            "memory_block": memory.render_block(mem=memories.get(m["uuid"])),
+            # Dreistufiger Schalter je Fan: '' folgt global, 'on'/'off' stechen.
+            "memory_mode": ((row["memory_mode"] if row else "") or ""),
+            "memory_active": memory.enabled_for(row),
+            "memory_long": memory.by_category(memories.get(m["uuid"]) or {}),
             "stats": db.ppv_offer_stats(m["uuid"]),
             "insight": insights.get(m["uuid"]),
             "group": m.get("group", ""),
@@ -1083,6 +1284,12 @@ def chats(request: Request, view: str = "group", q: str = "", msg: str = ""):
     ctx["chats"] = enriched
     ctx["has_insights"] = bool(insights)
     ctx["ppv_enabled"] = db.get_setting("ppv_enabled", False)
+    ctx["memory_on"] = memory_on
+    ctx["memory_consolidate_on"] = bool(db.get_setting("memory_consolidate_enabled", False))
+    ctx["memory_max_chars"] = int(db.get_setting("memory_max_chars", 1200) or 1200)
+    ctx["memory_categories"] = memory.CATEGORIES
+    ctx["memory_max_short"] = int(db.get_setting("memory_max_short", 12) or 12)
+    ctx["memory_short_max_age_days"] = int(db.get_setting("memory_short_max_age_days", 21) or 21)
     return templates.TemplateResponse("chats.html", ctx)
 
 
@@ -1236,7 +1443,7 @@ def ppv_reset_offered(user_uuid: str):
 @app.post("/chats/{user_uuid}/update")
 def update_chat_route(user_uuid: str, bot_enabled: str = Form("on"),
                       mode_override: str = Form(""), persona_override: str = Form(""),
-                      notes: str = Form("")):
+                      notes: str = Form(""), back: str = Form("")):
     db.update_chat(
         user_uuid,
         bot_enabled=1 if bot_enabled == "on" else 0,
@@ -1244,7 +1451,126 @@ def update_chat_route(user_uuid: str, bot_enabled: str = Form("on"),
         persona_override=persona_override.strip() or None,
         notes=notes.strip() or None,
     )
-    return RedirectResponse("/chats", status_code=303)
+    return _chats_back(back, "Gespeichert")
+
+
+# ------------------------------------------------------------- Gedaechtnis
+# Alles, was hier von Hand eingetragen wird, bekommt src="manual" und ist damit
+# vor der naechtlichen Verdichtung geschuetzt.
+
+def _chats_back(back: str, msg: str = "") -> RedirectResponse:
+    """Zurueck zur Subs-Seite - mit Ansicht, Sortierung, Suche UND Seite.
+
+    Der Wert kommt aus einem Formularfeld und wird deshalb nicht uebernommen,
+    sondern neu zusammengesetzt: nur bekannte Parameter, sauber kodiert. Sonst
+    liesse sich ueber ein manipuliertes Feld eine fremde Zieladresse einschleusen.
+    """
+    from urllib.parse import parse_qs
+    roh = parse_qs((back or "").lstrip("?&"), keep_blank_values=False)
+    teile = []
+    for key in ("view", "sort", "q", "page"):
+        wert = (roh.get(key) or [""])[0].strip()
+        if wert:
+            teile.append(f"{key}={_q(wert)}")
+    if msg:
+        teile.append(f"msg={_q(msg)}")
+    return RedirectResponse("/chats" + ("?" + "&".join(teile) if teile else ""),
+                            status_code=303)
+
+
+def _memory_back(back: str, msg: str) -> RedirectResponse:
+    return _chats_back(back, msg)
+
+
+@app.post("/chats/{user_uuid}/memory/add")
+def memory_add_route(user_uuid: str, layer: str = Form("long"), value: str = Form(""),
+                     due: str = Form(""), category: str = Form(""),
+                     is_open: str = Form(""), back: str = Form("")):
+    if memory.add_manual(user_uuid, layer, value, due, category=category,
+                         is_open=bool(is_open)):
+        return _memory_back(back, "Eintrag gespeichert")
+    return _memory_back(back, "Eintrag war leer")
+
+
+@app.post("/chats/{user_uuid}/memory/promote")
+def memory_promote_route(user_uuid: str, index: int = Form(-1),
+                         category: str = Form(""), back: str = Form("")):
+    """Eine Kurzzeit-Notiz ins Langzeitgedaechtnis heben, bevor sie verfaellt."""
+    if memory.promote(user_uuid, index, category):
+        return _memory_back(back, "Ins Langzeitgedächtnis übernommen")
+    return _memory_back(back, "Notiz nicht gefunden")
+
+
+@app.post("/chats/{user_uuid}/memory/mode")
+def memory_mode_route(user_uuid: str, mode: str = Form(""), back: str = Form("")):
+    """Gedaechtnis je Fan: Standard / immer an / immer aus.
+
+    Damit laesst sich die Funktion an einzelnen Fans erproben, ohne sie fuer
+    alle scharfzuschalten.
+    """
+    gesetzt = memory.set_mode(user_uuid, mode)
+    return _memory_back(back, {
+        "on": "Gedächtnis für diesen Fan eingeschaltet",
+        "off": "Gedächtnis für diesen Fan ausgeschaltet",
+    }.get(gesetzt, "Gedächtnis folgt wieder der globalen Einstellung"))
+
+
+@app.post("/chats/{user_uuid}/memory/delete")
+def memory_delete_route(user_uuid: str, layer: str = Form(""), index: int = Form(-1),
+                        back: str = Form("")):
+    if memory.delete_entry(user_uuid, layer, index):
+        return _memory_back(back, "Eintrag gelöscht")
+    return _memory_back(back, "Eintrag nicht gefunden")
+
+
+@app.post("/chats/{user_uuid}/memory/close")
+def memory_close_route(user_uuid: str, index: int = Form(-1), back: str = Form("")):
+    if memory.close_loop(user_uuid, index):
+        return _memory_back(back, "Faden als erledigt markiert")
+    return _memory_back(back, "Faden nicht gefunden")
+
+
+@app.post("/chats/{user_uuid}/memory/run")
+def memory_run_route(user_uuid: str, back: str = Form("")):
+    """Verdichtung sofort ausloesen - unabhaengig von Schwelle und Mindestabstand.
+
+    Das ist der Knopf fuer die Abnahme: Gedaechtnis vorher/nachher vergleichen,
+    ohne auf den naechsten Zyklus warten zu muessen.
+    """
+    try:
+        ok, note = memory.consolidate(user_uuid, force=True)
+    except Exception as exc:  # noqa: BLE001
+        return _memory_back(back, f"Verdichtung fehlgeschlagen: {exc}")
+    return _memory_back(back, f"Gedächtnis aktualisiert – {note}" if ok
+                        else f"Nicht aktualisiert – {note}")
+
+
+@app.post("/chats/{user_uuid}/memory/backfill")
+def memory_backfill_route(user_uuid: str, name: str = Form(""), back: str = Form("")):
+    """Kompletten Chatverlauf nachtraeglich einlesen und verdichten.
+
+    Laeuft im Hintergrund: bei mehreren tausend Nachrichten dauert allein das
+    Holen aus Fanvue eine gute Minute, dazu kommen Dutzende LLM-Aufrufe. Eine
+    HTTP-Antwort so lange offen zu halten waere ein Timeout mit Ansage.
+    """
+    if not fanvue.is_connected():
+        return _chats_back(back, "Nicht mit Fanvue verbunden")
+    ok, note = memory.start_backfill(user_uuid, name)
+    return _chats_back(back, f"Chat wird eingelesen – {note}" if ok
+                       else f"Nicht gestartet – {note}")
+
+
+@app.get("/chats/memory/backfill-status")
+def memory_backfill_status():
+    return memory.backfill_status()
+
+
+@app.post("/chats/{user_uuid}/memory/clear")
+def memory_clear_route(user_uuid: str, back: str = Form("")):
+    """Gedaechtnis, Protokoll und Rohnachrichten dieses Fans restlos loeschen."""
+    db.delete_memory(user_uuid)
+    db.log("info", "memory", f"Gedächtnis für {user_uuid[:8]} gelöscht", "")
+    return _memory_back(back, "Gedächtnis gelöscht")
 
 
 def _chat_is_waiting(row) -> bool:
@@ -1266,7 +1592,7 @@ def _chat_is_waiting(row) -> bool:
 
 
 @app.post("/chats/{user_uuid}/reset-inbound")
-def chat_reset_inbound(user_uuid: str, view: str = Form("")):
+def chat_reset_inbound(user_uuid: str, back: str = Form("")):
     """Setzt die Verarbeitungsmarke zurueck.
 
     Der Bot merkt sich in last_inbound_uuid, bis zu welcher Nachricht er einen
@@ -1276,37 +1602,28 @@ def chat_reset_inbound(user_uuid: str, view: str = Form("")):
     ohne Antwort. Nach dem Zuruecksetzen greift der naechste Durchlauf die
     letzte Fan-Nachricht wieder auf.
     """
-    sep = "&" if view else "?"
-    back = f"/chats?view={_q(view)}" if view else "/chats"
     chat = db.get_chat(user_uuid)
     if not chat:
-        return RedirectResponse(f"{back}{sep}msg={_q('Chat nicht gefunden')}", status_code=303)
+        return _chats_back(back, "Chat nicht gefunden")
     if db.has_open_draft(user_uuid):
-        return RedirectResponse(
-            f"{back}{sep}msg={_q('Es gibt bereits einen offenen Entwurf – bitte zuerst freigeben oder verwerfen')}",
-            status_code=303)
+        return _chats_back(
+            back, "Es gibt bereits einen offenen Entwurf – bitte zuerst freigeben oder verwerfen")
     db.update_chat(user_uuid, last_inbound_uuid=None)
     name = chat["display_name"] or chat["handle"] or user_uuid[:8]
     db.log("info", "system", f"Verarbeitungsmarke für {name} zurückgesetzt",
            f"war: {chat['last_inbound_uuid']}")
-    return RedirectResponse(
-        f"{back}{sep}msg={_q(f'{name}: letzte Nachricht wird beim nächsten Durchlauf erneut beantwortet')}",
-        status_code=303)
+    return _chats_back(
+        back, f"{name}: letzte Nachricht wird beim nächsten Durchlauf erneut beantwortet")
 
 
 @app.post("/chats/{user_uuid}/reactivate")
 def reactivate_now_route(user_uuid: str, handle: str = Form(""), display_name: str = Form(""),
-                         view: str = Form("")):
+                         back: str = Form("")):
     """Manuell eine Reaktivierung fuer diesen Fan ausloesen (landet in der Freigabe)."""
-    from urllib.parse import quote as _q
-    sep = "&" if view else "?"
-    back = f"/chats?view={_q(view)}" if view else "/chats"
     if not fanvue.is_connected():
-        return RedirectResponse(f"{back}{sep}msg={_q('Nicht mit Fanvue verbunden')}", status_code=303)
+        return _chats_back(back, "Nicht mit Fanvue verbunden")
     if db.has_open_draft(user_uuid):
-        return RedirectResponse(
-            f"{back}{sep}msg={_q('Es gibt bereits einen offenen Entwurf für diesen Fan')}",
-            status_code=303)
+        return _chats_back(back, "Es gibt bereits einen offenen Entwurf für diesen Fan")
     db.upsert_chat(user_uuid, handle, display_name)
     chat = db.get_chat(user_uuid)
     me_uuid = fanvue.account_uuid()
@@ -1314,12 +1631,15 @@ def reactivate_now_route(user_uuid: str, handle: str = Form(""), display_name: s
     try:
         poller._create_reactivation_draft(chat, me_uuid, folder, manual=True)
         db.update_chat(user_uuid, last_reactivation_at=time.time())
+        # Auch die Handausloesung zaehlt als Versuch - sonst umgeht sie die
+        # Abbruchgrenze und der Fan bekommt doch wieder unbegrenzt Anschreiben.
+        db.bump_reactivation_streak(user_uuid)
         msg = "Reaktivierung erstellt – sie liegt jetzt in der Freigabe-Queue"
     except Exception as exc:  # noqa: BLE001
         db.log("error", "generate",
                f"Manuelle Reaktivierung fehlgeschlagen ({handle or user_uuid})", str(exc))
         msg = f"Reaktivierung fehlgeschlagen: {exc}"
-    return RedirectResponse(f"{back}{sep}msg={_q(msg)}", status_code=303)
+    return _chats_back(back, msg)
 
 
 # ------------------------------------------------------------------ Settings
@@ -1457,9 +1777,16 @@ _INT_KEYS = {
     "ppv_max_media_per_set", "ppv_thumb_cache_hours", "ppv_offer_reset_days",
     "reactivation_inactive_hours", "reactivation_cooldown_days", "reactivation_max_per_cycle",
     "reactivation_delay_min_minutes", "reactivation_delay_max_minutes",
+    "reactivation_max_attempts", "reactivation_max_silence_days",
     "prio2_interval_minutes", "prio2_jitter_minutes",
+    "memory_max_chars", "memory_trigger_messages", "memory_quiet_hours",
+    "memory_min_interval_hours", "memory_min_fan_messages", "memory_max_per_cycle",
+    "memory_sweep_hour", "memory_max_long", "memory_max_short",
+    "memory_short_max_age_days",
+    "messages_retention_days", "chats_cache_seconds",
+    "memory_backfill_max_pages", "memory_backfill_chunk", "memory_loop_max_age_days",
 }
-_FLOAT_KEYS = {"temperature"}
+_FLOAT_KEYS = {"temperature", "memory_backfill_delay"}
 _BOOL_KEYS = {"active_hours_enabled", "ppv_enabled", "ppv_use_llm_classifier",
               "ppv_confirm_enabled", "ppv_confirm_fail_open",
               "anti_ai_enabled", "reactivation_enabled", "incoming_image_enabled",
@@ -1467,7 +1794,9 @@ _BOOL_KEYS = {"active_hours_enabled", "ppv_enabled", "ppv_use_llm_classifier",
               "time_context_enabled", "timestamps_in_history", "time_guard_enabled",
               "draft_recheck_enabled", "draft_regen_on_stale", "telegram_enabled",
               "update_check_enabled", "update_notify_telegram",
-              "alert_keywords_enabled"}
+              "alert_keywords_enabled",
+              "memory_enabled", "memory_consolidate_enabled", "messages_store_enabled",
+              "memory_reactivation_use_loops"}
 
 
 @app.post("/settings")

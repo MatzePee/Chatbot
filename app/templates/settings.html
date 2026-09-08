@@ -172,6 +172,8 @@
           <option value="auto" {% if s['mode']=='auto' %}selected{% endif %}>Auto (automatisch senden)</option>
         </select>
       </label>
+      <label>Fan-Liste zwischenspeichern (Sek.) <span class="info" tabindex="0" data-tip="Wie lange die von Fanvue geholte Fan-Liste für die Subs-Seite zwischengespeichert wird. Ohne das kostet jeder Ansichts-, Sortier- und Seitenwechsel gut ein Dutzend API-Aufrufe und dauert mehrere Sekunden. 0 = aus. Der Knopf „Neu laden" holt jederzeit frisch.">ⓘ</span>
+        <input name="chats_cache_seconds" type="number" min="0" value="{{ s['chats_cache_seconds'] }}"></label>
       <label>Chat-Gruppe (welche Chats bearbeitet der Bot)
         <select name="chat_filter">
           <optgroup label="Aktivität">
@@ -348,6 +350,13 @@
       <label>Max. pro Durchlauf <input name="reactivation_max_per_cycle" type="number" min="1" value="{{ s['reactivation_max_per_cycle'] }}"></label>
     </div>
     <div class="row">
+      <label>Aufgeben nach (Versuchen) <span class="info" tabindex="0" data-tip="So oft wird ein Fan hintereinander angeschrieben, ohne dass er antwortet. Danach ist Ruhe, bis er sich von selbst meldet – dann beginnt die Zählung von vorn. OHNE diese Grenze wird ein stiller Fan endlos angeschrieben: seine letzte Nachricht wird ja nicht jünger, er ist also nach jedem Cooldown erneut fällig. Standard 3.">ⓘ</span>
+        <input name="reactivation_max_attempts" type="number" min="1" value="{{ s['reactivation_max_attempts'] }}"></label>
+      <label>Gar nicht mehr nach (Tagen Stille) <span class="info" tabindex="0" data-tip="Fans, die länger als das nichts geschrieben haben, werden überhaupt nicht mehr angeschrieben. 0 = keine Obergrenze. Standard 60.">ⓘ</span>
+        <input name="reactivation_max_silence_days" type="number" min="0" value="{{ s['reactivation_max_silence_days'] }}"></label>
+    </div>
+    <p class="muted small">Die beiden Grenzen sind die Bremse gegen Endlos-Anschreiben. Ein Fan, der nie wieder antwortet, war bis v1.4 nach jedem Cooldown erneut fällig – Woche für Woche.</p>
+    <div class="row">
       <label>Sende-Delay min (Min) <span class="info" tabindex="0" data-tip="Untergrenze der zufälligen Wartezeit vor dem Senden der Reaktivierung (nur Auto-Modus). Wirkt menschlicher, statt exakt zur Stundengrenze zu schreiben. Standard 15.">ⓘ</span> <input name="reactivation_delay_min_minutes" type="number" min="0" value="{{ s['reactivation_delay_min_minutes'] }}"></label>
       <label>Sende-Delay max (Min) <span class="info" tabindex="0" data-tip="Obergrenze der zufälligen Wartezeit vor dem Senden (nur Auto-Modus). Der Bot wartet eine zufällige Zeit zwischen min und max. Standard 45.">ⓘ</span> <input name="reactivation_delay_max_minutes" type="number" min="0" value="{{ s['reactivation_delay_max_minutes'] }}"></label>
     </div>
@@ -356,6 +365,58 @@
     <label>Reaktivierungs-Prompt
       <textarea name="reactivation_prompt" rows="3">{{ s['reactivation_prompt'] }}</textarea></label>
     <p class="muted small">Reaktivierungen knüpfen an euer letztes Chat-Thema an (persönlich), laufen im gewählten Modus (Freigabe/Auto) und respektieren die aktiven Zeiten. Im Auto-Modus wird zufällig 15–45 Min (einstellbar) gewartet; bei „Freigabe" landen sie sofort in der Queue.</p>
+  </details>
+
+  <h2 class="grp">Gedächtnis</h2>
+  <p class="muted grp-desc">Was der Bot über einen Fan behält, ohne den ganzen Chatverlauf mitzuschicken.</p>
+  <details class="card sect" id="memory">
+    <summary>Gesprächsgedächtnis</summary>
+    <label class="chk"><input type="checkbox" name="memory_enabled" {% if s['memory_enabled'] %}checked{% endif %}> Gedächtnis an das Modell übergeben <span class="info" tabindex="0" data-tip="Hauptschalter. Aus = Einträge werden gespeichert und in der Subs-Ansicht angezeigt, gehen aber nicht in den Prompt.">ⓘ</span></label>
+    <label class="chk"><input type="checkbox" name="memory_consolidate_enabled" {% if s['memory_consolidate_enabled'] %}checked{% endif %}> Automatisch verdichten (LLM) <span class="info" tabindex="0" data-tip="Zweiter Hauptschalter. Aus = das Gedächtnis wird nur von Hand gepflegt. Erst einschalten, wenn die Stichprobe sauber war.">ⓘ</span></label>
+    <label class="chk"><input type="checkbox" name="messages_store_enabled" {% if s['messages_store_enabled'] %}checked{% endif %}> Chatverlauf lokal mitschreiben <span class="info" tabindex="0" data-tip="Grundlage für die Verdichtung. Kostet keine zusätzlichen API-Aufrufe – der Verlauf wird ohnehin geholt. Ohne das kann nur mit den letzten 15 Nachrichten verdichtet werden.">ⓘ</span></label>
+    <div class="row">
+      <label>Modell für die Verdichtung <span class="info" tabindex="0" data-tip="Leer = Chat-Modell. Verdichten ist eine strukturierte JSON-Aufgabe; ein günstiges Modell genügt und spart ein Vielfaches.">ⓘ</span>
+        <input name="memory_model" value="{{ s['memory_model'] }}" placeholder="leer = Chat-Modell"></label>
+      <label>Max. Zeichen im Prompt <span class="info" tabindex="0" data-tip="Harte Obergrenze für den Gedächtnisblock. Er geht bei JEDER Antwort mit – hier entstehen die laufenden Kosten, nicht bei der Verdichtung. Standard 1200.">ⓘ</span>
+        <input name="memory_max_chars" type="number" min="200" value="{{ s['memory_max_chars'] }}"></label>
+    </div>
+    <div class="row">
+      <label>Verdichten ab (neue Nachrichten) <span class="info" tabindex="0" data-tip="So viele neue Fan-Nachrichten lösen eine Verdichtung aus, auch wenn der Chat noch läuft. Standard 20.">ⓘ</span>
+        <input name="memory_trigger_messages" type="number" min="1" value="{{ s['memory_trigger_messages'] }}"></label>
+      <label>… oder Chat ruhig seit (Std.) <span class="info" tabindex="0" data-tip="Alternativer Auslöser: der Chat ist so lange still und es gibt neue Nachrichten. Standard 2.">ⓘ</span>
+        <input name="memory_quiet_hours" type="number" min="0" value="{{ s['memory_quiet_hours'] }}"></label>
+      <label>Mindestabstand je Fan (Std.) <span class="info" tabindex="0" data-tip="Der eigentliche Kostenhebel. 6 Stunden = höchstens 4 Verdichtungen pro Fan und Tag. Bremst auch Vielschreiber.">ⓘ</span>
+        <input name="memory_min_interval_hours" type="number" min="1" value="{{ s['memory_min_interval_hours'] }}"></label>
+    </div>
+    <div class="row">
+      <label>Erst ab X Fan-Nachrichten <span class="info" tabindex="0" data-tip="Darunter wird nicht verdichtet. Verhindert Kosten und Datenmüll bei Fans, die einmal ‚hi‘ schreiben und nie wieder. Standard 5.">ⓘ</span>
+        <input name="memory_min_fan_messages" type="number" min="0" value="{{ s['memory_min_fan_messages'] }}"></label>
+      <label>Max. pro Durchlauf <input name="memory_max_per_cycle" type="number" min="1" value="{{ s['memory_max_per_cycle'] }}"></label>
+      <label>Stunde des Nacht-Sweeps <span class="info" tabindex="0" data-tip="Sicherheitsnetz: zu dieser Stunde werden auch Chats verdichtet, die keine Schwelle gerissen haben.">ⓘ</span>
+        <input name="memory_sweep_hour" type="number" min="0" max="23" value="{{ s['memory_sweep_hour'] }}"></label>
+    </div>
+    <div class="row">
+      <label>Langzeit: max. Stichworte je Fan <span class="info" tabindex="0" data-tip="Das Langzeitgedächtnis hält Stichworte in festen Fächern: Name, Alter, Herkunft, Beruf, Familie, Vorlieben, Grenzen, Sonstiges. Es verfällt nicht von selbst. Standard 14.">ⓘ</span>
+        <input name="memory_max_long" type="number" min="1" value="{{ s['memory_max_long'] }}"></label>
+      <label>Kurzzeit: max. Notizen je Fan <span class="info" tabindex="0" data-tip="Datierte Gesprächsnotizen der letzten Tage und Wochen. Ist die Zahl erreicht, fällt die älteste heraus. Standard 12.">ⓘ</span>
+        <input name="memory_max_short" type="number" min="1" value="{{ s['memory_max_short'] }}"></label>
+      <label>Kurzzeit: verfällt nach (Tagen) <span class="info" tabindex="0" data-tip="Notizen, die älter sind, fallen heraus – auch wenn die Höchstzahl nicht erreicht ist. Beide Grenzen wirken zusammen, es greift die, die zuerst zieht. Von Hand angelegte Notizen und offene Fäden bleiben. 0 = nie verfallen. Standard 21.">ⓘ</span>
+        <input name="memory_short_max_age_days" type="number" min="0" value="{{ s['memory_short_max_age_days'] }}"></label>
+      <label>Rohnachrichten aufbewahren (Tage) <span class="info" tabindex="0" data-tip="Danach werden die mitgeschriebenen Nachrichten gelöscht. Das verdichtete Gedächtnis bleibt erhalten. 0 = nie löschen.">ⓘ</span>
+        <input name="messages_retention_days" type="number" min="0" value="{{ s['messages_retention_days'] }}"></label>
+    </div>
+    <div class="row">
+      <label>Einlesen: max. Seiten je Fan <span class="info" tabindex="0" data-tip="Beim Knopf „Ganzen Chat einlesen“. 60 Seiten à 100 Nachrichten = bis zu 6000 Nachrichten. Begrenzt Dauer und Kosten bei sehr langen Chats.">ⓘ</span>
+        <input name="memory_backfill_max_pages" type="number" min="1" value="{{ s['memory_backfill_max_pages'] }}"></label>
+      <label>Einlesen: Nachrichten je Block <span class="info" tabindex="0" data-tip="So viele Nachrichten gehen pro LLM-Aufruf ins Modell. Kleiner = genauer, aber mehr Aufrufe. 80 ist ein guter Mittelwert.">ⓘ</span>
+        <input name="memory_backfill_chunk" type="number" min="20" value="{{ s['memory_backfill_chunk'] }}"></label>
+      <label>Einlesen: Pause je Block (Sek.) <span class="info" tabindex="0" data-tip="Pause zwischen zwei Blöcken. Verhindert, dass ein langer Chat den laufenden Betrieb ausbremst oder in ein Rate-Limit läuft.">ⓘ</span>
+        <input name="memory_backfill_delay" type="number" min="0" step="0.5" value="{{ s['memory_backfill_delay'] }}"></label>
+    </div>
+    <label class="chk"><input type="checkbox" name="memory_reactivation_use_loops" {% if s['memory_reactivation_use_loops'] %}checked{% endif %}> Offene Fäden in der Reaktivierung nutzen <span class="info" tabindex="0" data-tip="Die Reaktivierung knüpft dann konkret an ein offenes Thema an („Wie war das Gespräch am Montag?“) statt allgemein ans letzte Chat-Thema.">ⓘ</span></label>
+    <p class="muted small"><strong>Zwei Schichten:</strong> Das <strong>Langzeitgedächtnis</strong> hält Stichworte in festen Fächern (Name, Alter, Herkunft, Beruf, Familie, Vorlieben, Grenzen, Sonstiges) und verfällt nicht. Das <strong>Kurzzeitgedächtnis</strong> hält datierte Gesprächsnotizen der letzten Wochen und verfällt nach Alter und Anzahl. Beim Verdichten hebt das Modell alles Dauerhafte aus der Notiz nach oben – was es übersieht, kannst du pro Notiz mit „↑ merken" selbst hochstufen.</p>
+    <p class="muted small"><strong>Einzeln testen:</strong> Unter <a href="/chats">Subs</a> → „🧠 Gedächtnis" hat jeder Fan einen eigenen Schalter <em>Standard / An / Aus</em>. „An" wirkt auch dann, wenn das Gedächtnis global aus ist – so lässt sich die Funktion an ein paar Fans erproben, ohne sie für alle scharfzuschalten.</p>
+    <p class="muted small">Das handgepflegte Feld „Notizen" pro Fan bleibt davon unberührt – die Automatik schreibt in eigene Felder und fasst Einträge mit der Markierung „Hand" nie an. Einsehen und korrigieren lässt sich alles unter <a href="/chats">Subs</a> → „🧠 Gedächtnis". Vor dem Einschalten der Verdichtung: 10 Fans verdichten und jeden erzeugten Fakt gegen die echten Nachrichten prüfen.</p>
   </details>
 
   <h2 class="grp">Sicherheit</h2>

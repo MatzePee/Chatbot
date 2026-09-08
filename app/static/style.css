@@ -214,3 +214,23 @@ nav { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; min-width: 0; }
   /* Kopfzeilen-Leisten in Karten umbrechen lassen statt zu quetschen */
   .filter-foot, .ppv-summary { flex-wrap: wrap; }
 }
+
+
+/* ------------------------------------------------------------ Ladeanzeige
+   Duenner Balken ganz oben am Fenster. Liegt ueber allem, nimmt keine Klicks
+   an und beansprucht keinen Platz im Layout - er darf beim Erscheinen nichts
+   verschieben. */
+.pageload {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  z-index: 9999; pointer-events: none;
+  opacity: 0; transition: opacity .15s ease;
+}
+.pageload.on { opacity: 1; }
+.pageload > span {
+  display: block; height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--green, #3ecf8e), #7ad9b6);
+  box-shadow: 0 0 8px rgba(62, 207, 142, .55);
+  transition: width .2s ease;
+}
+/* Zusaetzlicher Hinweis im Seiteninhalt, wenn eine Liste frisch geholt wird. */
+.cache-hint { font-size: 12px; color: var(--muted); }

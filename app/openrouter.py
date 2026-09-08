@@ -19,7 +19,7 @@ class OpenRouterError(Exception):
 
 
 def build_messages(system_prompt: str, history: list[dict[str, Any]], me_uuid: str,
-                   fan_notes: str = "") -> list[dict[str, str]]:
+                   fan_notes: str = "", fan_memory: str = "") -> list[dict[str, str]]:
     """Baut die OpenAI-kompatible messages-Liste aus dem Chatverlauf.
 
     history: Liste von Fanvue-Nachrichten (alt -> neu), jeweils mit
@@ -33,6 +33,14 @@ def build_messages(system_prompt: str, history: list[dict[str, Any]], me_uuid: s
     sys = system_prompt
     if fan_notes.strip():
         sys += f"\n\nWichtige Fakten ueber diesen Fan (beachten):\n{fan_notes.strip()}"
+    # Verdichtetes Gespraechsgedaechtnis NACH den Handnotizen: widersprechen sich
+    # beide, soll die Handarbeit des Creators gewinnen (sie steht weiter oben und
+    # ist als "wichtig" ausgezeichnet). Der Block ersetzt den langen Verlauf, den
+    # das Modell nicht mehr sieht - deshalb der Hinweis, ihn nicht auszuplaudern.
+    if fan_memory.strip():
+        sys += (f"\n\n{fan_memory.strip()}\n"
+                f"Nutze dieses Wissen NUR, wenn es natuerlich passt. Zaehle es niemals auf, "
+                f"und sage nie, dass du dir Notizen machst oder etwas gespeichert hast.")
 
     # Zeitmarken im Verlauf nur, wenn aktiviert UND die API Zeitstempel liefert
     with_stamps = bool(db.get_setting("timestamps_in_history", True))
@@ -83,11 +91,15 @@ def build_messages(system_prompt: str, history: list[dict[str, Any]], me_uuid: s
 def resolve_model(task: str) -> tuple[str, str]:
     """Liefert (Modell, API-Key) fuer eine Aufgabe. Leere Aufgaben-Modelle fallen
     auf das Standard-Chat-Modell zurueck, damit nichts konfiguriert werden MUSS.
-    Aufgaben: 'chat', 'caption', 'classifier', 'vision'."""
+    Aufgaben: 'chat', 'caption', 'classifier', 'vision', 'memory'."""
     okey = db.get_setting("openrouter_api_key", "")
     base = db.get_setting("openrouter_model", "openai/gpt-4o-mini")
     if task == "classifier":
         return (db.get_setting("classifier_model", "") or base, okey)
+    if task == "memory":
+        # Verdichten ist eine strukturierte JSON-Aufgabe - dafuer taugt ein
+        # guenstiges Modell genauso gut wie das teure Chat-Modell.
+        return (db.get_setting("memory_model", "") or base, okey)
     if task == "caption":
         m = db.get_setting("ppv_caption_model", "")
         if m:
@@ -536,3 +548,160 @@ def parse_tags(text: str) -> list[str]:
         if tag and tag not in seen:
             seen.append(tag)
     return seen[:15]
+
+
+def consolidate_memory(current: dict, new_messages: list[dict],
+                       limits: dict | None = None) -> dict:
+    """Verdichtet neue Nachrichten in das bestehende Gedaechtnis eines Fans.
+
+    Eingabe ist bewusst klein: der aktuelle Wissensstand plus die Nachrichten
+    seit der letzten Verdichtung - nicht der ganze Verlauf. Ausgabe ist der
+    VOLLSTAENDIGE neue Stand als JSON.
+
+    Der Prompt ist absichtlich streng. Ein erfundener Fakt ist schlimmer als
+    gar kein Gedaechtnis: er wandert in JEDE kuenftige Antwort und das Modell
+    behauptet ihn wochenlang mit voller Ueberzeugung.
+
+    Bei jedem Fehler wird {} geliefert - der Aufrufer laesst dann den alten
+    Stand stehen.
+    """
+    import json as _json
+
+    limits = limits or {}
+    max_long = int(limits.get("long", 14))
+    max_short = int(limits.get("short", 12))
+
+    model, api_key = resolve_model("memory")
+    if not api_key or not new_messages:
+        return {}
+
+    bestand = {
+        "long": [{"k": e.get("k", "sonstiges"), "v": e.get("v", ""),
+                  "src": e.get("src", "auto")} for e in (current.get("long") or [])],
+        "short": [{"d": e.get("d", ""), "v": e.get("v", ""),
+                   "open": e.get("open", 0), "due": e.get("due", ""),
+                   "src": e.get("src", "auto")} for e in (current.get("short") or [])],
+    }
+
+    system = (
+        "Du pflegst das Gedaechtnis einer Creatorin ueber EINEN einzelnen Fan. "
+        "Du bekommst den bisherigen Wissensstand und die neuen Nachrichten seit der "
+        "letzten Aktualisierung. Gib den VOLLSTAENDIGEN neuen Stand zurueck.\n"
+        "Es gibt ZWEI Schichten:\n"
+        "  long  = LANGZEIT. Was den Fan ausmacht. Bleibt dauerhaft.\n"
+        "  short = KURZZEIT. Worueber ihr zuletzt gesprochen habt. Verfaellt nach "
+        "wenigen Wochen von selbst.\n"
+        "Antworte AUSSCHLIESSLICH mit kompaktem JSON, ohne Erklaerung, im Format:\n"
+        '{"long": [{"k": "kategorie", "v": "Stichwort"}], '
+        '"short": [{"d": "YYYY-MM-DD", "v": "worum es ging", "open": 0, '
+        '"due": "YYYY-MM-DD"}]}\n'
+        "\nDie Kategorie \"k\" ist FEST VORGEGEBEN. Erlaubt ist AUSSCHLIESSLICH einer "
+        "dieser elf Werte - erfinde keine eigenen:\n"
+        "  name          Vorname oder wie er genannt werden will\n"
+        "  anrede        wie er SIE nennt und wie er genannt werden will "
+        "(Kosenamen, Spitznamen)\n"
+        "  alter         NUR Lebensalter in Jahren, Altersgruppe oder Geburtstag\n"
+        "  koerper       Koerpergroesse, Statur, Haare, Aussehen - seines, nicht ihres\n"
+        "  herkunft      Land, Stadt, Gegend, Zeitzone, Sprache\n"
+        "  beruf         Beruf, Arbeit, Schichten, Ausbildung\n"
+        "  familie       Partnerin, Kinder, Eltern, Haustiere\n"
+        "  vorlieben     was er mag: Hobbys, Interessen, Geschmack, Themen\n"
+        "  grenzen       was er NICHT mag oder ausdruecklich ablehnt\n"
+        "  kaufverhalten Preisgrenze, was er kauft und was nie "
+        "(\"nur unter 15 $\", \"nie Videos\")\n"
+        "  sonstiges     alles Dauerhafte, das in kein anderes Fach passt - "
+        "z.B. Wohnform, Lebensumstaende\n"
+        "\nIM ZWEIFEL IMMER \"sonstiges\". Ein Fakt im falschen Fach ist schlimmer als "
+        "einer in \"sonstiges\": die Creatorin liest das Fach als Aussage. Presse nichts "
+        "in ein Fach, nur weil es ungefaehr passen koennte.\n"
+        "Haeufige Verwechslungen - so NICHT:\n"
+        "  \"5'6.5\" (168.9 cm)\" ist eine KOERPERGROESSE, kein Alter -> koerper, "
+        "als \"1,69 m gross\"\n"
+        "  \"Homestead\" ist eine WOHNFORM, keine Familie -> sonstiges, als "
+        "\"lebt auf einem Homestead\"\n"
+        "  Eine Zahl mit Einheit (cm, kg, ft, \", \') gehoert NIE nach \"alter\".\n"
+        "\nREGELN - streng befolgen:\n"
+        "1. Halte NUR fest, was der Fan woertlich gesagt hat. Folgere nichts, schmuecke "
+        "nichts aus, rate nicht. Im Zweifel WEGLASSEN. Ein erfundener Fakt richtet mehr "
+        "Schaden an als eine Luecke - er geht in JEDE kuenftige Antwort ein.\n"
+        "2. Bestehende Eintraege NUR ersetzen, wenn der Fan ihnen ausdruecklich "
+        "widerspricht. Sonst behalten und hoechstens ergaenzen.\n"
+        "3. Eintraege mit \"src\": \"manual\" stammen von der Creatorin selbst: gib sie "
+        "unveraendert zurueck, aendere oder loesche sie NIEMALS.\n"
+        "4. long = STICHWORTE, keine Saetze. \"Elektriker\", nicht \"Er arbeitet als "
+        "Elektriker\". Ein Fakt pro Eintrag, max. 80 Zeichen. Nur was in einem halben "
+        "Jahr noch stimmt.\n"
+        "4b. Jeder Eintrag muss fuer sich verstaendlich sein, auch ohne das Fach "
+        "danebenzulesen. \"Homestead\" allein sagt nichts - \"lebt auf einem Homestead\" "
+        "schon. Lieber drei Woerter mehr als ein raetselhaftes Stichwort.\n"
+        "4c. AUSNAHMEN GEHOEREN DAZU, sonst dreht sich die Aussage um. Sagt der Fan "
+        "\"ich hasse Fuesse, ABER deine finde ich toll\", dann ist \"hasst Fuesse\" "
+        "grob falsch: der Bot wuerde genau das meiden, was dieser Fan will. Entweder "
+        "die Ausnahme mit aufnehmen (\"mag Fuesse sonst nicht, ihre aber schon\") oder "
+        "den Eintrag ganz weglassen. Nach \"grenzen\" gehoert nur, was auch IM CHAT "
+        "MIT IHR gilt.\n"
+        "5. short = ein Satz je Gespraechstag: worum es ging. Datum aus der Nachricht, "
+        "nicht von heute.\n"
+        "6. WICHTIGSTE REGEL - HOCHSTUFEN: Steht in short etwas, das dauerhaft gilt "
+        "(sein Name, sein Beruf, sein Hund), dann schreibe es zusaetzlich als Stichwort "
+        "nach long. Kurzzeitnotizen verfallen; was du nicht hochstufst, ist danach "
+        "endgueltig weg.\n"
+        "7. \"open\": 1 bei einem offenen Faden - etwas, worauf man spaeter zurueckkommen "
+        "kann (bevorstehender Termin, Plan, Sorge). Setze es zurueck auf 0, sobald das "
+        "Thema erledigt oder besprochen ist. \"due\" nur, wenn der Fan ein Datum genannt "
+        "hat.\n"
+        f"8. Obergrenzen: long max. {max_long}, short max. {max_short}. Beim Ueberlauf "
+        "in short das Aelteste streichen, in long das Unwichtigste.\n"
+        "9. NICHT speichern: Zahlungs- und Kontodaten, Passwoerter, Adressen, Klarnamen "
+        "Dritter, Gesundheitsdiagnosen, sowie alles, was der Fan ausdruecklich vertraulich "
+        "genannt hat.\n"
+        "10. Rein sexuelle Rollenspiel-Inhalte gehoeren NICHT ins Gedaechtnis - nur echte "
+        "Vorlieben, die fuer spaetere Gespraeche zaehlen.\n"
+        "11. Schreibe die Eintraege in der Sprache, in der der Fan schreibt."
+    )
+    user_content = (
+        "BISHERIGER STAND:\n" + _json.dumps(bestand, ensure_ascii=False)
+        + "\n\nNEUE NACHRICHTEN:\n" + _json.dumps(new_messages, ensure_ascii=False)
+    )
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content[:12000]},
+        ],
+        "temperature": 0,
+        "max_tokens": 900,
+        "usage": {"include": True},
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+               "HTTP-Referer": "http://localhost", "X-Title": "Fanvue Chatbot"}
+    try:
+        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
+        if resp.status_code != 200:
+            db.log("warn", "memory", f"Verdichtung: HTTP {resp.status_code}",
+                   resp.text[:300])
+            return {}
+        full = resp.json()
+        _record_cost(full, model, "memory")
+        content = _extract_content(full).strip()
+        if content.startswith("```"):
+            content = content.strip("`")
+        if "{" in content:
+            content = content[content.find("{"):content.rfind("}") + 1]
+        data = _json.loads(content)
+        if not isinstance(data, dict):
+            return {}
+        out = {k: [e for e in (data.get(k) or []) if isinstance(e, dict)]
+               for k in ("long", "short")}
+        # Ein Modell, das auf einmal ALLES vergisst, hat sich verrannt. Lieber den
+        # alten Stand behalten, als ein gewachsenes Gedaechtnis stillschweigend
+        # zu leeren.
+        hatte = sum(len(bestand[k]) for k in bestand)
+        jetzt = sum(len(out[k]) for k in out)
+        if hatte >= 3 and jetzt == 0:
+            db.log("warn", "memory", "Verdichtung verworfen: Ergebnis war leer", "")
+            return {}
+        return out
+    except Exception as exc:  # noqa: BLE001 - nie den Aufrufer mitreissen
+        db.log("warn", "memory", "Verdichtung fehlgeschlagen", str(exc)[:300])
+        return {}

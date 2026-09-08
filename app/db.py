@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS chats (
     last_inbound_uuid    TEXT,                -- letzte verarbeitete eingehende Nachricht
     last_inbound_at      REAL,                -- Zeit der letzten Fan-Nachricht (fuer Reaktivierung)
     last_reactivation_at REAL,                -- letzte proaktive Reaktivierung
+    reactivation_streak  INTEGER DEFAULT 0,   -- unbeantwortete Reaktivierungen in Folge
+    memory_mode          TEXT DEFAULT '',     -- ''=global, 'on'=immer, 'off'=nie
     last_seen_at         REAL,
     updated_at           REAL
 );
@@ -181,11 +183,73 @@ CREATE TABLE IF NOT EXISTS reactivation_sent (
     PRIMARY KEY (user_uuid, media_uuid)
 );
 
+-- Mitgeschriebener Chatverlauf. Der Bot holt den Verlauf ohnehin bei jedem
+-- Durchlauf aus der Fanvue-API; hier wird er nebenbei festgehalten, damit das
+-- Gedaechtnis spaeter mehr als die letzten 15 Nachrichten verdichten kann.
+-- Keine zusaetzlichen API-Aufrufe.
+CREATE TABLE IF NOT EXISTS messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_uuid  TEXT NOT NULL,
+    msg_uuid   TEXT UNIQUE,           -- Fanvue-UUID, verhindert Duplikate
+    direction  TEXT,                  -- 'in' (Fan) | 'out' (wir)
+    text       TEXT,
+    has_media  INTEGER DEFAULT 0,
+    msg_type   TEXT,                  -- z.B. 'TIP'
+    sent_at    REAL,                  -- Zeitstempel laut Fanvue
+    seen_at    REAL                   -- wann lokal erfasst
+);
+
+-- Verdichtetes Gedaechtnis je Fan (eine Zeile pro Fan).
+-- Drei Schichten mit unterschiedlicher Lebensdauer, jeweils JSON-Liste:
+--   profile_json : stabile Fakten  [{"t":..,"v":..,"at":..,"src":"auto|manual"}]
+--   notes_json   : rollende Notizen [{"d":"2026-08-14","v":..}]
+--   loops_json   : offene Faeden    [{"v":..,"due":"2026-08-24","at":..,"done":0}]
+CREATE TABLE IF NOT EXISTS chat_memory (
+    user_uuid    TEXT PRIMARY KEY,
+    -- Zwei Schichten mit unterschiedlicher Lebensdauer:
+    long_json    TEXT DEFAULT '[]',    -- Langzeit: feste Kategorien (Name, Alter, Beruf ...)
+    short_json   TEXT DEFAULT '[]',    -- Kurzzeit: datierte Notizen, verfallen
+    -- Alt (bis v1.4): profile/notes/loops. Bleiben stehen, damit ein Downgrade
+    -- die Daten nicht verliert; memory.py liest sie einmalig um.
+    profile_json TEXT DEFAULT '[]',
+    notes_json   TEXT DEFAULT '[]',
+    loops_json   TEXT DEFAULT '[]',
+    last_run_at  REAL,                 -- letzte Verdichtung
+    last_msg_id  INTEGER DEFAULT 0,    -- bis zu welcher messages.id verdichtet wurde
+    dirty_count  INTEGER DEFAULT 0,    -- neue Fan-Nachrichten seit der Verdichtung
+    updated_at   REAL
+);
+
+-- Nachvollziehbarkeit: wer hat wann was ins Gedaechtnis geschrieben. Ohne diese
+-- Spur laesst sich ein erfundener "Fakt" spaeter nicht mehr zuordnen.
+CREATE TABLE IF NOT EXISTS memory_log (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_uuid TEXT,
+    ts        REAL,
+    action    TEXT,      -- add|remove|manual|consolidate|close
+    layer     TEXT,      -- profile|note|loop
+    content   TEXT,
+    model     TEXT
+);
+
+-- Zwischenspeicher fuer teure Fanvue-Abfragen (vor allem die seitenweise
+-- geholten Fan-Listen der Subs-Seite). Bewusst in der DB und nicht nur im
+-- Arbeitsspeicher: sonst ist nach jedem Neustart des Dienstes wieder alles
+-- weg und der naechste Seitenaufruf wartet erneut auf ein Dutzend API-Aufrufe.
+CREATE TABLE IF NOT EXISTS api_cache (
+    key        TEXT PRIMARY KEY,
+    data       TEXT,
+    updated_at REAL
+);
+
 CREATE INDEX IF NOT EXISTS idx_drafts_status ON drafts(status);
 CREATE INDEX IF NOT EXISTS idx_logs_ts ON logs(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_ppv_media_folder ON ppv_media(folder_name);
 CREATE INDEX IF NOT EXISTS idx_ppv_offers_user ON ppv_offers(user_uuid);
 CREATE INDEX IF NOT EXISTS idx_api_costs_ts ON api_costs(ts);
+CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_uuid, id);
+CREATE INDEX IF NOT EXISTS idx_messages_sent ON messages(sent_at);
+CREATE INDEX IF NOT EXISTS idx_memory_log_user ON memory_log(user_uuid, ts DESC);
 """
 
 
@@ -204,6 +268,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "prio2_interval_minutes": 30,       # Prio-2-Scan-Intervall
     "prio2_jitter_minutes": 30,         # zusaetzlicher Zufalls-Delay 1..X Minuten
     "max_chats_per_cycle": 10,          # wie viele Chats pro Zyklus max. bearbeitet werden
+    # Subs-Seite: wie lange die von Fanvue geholte Fan-Liste zwischengespeichert
+    # wird. Ohne das kostet jeder Ansichts-, Sortier- und Seitenwechsel ein
+    # Dutzend API-Aufrufe. 0 = aus.
+    "chats_cache_seconds": 120,
     "reply_cooldown_seconds": 120,      # min. Abstand zwischen zwei Antworten an denselben Fan
     # Aktive Zeiten (lokale Serverzeit, 24h)
     "active_hours_enabled": False,
@@ -425,6 +493,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "reactivation_inactive_hours": 14,   # ab wie vielen STUNDEN Stille reaktivieren
     "reactivation_cooldown_days": 14,    # min. Abstand zwischen zwei Reaktivierungen pro Fan
     "reactivation_max_per_cycle": 3,     # max. Reaktivierungen pro Durchlauf
+    # Zwei Bremsen gegen Endlos-Anschreiben. Ohne sie bleibt ein Fan, der nie
+    # antwortet, fuer immer faellig: last_inbound_at bewegt sich ja nicht mehr.
+    "reactivation_max_attempts": 3,      # so oft ohne Antwort, dann Ruhe
+    "reactivation_max_silence_days": 60, # laenger still = gar nicht mehr anschreiben
     "reactivation_delay_min_minutes": 15,  # Zufalls-Delay vor dem Senden (Auto), Untergrenze
     "reactivation_delay_max_minutes": 45,  # Zufalls-Delay vor dem Senden (Auto), Obergrenze
     "reactivation_folder": "",           # optionaler Vault-Ordner mit Selfies (leer = nur Text)
@@ -436,6 +508,35 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "echt persoenlich wirkt und nicht wie eine Standard-Nachricht. Nutze auch, was du "
         "ueber den Fan weisst (Notizen)."
     ),
+    # --- Gespraechsgedaechtnis ---
+    # Zwei getrennte Hauptschalter: das Gedaechtnis kann angezeigt und von Hand
+    # gepflegt werden, ohne dass die automatische Verdichtung laeuft - und
+    # umgekehrt kann verdichtet werden, ohne dass es in den Prompt geht.
+    "messages_store_enabled": True,      # Chatverlauf lokal mitschreiben (Phase 0)
+    "messages_retention_days": 90,       # danach werden Rohnachrichten geloescht
+    "memory_enabled": False,             # HAUPTSCHALTER: Gedaechtnis in den Prompt geben
+    "memory_consolidate_enabled": False, # HAUPTSCHALTER: automatische Verdichtung per LLM
+    "memory_model": "openai/gpt-5.6-luna",  # leer = Chat-Modell; guenstiges Modell genuegt
+    "memory_max_chars": 1200,            # harte Obergrenze fuer den Prompt-Block
+    "memory_trigger_messages": 20,       # ab so vielen neuen Fan-Nachrichten verdichten
+    "memory_quiet_hours": 2,             # ODER: so lange still, dann verdichten
+    "memory_min_interval_hours": 6,      # Mindestabstand zweier Verdichtungen je Fan
+    "memory_min_fan_messages": 5,        # darunter lohnt kein Gedaechtnis (Einmal-Schreiber)
+    "memory_max_per_cycle": 3,           # Verdichtungen pro Poller-Durchlauf
+    "memory_sweep_hour": 4,              # Stunde des naechtlichen Sicherheits-Sweeps
+    "memory_max_long": 18,               # Langzeit: Stichworte je Fan (11 Faecher)
+    "memory_max_short": 12,              # Kurzzeit: Gespraechsnotizen je Fan
+    "memory_short_max_age_days": 21,     # Kurzzeit: aelter als das faellt raus
+    "memory_reactivation_use_loops": True,  # offene Faeden in die Reaktivierung geben
+    # Alt (bis v1.4), nur noch fuer die Umstellung gelesen:
+    "memory_max_profile": 12,
+    "memory_max_notes": 10,
+    "memory_max_loops": 5,
+    # Ganzen Chat nachtraeglich einlesen (Knopf pro Fan)
+    "memory_backfill_max_pages": 60,     # 60 x 100 = bis zu 6000 Nachrichten je Fan
+    "memory_backfill_chunk": 80,         # Nachrichten je LLM-Aufruf beim Einlesen
+    "memory_backfill_delay": 1.0,        # Pause zwischen den Bloecken (Sek.)
+    "memory_loop_max_age_days": 30,      # aeltere offene Faeden nach dem Einlesen verwerfen
 }
 
 
@@ -466,9 +567,21 @@ def _migrate(conn: sqlite3.Connection) -> None:
         "ppv_media": {
             "fanvue_tags": "TEXT DEFAULT ''",
         },
+        "chat_memory": {
+            "long_json": "TEXT DEFAULT '[]'",
+            "short_json": "TEXT DEFAULT '[]'",
+        },
         "chats": {
             "last_inbound_at": "REAL",
             "last_reactivation_at": "REAL",
+            # Wie oft dieser Fan hintereinander angeschrieben wurde, ohne zu
+            # antworten. Wird bei jeder Fan-Nachricht auf 0 gesetzt. Ohne diesen
+            # Zaehler bleibt ein stiller Fan ewig faellig und wird endlos
+            # angeschrieben - genau das war der Fehler bis v1.4.
+            "reactivation_streak": "INTEGER DEFAULT 0",
+            # Gedaechtnis je Fan: '' folgt dem globalen Schalter, 'on'/'off'
+            # ueberstimmen ihn. Fuer den Test an einzelnen Fans.
+            "memory_mode": "TEXT DEFAULT ''",
             # Bis zu welcher Nachricht der Stichwort-Alarm schon gemeldet hat.
             # Getrennt von last_inbound_uuid, damit eine Meldung auch dann
             # genau einmal rausgeht, wenn der Chat mehrfach durchlaufen wird.
@@ -489,6 +602,24 @@ def _migrate(conn: sqlite3.Connection) -> None:
                         "UPDATE ppv_folders SET media_kind = 'video' "
                         "WHERE lower(name) LIKE '%video%' OR lower(name) LIKE '%clip%' "
                         "   OR lower(',' || COALESCE(tags,'') || ',') LIKE '%,video,%'")
+                # Startwert fuer den Reaktivierungs-Zaehler aus der Historie:
+                # wie viele Reaktivierungen wurden diesem Fan geschickt, ohne
+                # dass er seither geschrieben hat. Ohne diesen Startwert
+                # bekaemen ausgerechnet die Fans, die schon zehnmal
+                # unbeantwortet angeschrieben wurden, noch einmal die volle
+                # Zahl an Versuchen - der Fehler wuerde also ein letztes Mal
+                # in voller Breite auftreten.
+                if table == "chats" and col == "reactivation_streak":
+                    conn.execute(
+                        "UPDATE chats SET reactivation_streak = ("
+                        "  SELECT count(*) FROM drafts d "
+                        "  WHERE d.user_uuid = chats.user_uuid "
+                        "    AND d.guardrail_note LIKE 'Reaktivierung%' "
+                        "    AND d.created_at > COALESCE(chats.last_inbound_at, 0))")
+    # Verwaiste Einstellung aus einer frueheren Fassung. Sie wird von keinem
+    # Code mehr gelesen, steht aber weiter in der Oberflaeche-Datenbank und
+    # laesst glauben, sie sei wirksam - wirksam ist reactivation_inactive_hours.
+    conn.execute("DELETE FROM settings WHERE key = 'reactivation_inactive_days'")
     conn.commit()
 
 
@@ -631,17 +762,54 @@ def list_chats() -> list[sqlite3.Row]:
 
 
 def due_reactivation_chats(now: float, inactive_seconds: float,
-                           cooldown_seconds: float, limit: int) -> list[sqlite3.Row]:
-    """Aktive Chats, deren letzte Fan-Nachricht laenger als inactive_seconds her ist
-    und die innerhalb des Cooldowns nicht schon reaktiviert wurden."""
+                           cooldown_seconds: float, limit: int,
+                           max_attempts: int = 3,
+                           max_silence_seconds: float = 0.0) -> list[sqlite3.Row]:
+    """Chats, die proaktiv angeschrieben werden duerfen.
+
+    Vier Bedingungen, und die letzten beiden sind der eigentliche Punkt:
+
+      1. lange genug still            (inactive_seconds)
+      2. Cooldown eingehalten         (cooldown_seconds)
+      3. noch nicht aufgegeben        (reactivation_streak < max_attempts)
+      4. nicht endgueltig weg         (max_silence_seconds)
+
+    Ohne 3 und 4 blieb ein Fan, der nie wieder antwortet, fuer immer faellig:
+    `last_inbound_at` steht ja still, also war er nach jedem Cooldown erneut
+    dran - Woche fuer Woche, ohne Ende.
+    """
+    sql = ("SELECT * FROM chats WHERE bot_enabled = 1 "
+           "AND last_inbound_at IS NOT NULL AND last_inbound_at <= ? "
+           "AND (last_reactivation_at IS NULL OR last_reactivation_at <= ?) "
+           "AND COALESCE(reactivation_streak, 0) < ? ")
+    args: list[Any] = [now - inactive_seconds, now - cooldown_seconds, int(max_attempts)]
+    if max_silence_seconds and max_silence_seconds > 0:
+        sql += "AND last_inbound_at >= ? "
+        args.append(now - max_silence_seconds)
+    sql += "ORDER BY last_inbound_at ASC LIMIT ?"
+    args.append(int(limit))
     with _lock:
-        return get_conn().execute(
-            "SELECT * FROM chats WHERE bot_enabled = 1 "
-            "AND last_inbound_at IS NOT NULL AND last_inbound_at <= ? "
-            "AND (last_reactivation_at IS NULL OR last_reactivation_at <= ?) "
-            "ORDER BY last_inbound_at ASC LIMIT ?",
-            (now - inactive_seconds, now - cooldown_seconds, limit),
-        ).fetchall()
+        return get_conn().execute(sql, tuple(args)).fetchall()
+
+
+def bump_reactivation_streak(user_uuid: str) -> None:
+    """Eine Reaktivierung wurde angesetzt - Zaehler hoch."""
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "UPDATE chats SET reactivation_streak = COALESCE(reactivation_streak, 0) + 1, "
+            "updated_at = ? WHERE user_uuid = ?", (time.time(), user_uuid))
+        conn.commit()
+
+
+def reset_reactivation_streak(user_uuid: str) -> None:
+    """Der Fan hat geschrieben - er ist wieder erreichbar, Zaehler auf 0."""
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "UPDATE chats SET reactivation_streak = 0 WHERE user_uuid = ? "
+            "AND COALESCE(reactivation_streak, 0) > 0", (user_uuid,))
+        conn.commit()
 
 
 def update_chat(user_uuid: str, **fields: Any) -> None:
@@ -786,16 +954,19 @@ def add_api_cost(cost: float, model: str = "", category: str = "") -> None:
         pass
 
 
-def api_cost_between(start_ts: float, end_ts: float) -> float:
-    """Summe der OpenRouter-Kosten (USD) im Zeitraum [start, end). Absturzsicher -> 0.0."""
+def api_cost_between(start_ts: float, end_ts: float, category: str = "") -> float:
+    """Summe der OpenRouter-Kosten (USD) im Zeitraum [start, end). Absturzsicher -> 0.0.
+    Mit `category` laesst sich auf eine Kostenart einschraenken (z.B. 'memory')."""
+    sql = "SELECT COALESCE(SUM(cost), 0) AS c FROM api_costs WHERE ts >= ? AND ts < ?"
+    params: list[Any] = [start_ts, end_ts]
+    if category:
+        sql += " AND category = ?"
+        params.append(category)
     try:
         with _lock:
             conn = get_conn()
             conn.execute(_API_COSTS_DDL)   # Tabelle sicherstellen (verhindert 'no such table')
-            row = conn.execute(
-                "SELECT COALESCE(SUM(cost), 0) AS c FROM api_costs WHERE ts >= ? AND ts < ?",
-                (start_ts, end_ts),
-            ).fetchone()
+            row = conn.execute(sql, tuple(params)).fetchone()
         return float(row["c"] or 0) if row else 0.0
     except sqlite3.Error:
         return 0.0
@@ -1315,3 +1486,241 @@ def ppv_offer_stats(user_uuid: str) -> dict[str, Any]:
     return {"offered": offered, "purchased": purchased,
             "revenue_cents": row["revenue_cents"] or 0,
             "conversion": (purchased / offered * 100) if offered else 0.0}
+
+
+# --------------------------------------------------------- Chatverlauf (lokal)
+# Der Poller holt den Verlauf ohnehin bei jedem Durchlauf aus der Fanvue-API.
+# Hier wird er nebenbei festgehalten - ohne einen einzigen zusaetzlichen
+# API-Aufruf. Grundlage fuer das Gedaechtnis, das mehr als die letzten 15
+# Nachrichten verdichten koennen soll.
+
+def insert_messages(rows: list[dict[str, Any]]) -> int:
+    """Schreibt normalisierte Nachrichten. Duplikate werden ueber msg_uuid
+    stillschweigend verworfen. Gibt die Anzahl NEU gespeicherter Zeilen zurueck."""
+    if not rows:
+        return 0
+    now = time.time()
+    with _lock:
+        conn = get_conn()
+        before = conn.total_changes
+        conn.executemany(
+            "INSERT OR IGNORE INTO messages "
+            "(user_uuid, msg_uuid, direction, text, has_media, msg_type, sent_at, seen_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [(r["user_uuid"], r["msg_uuid"], r["direction"], r["text"],
+              1 if r.get("has_media") else 0, r.get("msg_type") or "",
+              r.get("sent_at"), now) for r in rows if r.get("msg_uuid")],
+        )
+        conn.commit()
+        return conn.total_changes - before
+
+
+def messages_since(user_uuid: str, after_id: int = 0, limit: int = 80) -> list[sqlite3.Row]:
+    """Nachrichten NACH after_id, chronologisch. Bei Ueberlauf werden die
+    NEUESTEN limit Nachrichten geliefert - eine Verdichtung soll lieber den
+    aktuellen Rand sehen als einen abgeschnittenen Anfang."""
+    with _lock:
+        rows = get_conn().execute(
+            "SELECT * FROM messages WHERE user_uuid = ? AND id > ? "
+            "ORDER BY id DESC LIMIT ?", (user_uuid, int(after_id or 0), int(limit))
+        ).fetchall()
+    return list(reversed(rows))
+
+
+def messages_chronological(user_uuid: str, limit: int = 100000) -> list[sqlite3.Row]:
+    """Alle Nachrichten eines Fans in ECHTER Zeitreihenfolge.
+
+    Nicht ueber die id sortieren: Fanvue liefert den Verlauf seitenweise mit der
+    NEUESTEN Seite zuerst. Beim nachtraeglichen Einlesen bekommen die aeltesten
+    Nachrichten dadurch die hoechsten ids - nach id sortiert liefe die
+    Verdichtung rueckwaerts durch die Geschichte, und das Gedaechtnis endete
+    beim aeltesten Stand statt beim aktuellen.
+    """
+    with _lock:
+        return get_conn().execute(
+            "SELECT * FROM messages WHERE user_uuid = ? "
+            "ORDER BY COALESCE(sent_at, seen_at) ASC, id ASC LIMIT ?",
+            (user_uuid, int(limit))).fetchall()
+
+
+def last_message_id(user_uuid: str) -> int:
+    with _lock:
+        row = get_conn().execute(
+            "SELECT MAX(id) AS m FROM messages WHERE user_uuid = ?", (user_uuid,)).fetchone()
+    return int((row["m"] if row else 0) or 0)
+
+
+def fan_message_count(user_uuid: str) -> int:
+    """Wie viele eigene Nachrichten des Fans liegen lokal vor."""
+    with _lock:
+        row = get_conn().execute(
+            "SELECT COUNT(*) AS n FROM messages WHERE user_uuid = ? AND direction = 'in'",
+            (user_uuid,)).fetchone()
+    return int((row["n"] if row else 0) or 0)
+
+
+def message_count(user_uuid: str = "") -> int:
+    with _lock:
+        if user_uuid:
+            row = get_conn().execute(
+                "SELECT COUNT(*) AS n FROM messages WHERE user_uuid = ?", (user_uuid,)).fetchone()
+        else:
+            row = get_conn().execute("SELECT COUNT(*) AS n FROM messages").fetchone()
+    return int((row["n"] if row else 0) or 0)
+
+
+def purge_old_messages(days: int) -> int:
+    """Loescht Rohnachrichten aelter als `days`. 0 oder negativ = nichts tun."""
+    if not days or days <= 0:
+        return 0
+    cutoff = time.time() - days * 86400.0
+    with _lock:
+        conn = get_conn()
+        before = conn.total_changes
+        # sent_at kann fehlen (API ohne Zeitstempel) - dann greift seen_at.
+        conn.execute("DELETE FROM messages WHERE COALESCE(sent_at, seen_at) < ?", (cutoff,))
+        conn.commit()
+        return conn.total_changes - before
+
+
+# ------------------------------------------------------------- Gedaechtnis API
+def get_memory_row(user_uuid: str) -> Optional[sqlite3.Row]:
+    with _lock:
+        return get_conn().execute(
+            "SELECT * FROM chat_memory WHERE user_uuid = ?", (user_uuid,)).fetchone()
+
+
+def memory_rows(uuids: Optional[list[str]] = None) -> dict[str, sqlite3.Row]:
+    """Alle Gedaechtnis-Zeilen auf einmal. Fuer Listenansichten gedacht: eine
+    Abfrage statt einer pro Fan-Karte."""
+    with _lock:
+        conn = get_conn()
+        if uuids is None:
+            rows = conn.execute("SELECT * FROM chat_memory").fetchall()
+        elif not uuids:
+            return {}
+        else:
+            out: dict[str, sqlite3.Row] = {}
+            # SQLite-Parametergrenze im Blick behalten
+            for i in range(0, len(uuids), 400):
+                chunk = uuids[i:i + 400]
+                marks = ",".join("?" for _ in chunk)
+                for r in conn.execute(
+                        f"SELECT * FROM chat_memory WHERE user_uuid IN ({marks})", chunk):
+                    out[r["user_uuid"]] = r
+            return out
+    return {r["user_uuid"]: r for r in rows}
+
+
+def upsert_memory(user_uuid: str, **fields: Any) -> None:
+    """Legt die Zeile bei Bedarf an und schreibt die uebergebenen Felder."""
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT OR IGNORE INTO chat_memory (user_uuid, updated_at) VALUES (?, ?)",
+            (user_uuid, time.time()))
+        if fields:
+            fields["updated_at"] = time.time()
+            cols = ", ".join(f"{k} = ?" for k in fields)
+            conn.execute(f"UPDATE chat_memory SET {cols} WHERE user_uuid = ?",
+                         list(fields.values()) + [user_uuid])
+        conn.commit()
+
+
+def bump_memory_dirty(user_uuid: str, n: int = 1) -> None:
+    """Zaehlt neue Fan-Nachrichten seit der letzten Verdichtung."""
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO chat_memory (user_uuid, dirty_count, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_uuid) DO UPDATE SET "
+            "dirty_count = chat_memory.dirty_count + excluded.dirty_count, "
+            "updated_at = excluded.updated_at",
+            (user_uuid, int(n), time.time()))
+        conn.commit()
+
+
+def memory_candidates(now: float, min_interval_seconds: float, limit: int) -> list[sqlite3.Row]:
+    """Faellige Chats fuer die Verdichtung: mindestens eine neue Fan-Nachricht und
+    der Mindestabstand ist eingehalten.
+
+    Sortiert nach der aeltesten Verdichtung zuerst - sonst koennte ein einzelner
+    Vielschreiber, der die Schwelle staendig reisst, das Kontingent pro Durchlauf
+    allein aufbrauchen und ruhigere Fans nie drankommen lassen.
+    """
+    with _lock:
+        return get_conn().execute(
+            "SELECT m.*, c.last_inbound_at, c.bot_enabled, c.memory_mode "
+            "FROM chat_memory m "
+            "JOIN chats c ON c.user_uuid = m.user_uuid "
+            "WHERE m.dirty_count > 0 "
+            "AND (m.last_run_at IS NULL OR m.last_run_at <= ?) "
+            # Ein Fan, der ausdruecklich auf 'off' steht, kostet auch keinen
+            # Verdichtungs-Aufruf.
+            "AND COALESCE(c.memory_mode, '') <> 'off' "
+            "ORDER BY COALESCE(m.last_run_at, 0) ASC LIMIT ?",
+            (now - min_interval_seconds, int(limit)),
+        ).fetchall()
+
+
+def add_memory_log(user_uuid: str, action: str, layer: str,
+                   content: str, model: str = "") -> None:
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO memory_log (user_uuid, ts, action, layer, content, model) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_uuid, time.time(), action, layer, (content or "")[:500], model or ""))
+        conn.commit()
+
+
+def list_memory_log(user_uuid: str, limit: int = 50) -> list[sqlite3.Row]:
+    with _lock:
+        return get_conn().execute(
+            "SELECT * FROM memory_log WHERE user_uuid = ? ORDER BY ts DESC LIMIT ?",
+            (user_uuid, int(limit))).fetchall()
+
+
+def delete_memory(user_uuid: str) -> None:
+    """Gedaechtnis, Protokoll und Rohnachrichten eines Fans restlos entfernen."""
+    with _lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM chat_memory WHERE user_uuid = ?", (user_uuid,))
+        conn.execute("DELETE FROM memory_log WHERE user_uuid = ?", (user_uuid,))
+        conn.execute("DELETE FROM messages WHERE user_uuid = ?", (user_uuid,))
+        conn.commit()
+
+
+# ---------------------------------------------------- Zwischenspeicher (API)
+def get_api_cache(key: str) -> Optional[dict[str, Any]]:
+    """Gespeicherte Antwort oder None. Defekte Eintraege gelten als nicht da."""
+    with _lock:
+        row = get_conn().execute(
+            "SELECT data, updated_at FROM api_cache WHERE key = ?", (key,)).fetchone()
+    if row is None:
+        return None
+    try:
+        return {"data": json.loads(row["data"]), "updated_at": float(row["updated_at"] or 0)}
+    except (TypeError, ValueError):
+        return None
+
+
+def set_api_cache(key: str, data: Any) -> None:
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO api_cache (key, data, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET data = excluded.data, "
+            "updated_at = excluded.updated_at",
+            (key, json.dumps(data, ensure_ascii=False), time.time()))
+        conn.commit()
+
+
+def clear_api_cache(prefix: str = "") -> None:
+    with _lock:
+        conn = get_conn()
+        if prefix:
+            conn.execute("DELETE FROM api_cache WHERE key LIKE ?", (prefix + "%",))
+        else:
+            conn.execute("DELETE FROM api_cache")
+        conn.commit()

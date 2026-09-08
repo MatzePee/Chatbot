@@ -17,7 +17,8 @@ import time
 from datetime import datetime
 from typing import Any
 
-from . import db, fanvue, guardrails, namefilter, notify, openrouter, ppv_engine, updater
+from . import (db, fanvue, guardrails, memory, namefilter, notify, openrouter,
+               ppv_engine, updater)
 
 _thread: threading.Thread | None = None
 _stop = threading.Event()
@@ -163,6 +164,10 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
 
     # API liefert neueste zuerst -> chronologisch drehen
     messages_chrono = list(reversed(messages))
+    # Verlauf lokal mitschreiben (Grundlage fuer das Gedaechtnis). Passiert VOR
+    # allen Abbruchbedingungen: auch ein Chat, in dem gerade nicht geantwortet
+    # wird, soll spaeter verdichtet werden koennen.
+    memory.store_history(user_uuid, messages_chrono, me_uuid)
     last_msg = messages_chrono[-1]
     last_sender = (last_msg.get("sender") or {}).get("uuid", "")
 
@@ -175,6 +180,10 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
     _check_alert_keywords(user_uuid, handle, display_name, last_msg, chat)
     if chat and chat["last_inbound_uuid"] == last_uuid:
         return  # schon verarbeitet
+
+    # Ab hier steht fest: eine noch nicht verarbeitete Fan-Nachricht liegt vor.
+    # Genau das ist der Zaehler, an dem die Verdichtung faellig wird.
+    memory.mark_dirty(user_uuid)
 
     # Neue Fan-Nachricht liegt vor -> eine noch eingeplante Reaktivierung verwerfen,
     # damit nicht kurz danach doch noch ein "wo bist du?" rausgeht.
@@ -197,6 +206,9 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
             tip_cents = 0
     # Zeitstempel der letzten Fan-Nachricht (fuer die proaktive Reaktivierung)
     db.update_chat(user_uuid, last_inbound_at=time.time())
+    # Der Fan ist wieder da: die Serie unbeantworteter Anschreiben ist beendet.
+    # Ohne dieses Zuruecksetzen bliebe er nach drei Versuchen fuer immer gesperrt.
+    db.reset_reactivation_streak(user_uuid)
 
     # Eskalations-Check auf die eingehende Nachricht
     escalation = guardrails.incoming_needs_escalation(incoming_text)
@@ -208,6 +220,9 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
         if chat["persona_override"]:
             system_prompt = chat["persona_override"]
         fan_notes = chat["notes"] or ""
+    # Verdichtetes Gespraechsgedaechtnis. Getrennt von den Handnotizen oben:
+    # `chats.notes` gehoert dem Creator, hier steht, was die Automatik gelernt hat.
+    fan_memory = _fan_memory(user_uuid)
 
     # Anti-AI: verbotene Woerter aus der letzten eigenen Nachricht bestimmen
     banned: list[str] = []
@@ -283,7 +298,7 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
                     # Sonst geht die Nachricht bei einem Timeout dauerhaft verloren.
                     if _create_ppv_draft(user_uuid, handle, display_name, incoming_text,
                                          messages_chrono, me_uuid, system_prompt, fan_notes,
-                                         payload, decision, chat, banned):
+                                         payload, decision, chat, banned, fan_memory):
                         db.update_chat(user_uuid, last_inbound_uuid=last_uuid)
                     else:
                         db.log("warn", "generate",
@@ -329,7 +344,8 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
 
     # Generieren (mit Anti-AI-Regeln + Namens-Filter)
     try:
-        generated = _generate(system_prompt, messages_chrono, me_uuid, fan_notes, banned)
+        generated = _generate(system_prompt, messages_chrono, me_uuid, fan_notes, banned,
+                              fan_memory=fan_memory)
     except Exception as exc:  # noqa: BLE001 – nie den ganzen Poll-Zyklus abbrechen
         # BEWUSST OHNE last_inbound_uuid: Die Nachricht darf NICHT als erledigt
         # gelten. Ein Netzwerk-Timeout ist voruebergehend - wird hier markiert,
@@ -422,8 +438,31 @@ def _fan_language(messages_chrono: list, me_uuid: str) -> str:
     return best if scores[best] > 0 else "en"
 
 
+def _fan_memory(user_uuid: str) -> str:
+    """Gedaechtnisblock fuer den Prompt - oder leer, wenn abgeschaltet.
+
+    Der Schalter je Fan (`chats.memory_mode`) sticht den globalen: so laesst sich
+    das Gedaechtnis an einer Handvoll Fans erproben, bevor es fuer alle laeuft.
+
+    Bewusst fehlertolerant: ein Problem im Gedaechtnis darf niemals dazu fuehren,
+    dass eine Fan-Nachricht unbeantwortet bleibt.
+    """
+    try:
+        if not memory.enabled_for_uuid(user_uuid):
+            return ""
+    except Exception:  # noqa: BLE001
+        if not db.get_setting("memory_enabled", False):
+            return ""
+    try:
+        return memory.render_block(user_uuid)
+    except Exception as exc:  # noqa: BLE001
+        db.log("warn", "memory", "Gedaechtnisblock nicht lesbar", str(exc))
+        return ""
+
+
 def _generate(system_prompt: str, messages_chrono: list, me_uuid: str, fan_notes: str,
-              banned: list[str], task: str = "chat", retry_delay: float | None = None) -> str:
+              banned: list[str], task: str = "chat", retry_delay: float | None = None,
+              fan_memory: str = "") -> str:
     """Generiert eine Antwort inkl. Anti-AI-Regeln, Namens-Filter und Sprach-Anker.
     Bei einer Wiederholung verbotener Woerter wird EINMAL neu generiert.
     task steuert das genutzte Modell ('chat' oder 'caption').
@@ -449,7 +488,7 @@ def _generate(system_prompt: str, messages_chrono: list, me_uuid: str, fan_notes
                  f"language these instructions are written in.")
     # Bis zu `retries` Versuche gegen leere Antworten (Reasoning-Modelle), mit Pause.
     text = openrouter.generate_retry(
-        openrouter.build_messages(sys, messages_chrono, me_uuid, fan_notes),
+        openrouter.build_messages(sys, messages_chrono, me_uuid, fan_notes, fan_memory),
         model=model, api_key=api_key, attempts=retries, delay_seconds=retry_delay,
         category=task)
     if text and banned:
@@ -458,7 +497,8 @@ def _generate(system_prompt: str, messages_chrono: list, me_uuid: str, fan_notes
             sys2 = sys + ("\n\nVerwende folgende Woerter NICHT in deiner Antwort: "
                           + ", ".join(viol) + ".")
             regen = openrouter.generate_retry(
-                openrouter.build_messages(sys2, messages_chrono, me_uuid, fan_notes),
+                openrouter.build_messages(sys2, messages_chrono, me_uuid, fan_notes,
+                                          fan_memory),
                 model=model, api_key=api_key, attempts=retries, delay_seconds=retry_delay,
                 category=task)
             if regen and regen.strip():
@@ -470,7 +510,7 @@ def _generate(system_prompt: str, messages_chrono: list, me_uuid: str, fan_notes
 def _create_ppv_draft(user_uuid: str, handle: str, display_name: str, incoming_text: str,
                       messages_chrono: list, me_uuid: str, system_prompt: str, fan_notes: str,
                       payload: dict, decision: dict, chat: Any,
-                      banned: list[str] | None = None) -> bool:
+                      banned: list[str] | None = None, fan_memory: str = "") -> bool:
     """Erzeugt einen PPV-Entwurf (Verkaufston + Media/Preis/Vorschau).
 
     Rueckgabe: True, wenn ein Entwurf entstand. Nur dann darf die Nachricht
@@ -496,7 +536,7 @@ def _create_ppv_draft(user_uuid: str, handle: str, display_name: str, incoming_t
     caption_model, _ = openrouter.resolve_model("caption")
     try:
         generated = _generate(sys, messages_chrono, me_uuid, fan_notes, banned or [],
-                              task="caption")
+                              task="caption", fan_memory=fan_memory)
     except openrouter.OpenRouterError as exc:
         db.log("error", "generate", f"PPV-Text fehlgeschlagen ({handle})", str(exc))
         return False
@@ -689,6 +729,15 @@ def _send_draft(draft_id: int) -> bool:
     except fanvue.FanvueError as exc:
         db.update_draft(draft_id, status="failed", error=str(exc))
         db.log("error", "send", f"Senden fehlgeschlagen (Draft #{draft_id})", str(exc))
+        # "Invalid user UUID" heisst: diesen Fan gibt es bei Fanvue nicht mehr
+        # (Abo gekuendigt, Konto geloescht). Bisher lief er trotzdem weiter im
+        # Reaktivierungs-Karussell mit und kostete alle paar Tage einen
+        # Generierungs-Aufruf, dessen Nachricht nie ankommen konnte.
+        if "invalid user uuid" in str(exc).lower():
+            db.update_chat(user_uuid, bot_enabled=0)
+            db.log("warn", "send",
+                   f"Chat stillgelegt: Fanvue kennt {draft['handle'] or user_uuid} nicht mehr",
+                   "bot_enabled = 0 – bei Bedarf in der Chatliste wieder einschalten")
         return False
 
 
@@ -893,7 +942,11 @@ def reactivation_cycle() -> None:
     inactive_s = float(db.get_setting("reactivation_inactive_hours", 14)) * 3600
     cooldown_s = float(db.get_setting("reactivation_cooldown_days", 14)) * 86400
     limit = int(db.get_setting("reactivation_max_per_cycle", 3))
-    chats = db.due_reactivation_chats(now, inactive_s, cooldown_s, limit)
+    max_attempts = int(db.get_setting("reactivation_max_attempts", 3) or 3)
+    max_silence_s = float(db.get_setting("reactivation_max_silence_days", 60) or 0) * 86400
+    chats = db.due_reactivation_chats(now, inactive_s, cooldown_s, limit,
+                                      max_attempts=max_attempts,
+                                      max_silence_seconds=max_silence_s)
     if not chats:
         return
     folder = (db.get_setting("reactivation_folder", "") or "").strip()
@@ -908,6 +961,16 @@ def reactivation_cycle() -> None:
             db.log("error", "generate", f"Reaktivierung fehlgeschlagen ({chat['handle'] or uuid})",
                    str(exc))
         db.update_chat(uuid, last_reactivation_at=now)
+        # Zaehler hoch. Er faellt erst wieder auf 0, wenn der Fan von sich aus
+        # schreibt. Genau das beendet die Endlosschleife: bisher blieb ein Fan,
+        # der nie antwortete, nach jedem Cooldown erneut faellig.
+        db.bump_reactivation_streak(uuid)
+        versuch = int(chat["reactivation_streak"] or 0) + 1
+        if versuch >= max_attempts:
+            db.log("info", "generate",
+                   f"Reaktivierung: {chat['handle'] or uuid} nach {versuch} Versuchen "
+                   f"ohne Antwort ausgesetzt", "Zaehler laeuft erst weiter, wenn der "
+                   "Fan selbst schreibt")
         time.sleep(0.4)
 
 
@@ -934,12 +997,40 @@ def _reactivation_media(folder: str, user_uuid: str) -> list[str]:
     return [random.choice(remaining)]
 
 
+def _open_loop_hint(user_uuid: str) -> str:
+    """Zusatz fuer den Reaktivierungs-Prompt: der aelteste offene Gespraechsfaden.
+
+    Leer, wenn es keinen gibt oder die Funktion abgeschaltet ist - dann bleibt es
+    beim bisherigen, allgemeinen Bezug auf das letzte Thema.
+    """
+    if not db.get_setting("memory_reactivation_use_loops", True):
+        return ""
+    try:
+        # Gleicher Schalter wie beim Antwort-Prompt: steht der Fan auf 'on',
+        # nutzt auch die Reaktivierung sein Gedaechtnis - sonst waere ein
+        # Einzeltest nur halb wirksam.
+        if not memory.enabled_for_uuid(user_uuid):
+            return ""
+        offen = memory.open_loops(memory.get(user_uuid))
+    except Exception:  # noqa: BLE001
+        return ""
+    if not offen:
+        return ""
+    thema = str(offen[0].get("v") or "").strip()
+    if not thema:
+        return ""
+    return (f" KONKRETER ANKNUEPFUNGSPUNKT fuer Punkt 2: \"{thema}\". Frage beilaeufig "
+            f"und warm nach, wie es damit ausgegangen ist. Kein Verkauf. Wenn das Thema "
+            f"gerade unpassend wirkt, ignoriere es und nimm ein anderes.")
+
+
 def _create_reactivation_draft(chat: Any, me_uuid: str, folder: str,
                                manual: bool = False) -> None:
     uuid = chat["user_uuid"]
     handle = chat["handle"] or ""
     system_prompt = chat["persona_override"] or db.get_setting("system_prompt", "")
     fan_notes = chat["notes"] or ""
+    fan_memory = _fan_memory(uuid)
     # Persoenliche Anrede: NUR ein echter Vorname aus dem Anzeigenamen. NIEMALS das
     # Handle/@Username. Sieht der Anzeigename nach einem Handle aus (Ziffern, -, _, @,
     # sehr lang) oder ist er identisch mit dem Handle, wird KEIN Name verwendet.
@@ -981,8 +1072,12 @@ def _create_reactivation_draft(chat: Any, me_uuid: str, folder: str,
         "aufleben zu lassen. Kurz, warm, kein Verkauf, keine explizite Fortsetzung der Szene, "
         "keine Standard-Floskel."
     )
+    # Offener Faden als konkreter Anknuepfungspunkt. Genau hier zahlt sich das
+    # Gedaechtnis am staerksten aus: "Wie war das Gespraech am Montag?" ist etwas
+    # voellig anderes als ein generisches "wo bist du?".
+    faden = _open_loop_hint(uuid)
     sys = (system_prompt + "\n\n" + db.get_setting("reactivation_prompt", "")
-           + "\n\n" + structure)
+           + "\n\n" + structure + faden)
     banned = []
     if db.get_setting("anti_ai_enabled", True):
         last_out = ""
@@ -994,7 +1089,8 @@ def _create_reactivation_draft(chat: Any, me_uuid: str, folder: str,
         # Der Anrede-Name soll in der Reaktivierung ausdruecklich vorkommen duerfen
         if greet_name:
             banned = [b for b in banned if b != greet_name.lower()]
-    generated = _generate(sys, messages_chrono, me_uuid, fan_notes, banned)
+    generated = _generate(sys, messages_chrono, me_uuid, fan_notes, banned,
+                          fan_memory=fan_memory)
     media = _reactivation_media(folder, uuid)
     clean_text, note = guardrails.check_outgoing(generated, has_media=bool(media))
     mode = _effective_mode(chat)
@@ -1147,7 +1243,11 @@ def _fetch_history(user_uuid: str) -> list:
     """Aktueller Chatverlauf (alt -> neu) direkt aus Fanvue."""
     history_n = int(db.get_setting("history_messages", 15))
     result = fanvue.list_messages(user_uuid, size=max(history_n, 5), mark_as_read=False)
-    return list(reversed(result.get("data", [])))
+    chrono = list(reversed(result.get("data", [])))
+    # Auch hier mitschreiben: der Recheck-Zyklus sieht oft Nachrichten, die der
+    # normale Durchlauf nie zu Gesicht bekommt (z.B. eigene, bereits gesendete).
+    memory.store_history(user_uuid, chrono, _me_uuid())
+    return chrono
 
 
 def _newer_fan_messages(draft: Any, messages_chrono: list, me_uuid: str) -> list:
@@ -1248,7 +1348,8 @@ def regenerate_draft(draft_id: int, reason: str = "", interactive: bool = False)
 
     try:
         generated = _generate(system_prompt, messages_chrono, me_uuid, fan_notes, banned,
-                              task=task, retry_delay=0 if interactive else None)
+                              task=task, retry_delay=0 if interactive else None,
+                              fan_memory=_fan_memory(user_uuid))
     except Exception as exc:  # noqa: BLE001 - nie den Zyklus abbrechen
         db.log("error", "generate", f"Regenerate fehlgeschlagen ({handle})", str(exc))
         db.update_draft(draft_id, last_check_at=now, last_regen_at=now,
@@ -1462,6 +1563,9 @@ def _loop() -> None:
                     poll_cycle()  # Prio 1: jeder Zyklus
                     _prio2_cycle_if_due()
                     reactivation_cycle()
+                    # Gespraechsgedaechtnis verdichten. Drosselt sich selbst ueber
+                    # den Mindestabstand je Fan und die Obergrenze pro Durchlauf.
+                    memory.cycle()
                     # Wartende Drafts pflegen (veraltet? kaputt?) - drosselt sich
                     # selbst ueber last_check_at, laeuft also faktisch alle 3 Min.
                     recheck_pending_cycle()

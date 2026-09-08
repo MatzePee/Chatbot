@@ -9,6 +9,11 @@
   <link rel="icon" type="image/svg+xml" href="/static/fanvue-logo.svg?v={{ css_v | default('0') }}">
 </head>
 <body>
+{# Ladeanzeige. Manche Seiten - allen voran "Subs" - muessen Listen erst
+   seitenweise von Fanvue holen; bis die Antwort da ist, passiert im Browser
+   sichtbar nichts und die Seite wirkt haengengeblieben. Der Balken laeuft ab
+   dem Klick und verschwindet mit der neuen Seite von selbst. #}
+<div id="pageload" class="pageload" role="progressbar" aria-hidden="true"><span></span></div>
 <header>
   <div class="brand">
     <img class="brand-logo" src="/static/fanvue-logo.svg?v={{ css_v | default('0') }}" alt="" width="26" height="26">
@@ -51,5 +56,63 @@
   {% block content %}{% endblock %}
 </main>
 <footer>Daten in <code>data/bot.db</code></footer>
+<script>
+/* Ladeanzeige fuer normale Seitenwechsel.
+   Der Balken kann nicht wissen, wie weit der Server ist - er waechst deshalb
+   asymptotisch gegen 92% und wird nie von allein fertig. Das ist Absicht: er
+   zeigt "es passiert etwas", nicht "es ist zu X% fertig". Die neue Seite
+   ersetzt ihn ohnehin komplett. */
+(function () {
+  var box = document.getElementById('pageload');
+  if (!box) return;
+  var bar = box.firstElementChild;
+  var warten = null, ticker = null, breite = 0;
+
+  function start() {
+    if (warten || box.classList.contains('on')) return;
+    /* Kurz zoegern: schnelle Seiten sollen nicht kurz aufblitzen. */
+    warten = setTimeout(function () {
+      warten = null; breite = 8;
+      box.classList.add('on'); box.setAttribute('aria-hidden', 'false');
+      bar.style.width = breite + '%';
+      ticker = setInterval(function () {
+        breite += Math.max(0.3, (92 - breite) / 20);
+        if (breite > 92) breite = 92;
+        bar.style.width = breite + '%';
+      }, 170);
+    }, 120);
+  }
+
+  function stop() {
+    if (warten) { clearTimeout(warten); warten = null; }
+    if (ticker) { clearInterval(ticker); ticker = null; }
+    box.classList.remove('on'); box.setAttribute('aria-hidden', 'true');
+    bar.style.width = '0%';
+  }
+  window.pageLoadStart = start;
+
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest ? e.target.closest('a') : null;
+    if (!a || a.hasAttribute('download')) return;
+    if (a.target && a.target !== '_self') return;
+    var href = a.getAttribute('href') || '';
+    if (!href || href.charAt(0) === '#') return;
+    if (/^(mailto:|tel:|javascript:)/i.test(href)) return;
+    if (a.origin && a.origin !== location.origin) return;
+    /* Nur ein Sprung innerhalb derselben Seite? Dann laedt nichts nach. */
+    if (a.pathname === location.pathname && a.search === location.search && a.hash) return;
+    start();
+  }, true);
+
+  document.addEventListener('submit', function () { start(); }, true);
+
+  /* Zurueck-Knopf holt die Seite aus dem Verlaufsspeicher - dann darf kein
+     Balken von vorhin stehenbleiben. */
+  window.addEventListener('pageshow', stop);
+  window.addEventListener('pagehide', stop);
+})();
+</script>
 </body>
 </html>
