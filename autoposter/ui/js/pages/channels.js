@@ -2,6 +2,48 @@ import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
 import { watermarkEditor } from '../watermark.js?v=creatorstudio-mobile-system-20260909'
 import { h, clear, empty, field, modal, toast, guard, fmtDateTime } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
+function callbackEditor(channel = null) {
+  const suffix = '/api/v1/oauth/x/callback'
+  const initial = channel?.redirect_uri || `${location.origin}${suffix}`
+  const input = h('input', {
+    type: 'url', value: initial, autocomplete: 'off', spellcheck: false,
+    'aria-label': 'Callback-Adresse (Redirect-URI)',
+    placeholder: `https://dein-server.de${suffix}`,
+  })
+  const value = () => {
+    const raw = input.value.trim().replace(/\/+$/, '')
+    if (!raw) return ''
+    let url
+    try { url = new URL(raw) } catch { throw new Error('Bitte eine vollständige Callback-Adresse mit http:// oder https:// eintragen.') }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || /[\s\\]/.test(raw)) {
+      throw new Error('Bitte eine gültige Callback-Adresse ohne Zugangsdaten, Abfrage oder Fragment eintragen.')
+    }
+    if (!url.pathname.endsWith(suffix)) {
+      throw new Error(`Die Callback-Adresse muss auf ${suffix} enden.`)
+    }
+    return raw.slice(0, -suffix.length).replace(/\/+$/, '')
+  }
+  const setAddress = (address) => {
+    input.value = address
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  return {
+    values: () => channel && input.value === initial ? {} : { oauth_redirect_base: value() },
+    node: field('Callback-Adresse (Redirect-URI)', h('div', { class: 'col' },
+      input,
+      h('div', { class: 'row' },
+        h('button', { type: 'button', class: 'small', onClick: () => setAddress(`${location.origin}${suffix}`) }, 'Diese Serveradresse verwenden'),
+        h('button', { type: 'button', class: 'small', onClick: guard(async () => {
+          const base = value()
+          if (!base) { toast.info('Zum Kopieren zuerst eine Callback-Adresse eintragen.'); return }
+          if (!navigator.clipboard?.writeText) { input.focus(); input.select(); toast.info('Adresse markiert – bitte kopieren.'); return }
+          await navigator.clipboard.writeText(`${base}${suffix}`)
+          toast.info('Kopiert')
+        }) }, 'Kopieren'))),
+      'Die Adresse muss auf diesen Server führen und exakt so im X-Entwicklerportal hinterlegt sein. Vor dem Verbinden speichern. Leer = gemeinsame Basis-URL aus den AutoPost-Einstellungen.'),
+  }
+}
+
 export default async function renderChannels() {
   let [channels, personas] = await Promise.all([api.channels(), api.personas()])
   const list = h('div', { class: 'grid c3' })
@@ -123,6 +165,7 @@ export default async function renderChannels() {
         placeholder: channel.has_client_secret ? '•••••••• (gespeichert)' : '',
       })
       const appName = h('input', { value: channel.oauth_app_name || '', placeholder: 'z. B. „Sally Haupt-App"' })
+      const callback = callbackEditor(channel)
 
       return h('div', {},
         channel.platform === 'x'
@@ -135,20 +178,14 @@ export default async function renderChannels() {
         field('Name der App (nur zur Orientierung)', appName),
         field('Client-ID', clientId, 'Leer = globale App aus den Einstellungen verwenden'),
         field('Client-Secret', secret, 'Wird verschlüsselt gespeichert.'),
-        field('Redirect-URI (im Entwicklerportal eintragen)',
-          h('div', { class: 'row' },
-            h('input', { value: channel.redirect_uri || '', readonly: true }),
-            h('button', { onClick: () => {
-              navigator.clipboard?.writeText(channel.redirect_uri || '')
-              toast.info('Kopiert')
-            } }, 'Kopieren')),
-          'Muss exakt so hinterlegt sein, sonst schlägt die Autorisierung fehl.'),
+        callback.node,
         h('div', { class: 'row' },
           h('button', { class: 'primary', onClick: guard(async () => {
             await api.updateChannel(channel.id, {
               oauth_client_id: clientId.value.trim(),
               oauth_client_secret: secret.value.trim() || null,
               oauth_app_name: appName.value.trim(),
+              ...callback.values(),
             })
             toast.ok('API-Zugang gespeichert')
             close(); reload()
@@ -243,6 +280,7 @@ export default async function renderChannels() {
       const clientId = h('input', { autocomplete: 'off', placeholder: 'leer = globale App' })
       const clientSecret = h('input', { type: 'password', autocomplete: 'off' })
       const appName = h('input', { placeholder: 'Name der App (optional)' })
+      const callback = callbackEditor()
       const appHint = h('div', { class: 'warnbox', style: { marginBottom: '10px' } },
         'Bei X gehört zu jeder API-App genau ein Account. Für dieses Profil eine eigene App im ' +
         'Entwicklerportal anlegen und die Zugangsdaten hier eintragen.')
@@ -250,7 +288,7 @@ export default async function renderChannels() {
       const schedRow = h('label', { class: 'inline', style: { display: 'none' } },
         platformSched, 'Planung an Fanvue übergeben (publishAt) statt lokal halten')
 
-      const appFields = h('div', {}, field('Name der App', appName), field('Client-ID', clientId), field('Client-Secret', clientSecret))
+      const appFields = h('div', {}, field('Name der App', appName), field('Client-ID', clientId), field('Client-Secret', clientSecret), callback.node)
       const connectHint = h('div', { class: 'warnbox', style: { margin: '12px 0' } }, 'Nach dem Anlegen den X-Kanal per OAuth verbinden.')
       platform.addEventListener('change', () => {
         appFields.style.display = platform.value === 'fanvue' ? 'none' : ''
@@ -297,6 +335,7 @@ export default async function renderChannels() {
               oauth_client_id: isX ? clientId.value.trim() : '',
               oauth_client_secret: isX ? clientSecret.value.trim() : '',
               oauth_app_name: isX ? appName.value.trim() : '',
+              ...(isX ? callback.values() : {}),
               policy: {
                 posts_per_day: 2, min_gap_minutes: 180, jitter_minutes: 12,
                 max_images_per_post: isX ? 4 : 20,
@@ -322,20 +361,7 @@ export default async function renderChannels() {
     modal(`Einstellungen — ${channel.display_name}`, (close) => {
       const p = { ...channel.policy }
       const color = h('input', { type: 'color', value: channel.color || '#6366f1' })
-      const redirectBase = h('input', {
-        value: channel.oauth_redirect_base || '',
-        placeholder: 'leer = PUBLIC_BASE_URL aus der .env',
-        autocomplete: 'off',
-      })
-      const redirectShow = h('code', { style: { fontSize: '11px', wordBreak: 'break-all' } })
-      const paintRedirect = () => {
-        const base = (redirectBase.value.trim() || '').replace(/\/+$/, '')
-        redirectShow.textContent = base
-          ? `${base}/api/v1/oauth/${channel.platform}/callback`
-          : channel.redirect_uri || '—'
-      }
-      redirectBase.addEventListener('input', paintRedirect)
-      paintRedirect()
+      const callback = channel.platform === 'x' ? callbackEditor(channel) : null
       const numField = (key, label, hint, step = '1') => {
         const inp = h('input', { type: 'number', step, value: p[key] })
         inp.addEventListener('input', () => { p[key] = Number(inp.value) })
@@ -377,12 +403,7 @@ export default async function renderChannels() {
           field('Farbe im Kalender', color),
           field('Persona', personaSel),
         ),
-        channel.platform !== 'fanvue' ? field('Redirect-URI dieses Kanals', redirectBase,
-          'Nur nötig, wenn die Basis-URL des Servers nicht zu der URL passt, die '
-          + 'im Portal der Plattform hinterlegt ist — etwa wenn Sie die Oberfläche '
-          + 'über localhost aufrufen, der Server sich aber unter seiner LAN-Adresse kennt.') : h('div', { class: 'okbox' }, 'Fanvue verwendet die gemeinsame Verbindung. Keine zusätzliche Redirect-URI nötig.'),
-        channel.platform !== 'fanvue' ? h('div', { class: 'hint', style: { marginTop: '-6px', marginBottom: '10px' } },
-          'Wird verschickt als: ', redirectShow) : null,
+        callback ? callback.node : h('div', { class: 'okbox' }, 'Fanvue verwendet die gemeinsame Verbindung. ', h('a', { href: '/settings/shared#fanvue' }, 'Callback-Adresse in den gemeinsamen Einstellungen ändern.')),
         h('div', { class: 'grid c3' },
           numField('posts_per_day', 'Posts pro Tag', null, '0.5'),
           numField('min_gap_minutes', 'Mindestabstand (Min.)'),
@@ -449,7 +470,7 @@ export default async function renderChannels() {
               policy: p,
               persona_id: personaSel.value || null,
               color: color.value,
-              oauth_redirect_base: redirectBase.value.trim(),
+              ...(callback ? callback.values() : {}),
               ...watermark.values(),
             })
             toast.ok('Einstellungen gespeichert')

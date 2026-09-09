@@ -280,6 +280,10 @@ async def create_channel(
 ) -> ChannelOut:
     if payload.platform not in ("x", "fanvue"):
         raise HTTPException(400, "Unbekannte Plattform")
+    try:
+        redirect_base = oauthapp.normalize_redirect_base(payload.oauth_redirect_base, payload.platform)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
     policy = PostingPolicy(**payload.policy.model_dump())
     if payload.platform == "x":
@@ -298,7 +302,7 @@ async def create_channel(
         nsfw_level=payload.nsfw_level,
         platform_side_scheduling=payload.platform_side_scheduling,
         default_audience=payload.default_audience,
-        oauth_redirect_base=payload.oauth_redirect_base.strip(),
+        oauth_redirect_base=redirect_base,
         policy_id=policy.id,
         health=ChannelHealth.needs_reauth.value,
         health_note="Noch nicht verbunden",
@@ -336,6 +340,11 @@ async def update_channel(
         raise HTTPException(404, "Kanal nicht gefunden")
 
     data = payload.model_dump(exclude_unset=True)
+    if "oauth_redirect_base" in data:
+        try:
+            data["oauth_redirect_base"] = oauthapp.normalize_redirect_base(data["oauth_redirect_base"], channel.platform)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
     policy_data = data.pop("policy", None)
     client_id = data.pop("oauth_client_id", None)
     client_secret = data.pop("oauth_client_secret", None)

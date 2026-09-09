@@ -8,7 +8,7 @@ import renderLibrary from './pages/library.js?v=creatorstudio-mobile-system-2026
 import renderAssign from './pages/assign.js?v=creatorstudio-mobile-system-20260909'
 import renderMatrix from './pages/matrix.js?v=creatorstudio-mobile-system-20260909'
 import renderCalendar from './pages/calendar.js?v=creatorstudio-mobile-system-20260909'
-import renderChannels from './pages/channels.js?v=creatorstudio-mobile-system-20260909'
+import renderChannels from './pages/channels.js?v=creatorstudio-callback-20260909'
 import renderPersonas from './pages/personas.js?v=creatorstudio-mobile-system-20260909'
 import renderSettings from './pages/settings.js?v=creatorstudio-mobile-system-20260909'
 

@@ -8,6 +8,7 @@ eine App für den Creator genügt.
 from __future__ import annotations
 
 from typing import Optional, Tuple
+from urllib.parse import urlsplit
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,14 +35,38 @@ def global_app(platform: str) -> OAuthApp:
 def redirect_base_for(channel: Optional[Channel]) -> str:
     """Basis der Redirect-URI: Kanal-Eintrag schlägt PUBLIC_BASE_URL.
 
-    PUBLIC_BASE_URL beantwortet die Frage „wie ist dieser Server im Netz zu
-    erreichen" – auf dem Server also die LAN-Adresse. Die Redirect-URI muss
-    aber zu dem passen, was im Portal der Plattform hinterlegt ist, und das ist
-    beim Verbinden häufig der Rechner vor dem Bildschirm. Beides in einen Wert
-    zu zwingen geht nur, solange man den Server nie von woanders aufruft.
+    Die Adresse muss auf den Server zurückführen und mit dem Eintrag im
+    Entwicklerportal übereinstimmen. Ein optionaler Reverse-Proxy-Pfad bleibt
+    Teil der Basis. Fanvue verwendet separat die gemeinsame AutoChat-Verbindung.
     """
     override = (getattr(channel, "oauth_redirect_base", "") or "").strip()
     return (override or str(cfg("public_base_url") or "")).rstrip("/")
+
+
+def normalize_redirect_base(value: Optional[str], platform: str) -> str:
+    """Accept a server URL or its complete callback, retaining the existing DB field."""
+    value = (value or "").strip().rstrip("/")
+    if not value:
+        return ""
+    try:
+        parsed = urlsplit(value)
+        valid = (parsed.scheme in ("http", "https") and parsed.hostname
+                 and not parsed.username and not parsed.password
+                 and not parsed.query and not parsed.fragment
+                 and not any(c.isspace() or c == "\\" for c in value))
+        parsed.port  # Reject malformed/out-of-range ports, too.
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError("Bitte eine gültige Serveradresse mit http:// oder https:// angeben, ohne Zugangsdaten, Abfrage oder Fragment.")
+    suffix = f"/api/v1/oauth/{platform}/callback"
+    if value.endswith(suffix):
+        value = value[:-len(suffix)].rstrip("/")
+    elif "/api/v1/oauth/" in parsed.path:
+        raise ValueError(f"Die Callback-Adresse muss auf {suffix} enden.")
+    if len(value) > 255:
+        raise ValueError("Die Serveradresse darf höchstens 255 Zeichen lang sein.")
+    return value
 
 
 def for_channel(channel: Channel) -> OAuthApp:
@@ -57,8 +82,7 @@ def for_channel(channel: Channel) -> OAuthApp:
             name=channel.oauth_app_name or channel.display_name,
         )
     app = global_app(channel.platform)
-    # Auch bei der globalen App gilt der Kanal-Eintrag – sonst ließe sich die
-    # Redirect-URI für Fanvue nicht anpassen, wo eine App für alles reicht.
+    # Auch bei einer globalen X-App gilt die Callback-Adresse des Kanals.
     app.redirect_base = redirect_base_for(channel)
     return app
 
