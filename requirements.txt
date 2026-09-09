@@ -1,13 +1,14 @@
-fastapi==0.115.6
+# Python 3.11–3.14: abgestimmte Versionen mit Unterstützung für Python 3.14.
+fastapi==0.119.1
 uvicorn[standard]==0.34.0
 httpx==0.28.1
 jinja2==3.1.4
 python-multipart==0.0.20
 itsdangerous==2.2.0
 
-pydantic==2.11.7
-pydantic-settings==2.10.1
-SQLAlchemy[asyncio]==2.0.36
+pydantic==2.12.5
+pydantic-settings==2.12.0
+SQLAlchemy[asyncio]==2.0.52
 # SQLAlchemy deklariert greenlet nur für bekannte Plattformen als Pflicht.
 # Ohne greenlet scheitert JEDER async-Datenbankzugriff mit
 # "the greenlet library is required to use this function" – deshalb explizit.
@@ -21,14 +22,14 @@ aiosqlite==0.20.0
 # PostgreSQL-Treiber und Celery/Redis werden nur gebraucht, wenn
 # DATABASE_URL auf Postgres zeigt bzw. SCHEDULER_MODE=celery gesetzt ist.
 # Sie sind leichtgewichtig genug, um sie immer mitzuinstallieren.
-asyncpg==0.30.0
-psycopg[binary]==3.2.3
+asyncpg==0.31.0
+psycopg[binary]==3.2.13
 celery[redis]==5.4.0
 redis==5.2.1
 cryptography==44.0.0
 argon2-cffi==23.1.0
 python-jose[cryptography]==3.3.0
-Pillow==11.1.0
+Pillow==12.3.0
 ImageHash==4.3.1
 pyotp==2.9.0
 python-slugify==8.0.4

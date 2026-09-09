@@ -4,6 +4,8 @@ Du brauchst einmalig einen Befehl auf deinem bisherigen Linux-Server. Das Skript
 
 **Voraussetzung:** Matze hat **v2.0.2 einschließlich Versions-Tag** nach GitHub hochgeladen. Vorher ist der folgende Download noch nicht verfügbar.
 
+**Bei Python 3.14:** Für das eigentliche Programmupdate wird **v2.0.3 oder neuer** benötigt. v2.0.2 enthält noch Paketversionen, die sich unter Python 3.14 nicht installieren lassen. Wenn die Reparatur bereits mit „Updatefunktion repariert“ abgeschlossen wurde, brauchst du das Skript nicht erneut auszuführen. Sobald Matze v2.0.3 einschließlich Tag hochgeladen hat, suche in deiner Bot-Oberfläche erneut nach Updates und starte das Update. Python und die Serverkonfiguration müssen dafür nicht geändert werden.
+
 Verwende den unten stehenden Befehl mit **v2.0.2** auch dann, wenn du die Reparatur mit v2.0.1 bereits versucht hast. Die neue Fassung korrigiert die Berechtigungsprüfung für sudo-rs; der alte Downloadlink lädt weiterhin die alte Fassung.
 
 ## 1. Auf deinem Server anmelden

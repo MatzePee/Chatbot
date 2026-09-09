@@ -104,7 +104,7 @@ erfolgreicher Prüfung sichert er die aktuellen Daten und wechselt die Version.
 Bei einem Startfehler stellt er Programmcode und Python-Umgebung zurück; aktuelle
 Nachrichten und OAuth-Tokens werden dabei nicht durch alte Daten ersetzt.
 
-Es ist kein zweiter Dienst erforderlich. Python 3.11+ wird vorausgesetzt; der
+Es ist kein zweiter Dienst erforderlich. Python 3.11–3.14 wird unterstützt; der
 vorhandene Server wurde mit Python 3.13.3 geprüft. Die Updateknöpfe verwalten
 Linux/systemd. Der lokale Doppelklick-Starter bleibt im Mitlesemodus.
 Bei der Vorbereitung wurde kein GitHub-Release veröffentlicht und die laufende
@@ -137,6 +137,18 @@ Medien liegen weiterhin im Datenordner und sind kein Teil dieser Datenbanksicher
 
 Tests: `.venv/bin/python -m pytest -q`
 Datenvergleich: `.venv/bin/python tools/verify_data.py ../Fanvue_Chatbot .`
+
+Ab v2.0.3 sind die Paketversionen auch für Python 3.14 abgestimmt. Vorher konnte
+die Updatevorbereitung bereits an `psycopg-binary==3.2.3` scheitern; weitere ältere
+Vorgaben betrafen unter anderem asyncpg, Pydantic und Pillow. Die Anforderungen
+werden aus der neuen Programmversion installiert. Eine bereits erfolgreiche
+Helfer-Reparatur mit v2.0.2 muss deshalb nicht wiederholt werden.
+
+Bei Änderungen an `requirements.txt` die Prüfung in einer **frischen virtuellen
+Umgebung** für die betroffenen Python-Versionen ausführen: zuerst
+`python -m pip install --only-binary=:all: -r requirements-dev.txt`, danach
+`python -m pip check` und `python -m pytest -q`. Ein Test mit der bisherigen
+Umgebung allein erkennt nicht, ob sich alle neuen Pakete installieren lassen.
 
 Die Tests verwenden temporäre Datenbanken und simulierte APIs. Echte Nachrichten,
 Posts, Bezahlaktionen oder ein produktives GitHub-Update wurden nicht ausgelöst.
