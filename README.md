@@ -110,6 +110,22 @@ Linux/systemd. Der lokale Doppelklick-Starter bleibt im Mitlesemodus.
 Bei der Vorbereitung wurde kein GitHub-Release veröffentlicht und die laufende
 Serverversion nicht gewechselt.
 
+## Bestehende Installationen ab v2.0.1 vorbereiten
+
+Nach Veröffentlichung von **v2.0.1** kann die Updatefunktion einer bestehenden
+Installation einmalig direkt über GitHub repariert werden:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/v2.0.1/deploy/fix-update.sh | sudo bash
+```
+
+Der Aufruf gehört ins Terminal auf dem jeweiligen Linux-Server. Dienstbenutzer,
+Ordner, Dienstname und Port werden aus systemd ermittelt. Das Skript sichert und
+installiert den Update-Helfer samt eng begrenzter sudo-Regel. Es ändert weder die
+Programmdaten noch den laufenden Programmstand und startet den Bot nicht neu.
+Anschließend wird das eigentliche Programmupdate in der Oberfläche gestartet.
+Die kurze Anleitung steht in [ANLEITUNG_SABRINA.md](ANLEITUNG_SABRINA.md).
+
 ## Sicherungen und Prüfung
 
 Vor der Datenbankinitialisierung werden beide vorhandenen SQLite-Datenbanken mit

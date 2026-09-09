@@ -21,6 +21,7 @@ import urllib.request
 import venv
 
 TAG = re.compile(r'^v(\d+)\.(\d+)\.(\d+)$')
+HEALTH_PORT = 8000
 PRIVATE = re.compile(r'^(?:\.env(?!\.example$)(?:$|\.)|data/|\.venv(?:$|/|-)|exports/|\.askpass-)')
 
 
@@ -97,8 +98,8 @@ def snapshot(repo, destination):
 
 
 def prepare(repo):
-    if sys.version_info < (3, 11):
-        raise RuntimeError('Python 3.11 oder neuer ist erforderlich.')
+    if sys.version_info < (3, 11) or not hasattr(tarfile, 'data_filter'):
+        raise RuntimeError('Eine aktuelle Python-Version ab 3.11 mit tarfile.data_filter ist erforderlich.')
     state(repo, 'preparing', 'Neue Version und Voraussetzungen werden geprüft.', tag='', backup='')
     if git(repo, 'status', '--porcelain'):
         raise RuntimeError('Lokale Programmänderungen auf dem Server. Update abgebrochen; laufende Version bleibt erhalten.')
@@ -191,7 +192,7 @@ def healthy(expected, pending, timeout=90):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen('http://127.0.0.1:8000/api/creatorpilot/health', timeout=3) as response:
+            with urllib.request.urlopen(f'http://127.0.0.1:{HEALTH_PORT}/api/creatorpilot/health', timeout=3) as response:
                 value = json.load(response)
             if (value.get('application') == 'MP CreatorStudio' and value.get('revision') == expected
                 and value.get('preview') is False and value.get('deployment_pending') is pending
@@ -247,7 +248,7 @@ def supervise(repo, user, service):
             restored = False
             for _ in range(60):
                 try:
-                    with urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3) as response:
+                    with urllib.request.urlopen(f'http://127.0.0.1:{HEALTH_PORT}/health', timeout=3) as response:
                         restored = bool(json.load(response).get('ok'))
                     if restored:
                         break

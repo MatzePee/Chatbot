@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from app import main, publisher, updater
 from autoposter.bootstrap import ensure_config
 from deploy import creatorstudio_update as deploy
+from deploy import admin_permissions
 
 
 def git(repo, *args):
@@ -155,6 +156,27 @@ def test_release_selection_is_numeric_and_stable_only():
     assert not publisher.valid_github_remote('https://github.com.evil.test/user/repo')
     assert not publisher.valid_github_remote('https://token@github.com/user/repo')
     assert publisher.valid_github_remote('https://github.com/owner/repo.git')
+
+
+def test_admin_check_rejects_password_required_rule_even_when_listing_succeeds(monkeypatch):
+    def listing(args, **kwargs):
+        output = 'Sudoers entry: /etc/sudoers\n    Commands:\n        ALL\n'
+        if args[-1] != 'update':
+            output += '    Options: !authenticate\n'
+        return subprocess.CompletedProcess(args, 0, stdout=output)
+    monkeypatch.setattr(admin_permissions.subprocess, 'run', listing)
+    assert admin_permissions.check() == ['update']
+
+
+def test_admin_check_accepts_all_passwordless_actions_without_running_them(monkeypatch):
+    calls = []
+    def listing(args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 0, stdout='    Options: !authenticate\n')
+    monkeypatch.setattr(admin_permissions.subprocess, 'run', listing)
+    assert admin_permissions.check() == []
+    assert [args[-1] for args in calls] == list(admin_permissions.ACTIONS)
+    assert all(args[:3] == ['sudo', '-n', '-ll'] for args in calls)
 
 
 @pytest.mark.parametrize('checks', [[False], [True, False], [True, True]])

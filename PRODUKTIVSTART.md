@@ -1,15 +1,27 @@
 # MP CreatorStudio produktiv starten
 
-## Vorbereiteter Stand vom 9. September 2026
+## Produktiver Stand vom 9. September 2026
 
-Der bestehende Bot läuft auf `192.168.20.16:8000` weiterhin als Dienst
-`fanvue-chatbot` unter `/srv/fanvue/Fanvue_Chatbot`, Version `v1.6.2`.
-MP CreatorStudio ist zum Veröffentlichen und anschließenden Serverupdate vorbereitet.
-Ein Release und der Wechsel der laufenden Anwendung wurden noch nicht ausgelöst.
+Das Update auf **v2.0.0** wurde erfolgreich durchgeführt. AutoChat läuft produktiv
+mit den bisherigen Einstellungen und bestehender Fanvue-Verbindung. AutoPost ist
+übernommen und bleibt pausiert sowie im Trockenlauf. Beide Datenbanken wurden vor
+dem Wechsel gesichert und die Sicherungen geprüft.
+
+Beim ersten Updateversuch fehlte in der alten sudo-Regel die passwortlose Freigabe
+für `fanvue-admin update`. Diese wurde ergänzt; die Prüfung kontrolliert nun die
+Passwortfreiheit aller drei erlaubten Aktionen ausdrücklich. Der Updateversuch
+wurde danach erfolgreich wiederholt. Ein weiterer Upload ist für diese Reparatur
+nicht erforderlich.
+
+## Vorbereitung vor dem Produktivwechsel
+
+Der bisherige Bot lief auf `192.168.20.16:8000` als Dienst `fanvue-chatbot` unter
+`/srv/fanvue/Fanvue_Chatbot`, Version `v1.6.2`. Adresse, Verzeichnis und Dienstname
+bleiben auch nach dem Wechsel auf MP CreatorStudio erhalten.
 
 - GitHub-Zugang lokal per Push-Trockenlauf und serverseitiges Lesen geprüft.
 - Neuer Update-Helfer installiert, bisheriger Helfer unter
-  `/var/backups/mp-creatorstudio/` gesichert. Bestehende sudo-Regel beibehalten.
+  `/var/backups/mp-creatorstudio/` gesichert. Die sudo-Regel erlaubt genau Update und die beiden Neustartaktionen ohne Passwort.
 - Abhängigkeiten auf dem Server unter Python 3.13.3 separat installiert und geprüft.
 - Produktionsstart mit Kopien der aktuellen Daten getestet. Alle 15 bestehenden
   AutoChat-Tabellen und 25 AutoPost-Tabellen blieben unverändert. Gespeicherte
@@ -20,10 +32,10 @@ Ein Release und der Wechsel der laufenden Anwendung wurden noch nicht ausgelöst
 - Die produktive AutoChat-Datenbank und `.env` wurden nicht ersetzt. GitHub enthält
   ausschließlich Programmdateien; private Daten bleiben auf den jeweiligen Geräten.
 
-## 1. Lokal veröffentlichen
+## Ablauf für weitere Veröffentlichungen
 
 Den Doppelklick-Starter verwenden. Unter **Einstellungen → Version & GitHub** eine
-neue Version größer als `v1.6.2` wählen, zum Beispiel `v2.0.0`, eine kurze Beschreibung
+neue Version größer als `v2.0.0` wählen, zum Beispiel `v2.0.1`, eine kurze Beschreibung
 wie „MP CreatorStudio mit AutoChat und AutoPost“ eintragen und **Committen und hochladen**
 anklicken. Die Erfolgsmeldung muss sowohl Programmcode als auch Versions-Tag bestätigen.
 

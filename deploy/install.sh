@@ -189,6 +189,8 @@ chown root:root /usr/local/bin/fanvue-admin
 chmod 755 /usr/local/bin/fanvue-admin
 install -d -m 755 /usr/local/libexec
 install -o root -g root -m 755 "$INSTALL_DIR/deploy/creatorstudio_update.py" /usr/local/libexec/mp-creatorstudio-update
+[[ "$PORT" =~ ^[0-9]+$ ]] && (( PORT >= 1 && PORT <= 65535 )) || die "Ungültiger HTTP-Port"
+sed -i "s/^HEALTH_PORT = [0-9]*$/HEALTH_PORT = $PORT/" /usr/local/libexec/mp-creatorstudio-update
 ok "/usr/local/bin/fanvue-admin installiert"
 
 SUDOERS=/etc/sudoers.d/fanvue-admin
@@ -245,9 +247,11 @@ for i in $(seq 1 20); do
   [ "$i" -eq 20 ] && { warn "Keine Antwort. Protokoll ansehen mit:  journalctl -u $SERVICE -n 50"; break; }
   sleep 1
 done
-sudo -u "$SVC_USER" sudo -n /usr/local/bin/fanvue-admin 2>&1 | grep -q usage \
-  && ok "sudo-Regel funktioniert (Update-Knopf einsatzbereit)" \
-  || warn "sudo-Regel greift noch nicht - Neustart-/Update-Knöpfe prüfen"
+if runuser -u "$SVC_USER" -- /usr/bin/python3 "$INSTALL_DIR/deploy/admin_permissions.py"; then
+  ok "Passwortlose Freigaben für Update und Neustarts geprüft"
+else
+  die "sudo-Regel greift nicht vollständig - Neustart-/Update-Knöpfe prüfen"
+fi
 
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 cat <<EOF

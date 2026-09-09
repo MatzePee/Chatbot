@@ -56,14 +56,26 @@ fragt den Stand alle fünf Sekunden über `/api/deployment-status` ab. Details s
 im systemd-Journal der Aufgabe `fanvue-update`. Die bisherige AutoChat-Datenstruktur
 ist kompatibel; künftige inkompatible Migrationen benötigen eine gesonderte Strategie.
 
-## Installation des Helfers
+## Installation und Reparatur des Helfers
 
-Für den bestehenden Server ist `deploy/install-update-helper.sh` vorgesehen. Es
-sichert den bisherigen Helfer, installiert Wrapper und Supervisor als root und
-belässt Dienst, Daten und sudo-Regel unverändert. Es führt keinen Versionswechsel aus.
-`deploy/install.sh` enthält dieselben Helfer für eine Neuinstallation.
+`deploy/fix-update.sh` ist der Einzeiler-Einstieg über GitHub, gebunden an das
+veröffentlichte Tag v2.0.1. Er lädt alle erforderlichen Einrichtungsdateien erst
+vollständig in einen temporären Ordner und ruft danach `install-update-helper.sh`
+auf. Er liest keine Eingaben von stdin und funktioniert daher auch hinter `curl`.
 
-Der verifizierte Bestandsserver nutzt Port 8000 und Python 3.13.3. Der Supervisor
-prüft diesen Port; bei einem anderen Server müssen Zielpfad, Dienstbenutzer,
-Dienstname und Health-Port vorab angepasst werden. Aktuelle Daten, Konfigurationen
-und Medien werden nicht über GitHub verteilt.
+`deploy/repair_update.py` erkennt die vorhandene Installation aus systemd. Es
+übernimmt den tatsächlichen Dienstbenutzer, Programmordner, Dienstnamen und
+HTTP-Port. Bei mehreren Installationen ist eine explizite Auswahl mit `--service`
+nötig. Ein ungeeigneter Startaufbau oder fehlende Voraussetzungen führen zum
+Abbruch vor Änderungen an den installierten Helfern. `--check` prüft nur.
+
+Die Reparatur sichert bestehende Helfer und die sudo-Regel, prüft die Syntax,
+installiert die Dateien atomar und kontrolliert die effektive Passwortfreiheit
+aller drei erlaubten Aktionen als Dienstbenutzer. Scheitert diese Prüfung,
+werden die bisherigen Dateien wiederhergestellt. Die Reparatur verwendet dieselbe
+Sperre wie ein Programmupdate und verändert weder Programmcode noch Datenbanken
+oder den Zustand des laufenden Dienstes.
+
+Der Supervisor verwendet den erkannten HTTP-Port für Start- und Rückwechselprüfungen.
+`deploy/install.sh` übernimmt bei Neuinstallationen ebenfalls den gewählten Port.
+Weitere Hinweise und der vollständige Aufruf stehen in [ANLEITUNG_SABRINA.md](ANLEITUNG_SABRINA.md).
