@@ -35,7 +35,8 @@
   <h3>Welche Spalten werden benötigt?</h3>
   <p class="muted">Erste Zeile = Kopfzeile mit Spaltennamen. Reihenfolge egal, Groß/Klein egal.
   Trennzeichen Komma oder Semikolon wird automatisch erkannt.</p>
-  <table class="cols">
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+    <table class="cols">
     <thead><tr><th>Spalte</th><th>Pflicht?</th><th>Inhalt</th><th>Synonyme</th></tr></thead>
     <tbody>
       <tr><td><code>handle</code></td><td>Pflicht*</td><td>Fanvue-Benutzername des Subscribers</td><td>username, user, fan, subscriber</td></tr>
@@ -46,6 +47,7 @@
       <tr><td><code>status</code></td><td>optional</td><td>„purchased"/„gekauft"/1/yes = Kauf. Alles andere (z.B. „offered", „unknown") = nur Angebot.</td><td>purchased, gekauft</td></tr>
     </tbody>
   </table>
+  </div>
   <p class="small muted">Bei aktivierter API-Prüfung werden auch als „offered" markierte Zeilen geprüft und
   bei tatsächlichem Kauf automatisch auf „gekauft" gesetzt.</p>
   <p class="small">* Mindestens <strong>eine</strong> Fan-Spalte (<code>handle</code> oder <code>user_uuid</code>) plus <code>folder</code>.

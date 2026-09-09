@@ -1,6 +1,6 @@
 // Beispielposts einer Persona: Stilvorlagen, die in jeden Prompt einfließen.
-import { api } from './api.js?v=creatorstudio-layout-20260909'
-import { h, append, clear, empty, toast, guard, spinner, confirmDialog, fmtDate } from './ui.js?v=creatorstudio-layout-20260909'
+import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
+import { h, append, clear, empty, toast, guard, spinner, confirmDialog, fmtDate } from './ui.js?v=creatorstudio-mobile-system-20260909'
 
 const PLATFORMS = [['x', 'X'], ['fanvue', 'Fanvue']]
 

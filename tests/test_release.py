@@ -160,9 +160,12 @@ def test_release_selection_is_numeric_and_stable_only():
 
 def test_admin_check_rejects_password_required_rule_even_when_listing_succeeds(monkeypatch):
     def listing(args, **kwargs):
-        output = 'Sudoers entry: /etc/sudoers\n    Commands:\n        ALL\n'
-        if args[-1] != 'update':
-            output += '    Options: !authenticate\n'
+        output = '/usr/local/bin/fanvue-admin ' + args[-1] + '\n'
+        if args[-1] == '-ll':
+            output = ''.join('Sudoers entry:\n    RunAsUsers: root\n    Options: '
+                             + ('authenticate' if action == 'update' else '!authenticate')
+                             + '\n    Commands:\n        /usr/local/bin/fanvue-admin ' + action + '\n\n'
+                             for action in admin_permissions.ACTIONS)
         return subprocess.CompletedProcess(args, 0, stdout=output)
     monkeypatch.setattr(admin_permissions.subprocess, 'run', listing)
     assert admin_permissions.check() == ['update']
@@ -172,11 +175,16 @@ def test_admin_check_accepts_all_passwordless_actions_without_running_them(monke
     calls = []
     def listing(args, **kwargs):
         calls.append(args)
-        return subprocess.CompletedProcess(args, 0, stdout='    Options: !authenticate\n')
+        output = '/usr/local/bin/fanvue-admin ' + args[-1] + '\n'
+        if args[-1] == '-ll':
+            output = 'Sudoers entry:\n    RunAsUsers: root\n    Options: !authenticate\n    Commands:\n' + ''.join(
+                '        /usr/local/bin/fanvue-admin ' + action + '\n' for action in admin_permissions.ACTIONS)
+        return subprocess.CompletedProcess(args, 0, stdout=output)
     monkeypatch.setattr(admin_permissions.subprocess, 'run', listing)
     assert admin_permissions.check() == []
-    assert [args[-1] for args in calls] == list(admin_permissions.ACTIONS)
-    assert all(args[:3] == ['sudo', '-n', '-ll'] for args in calls)
+    assert calls[0] == ['sudo', '-n', '-ll']
+    assert [args[-1] for args in calls[1:]] == list(admin_permissions.ACTIONS)
+    assert all(args[:5] == ['sudo', '-n', '-l', '-u', 'root'] for args in calls[1:])
 
 
 @pytest.mark.parametrize('checks', [[False], [True, False], [True, True]])

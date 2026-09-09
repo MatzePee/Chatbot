@@ -1,8 +1,8 @@
 // System: installierte Version, Updates einspielen, nach GitHub veröffentlichen.
-import { api } from '../api.js?v=creatorstudio-layout-20260909'
+import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
 import {
   h, append, clear, card, field, empty, toast, guard, spinner, confirmDialog, fmtDateTime,
-} from '../ui.js?v=creatorstudio-layout-20260909'
+} from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 export default async function renderSystem() {
   const page = h('div', { class: 'page stack' },

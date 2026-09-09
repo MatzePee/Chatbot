@@ -1,6 +1,6 @@
 // Editor für den Tagesrhythmus einer Persona: Regeltext, Prüfung, Wochenraster.
-import { api } from './api.js?v=creatorstudio-layout-20260909'
-import { h, append, clear, empty, toast, guard, spinner, debounce } from './ui.js?v=creatorstudio-layout-20260909'
+import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
+import { h, append, clear, empty, toast, guard, spinner, debounce } from './ui.js?v=creatorstudio-mobile-system-20260909'
 
 const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 

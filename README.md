@@ -110,13 +110,13 @@ Linux/systemd. Der lokale Doppelklick-Starter bleibt im Mitlesemodus.
 Bei der Vorbereitung wurde kein GitHub-Release veröffentlicht und die laufende
 Serverversion nicht gewechselt.
 
-## Bestehende Installationen ab v2.0.1 vorbereiten
+## Bestehende Installationen vorbereiten
 
-Nach Veröffentlichung von **v2.0.1** kann die Updatefunktion einer bestehenden
+Nach Veröffentlichung von **v2.0.2** kann die Updatefunktion einer bestehenden
 Installation einmalig direkt über GitHub repariert werden:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/v2.0.1/deploy/fix-update.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/v2.0.2/deploy/fix-update.sh | sudo bash
 ```
 
 Der Aufruf gehört ins Terminal auf dem jeweiligen Linux-Server. Dienstbenutzer,

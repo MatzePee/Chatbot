@@ -54,7 +54,7 @@ h1 { font-size: 24px; margin: 0 0 6px; } h3 { margin: 0 0 12px; }
 }
 .card.warn { background: var(--warn); border-color: var(--warn-b); }
 .card.ok { background: var(--ok); border-color: var(--ok-b); }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 button, .btn, .btn-primary, .btn-danger {
   font: inherit; border: 1px solid var(--border); background: var(--panel2); color: var(--text);
   padding: 8px 14px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block;
@@ -164,7 +164,7 @@ nav { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; min-width: 0; }
   main { padding: 16px 14px 48px; }
   h1 { font-size: 20px; }
   .card { padding: 14px; margin-bottom: 14px; border-radius: 10px; }
-  .grid { grid-template-columns: 1fr; gap: 14px; }
+  .grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 
   /* Formularzeilen einspaltig - zwei Felder nebeneinander sind auf 360px unlesbar */
   .row { gap: 0; }
@@ -179,14 +179,6 @@ nav { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; min-width: 0; }
   .draft-actions { gap: 8px; }
   .draft-actions > *, .draft-actions button { flex: 1 1 auto; }
 
-  /* Breite Tabellen horizontal scrollbar machen, statt Spalten zu zerquetschen.
-     min-width auf thead/tbody haelt die Spaltenbreiten brauchbar. */
-  table.logs, table.ppv-table, table.cols {
-    display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
-  }
-  table.logs thead, table.logs tbody,
-  table.ppv-table thead, table.ppv-table tbody,
-  table.cols thead, table.cols tbody { display: table; width: 100%; min-width: 520px; }
   table.logs th, table.logs td { padding: 8px 8px; }
   /* Kopfzeile mitscrollen lassen, aber Umbruch vermeiden */
   table.logs th { white-space: nowrap; }
@@ -208,9 +200,6 @@ nav { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; min-width: 0; }
   /* Aktionsknoepfe untereinander - nebeneinander werden sie zu schmal */
   .draft-actions { flex-direction: column; }
   .draft-actions > *, .draft-actions button { width: 100%; }
-  table.logs thead, table.logs tbody,
-  table.ppv-table thead, table.ppv-table tbody,
-  table.cols thead, table.cols tbody { min-width: 460px; }
   /* Kopfzeilen-Leisten in Karten umbrechen lassen statt zu quetschen */
   .filter-foot, .ppv-summary { flex-wrap: wrap; }
 }

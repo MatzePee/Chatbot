@@ -3,27 +3,9 @@
 {% block content %}
 <h1>Gemeinsame Einstellungen</h1>
 <p class="muted">Verbindungen und Programm-Updates für deinen gesamten Creator Workspace.</p>
-<div class="card" id="deployment-status" data-live-preserve hidden>
-  <h3>Update-Fortschritt</h3><p class="muted" id="deployment-message"></p>
-</div>
-<script>
-(() => {
-  const card = document.getElementById('deployment-status');
-  async function refreshDeployment() {
-    try {
-      const response = await fetch('/api/deployment-status', {cache: 'no-store'});
-      if (!response.ok) return;
-      const state = await response.json();
-      card.hidden = !state.message;
-      document.getElementById('deployment-message').textContent = state.message || '';
-      card.className = 'card' + (['failed', 'rolled_back'].includes(state.phase) ? ' warn' : state.phase === 'complete' ? ' ok' : '');
-    } catch { /* Service may be restarting; retry automatically. */ }
-  }
-  refreshDeployment(); setInterval(refreshDeployment, 5000);
-})();
-</script>
-{% if saved in ['fanvue', 'updates'] %}<div class="card ok" role="status">Einstellungen gespeichert.</div>{% endif %}
-{% if preview %}<p class="muted">Im geschützten Mitlesemodus sind Änderungen an der Verbindung und den Updates gesperrt.</p>{% endif %}
+{% include "_deployment_status.html" %}
+{% if saved in ['fanvue', 'telegram', 'updates'] %}<div class="card ok" role="status">Einstellungen gespeichert.</div>{% endif %}
+{% if preview %}<p class="muted">Im geschützten Mitlesemodus sind Änderungen an den Verbindungen und den Updates gesperrt.</p>{% endif %}
 <div class="card" id="fanvue">
   <h2>Gemeinsame Fanvue-Verbindung</h2>
   <p class="muted">AutoChat und AutoPost verwenden dieselben Zugangsdaten und dieselbe Anmeldung.</p>
@@ -61,12 +43,49 @@
     <p><button class="btn-primary">Fanvue-Einstellungen speichern</button></p>
   </details>
 </form>
+<form method="post" action="/settings/shared/telegram" id="telegram-form">
+  <div class="card" id="telegram">
+    <h2>Telegram-Verbindung</h2>
+    <p class="muted">Gemeinsamer Bot und Zielchat für Telegram-Benachrichtigungen.
+    Die Meldungen zu Gesprächen und Freigaben wählst du in den
+    <a href="/settings#telegram">AutoChat-Einstellungen</a>.</p>
+    <details style="margin-bottom:10px">
+      <summary class="muted" style="cursor:pointer">Einrichtung in 3 Schritten</summary>
+      <ol class="muted" style="font-size:13px;line-height:1.7;margin:8px 0 0 0">
+        <li>In Telegram <code>@BotFather</code> anschreiben, <code>/newbot</code> senden,
+            Namen vergeben → du bekommst ein Token.</li>
+        <li>Token unten eintragen. Dann deinen <em>eigenen neuen Bot</em> in Telegram suchen
+            und ihm einmal kurz „hallo“ schreiben (vorher darf er dir nicht antworten).</li>
+        <li>Auf „Chat-ID ermitteln“ klicken, danach „Testnachricht senden“.</li>
+      </ol>
+    </details>
+    <div class="row">
+      <label>Chat-ID <input name="telegram_chat_id" value="{{ s['telegram_chat_id'] }}"
+        placeholder="wird unten ermittelt"></label>
+    </div>
+    <label>Bot-Token (von @BotFather)
+      <input name="telegram_bot_token" type="password" value="{{ s['telegram_bot_token'] }}"
+        placeholder="123456789:ABCdef..."></label>
+    <label>Basis-URL dieser Oberfläche (für den Link in der Meldung)
+      <input name="app_base_url" value="{{ s['app_base_url'] }}"
+        placeholder="https://creatorstudio.example"></label>
+    <div class="draft-actions" style="margin-top:8px">
+      <button type="button" class="btn" id="tg-chatid"{% if preview %} disabled{% endif %}>🔎 Chat-ID ermitteln</button>
+      <button type="button" class="btn" id="tg-test"{% if preview %} disabled{% endif %}>📨 Testnachricht senden</button>
+    </div>
+    <p id="tg-out" data-live-preserve role="status" class="muted" style="margin-top:8px"></p>
+
+    <p><button class="btn-primary">Telegram-Verbindung speichern</button></p>
+  </div>
+</form>
+<script src="/static/telegram-settings.js?v={{ css_v }}" defer></script>
+
 <form method="post" action="/settings/shared/updates">
   <div class="card" id="updates">
     <h2>Programm-Updates</h2>
     <p class="muted">Ein gemeinsamer Updateweg für MP CreatorStudio mit AutoChat und AutoPost.</p>
     <p class="muted">Prüft regelmäßig, ob im Repository eine neue Version (Git-Tag <code>vX.Y.Z</code>)
-    veröffentlicht wurde. Installiert wird nur auf Knopfdruck über das Dashboard – nie von selbst.</p>
+    veröffentlicht wurde. Installiert wird nur auf Knopfdruck über <a href="/system">System</a> – nie von selbst.</p>
     <div class="row">
       <label class="chk"><input type="checkbox" name="update_check_enabled"
         {% if s['update_check_enabled'] %}checked{% endif %}> Automatisch nach Updates sehen</label>
@@ -77,7 +96,16 @@
           value="{{ s['update_check_interval_hours'] }}"></label>
     </div>
     <div class="draft-actions"><button class="btn-primary">Update-Einstellungen speichern</button><a class="btn" href="/upload">Version &amp; GitHub</a></div>
-    <p class="muted small">Telegram-Benachrichtigungen nutzen die in <a href="/settings#telegram">AutoChat</a> hinterlegte Telegram-Verbindung.</p>
+    <p class="muted small">Update-Meldungen nutzen die <a href="#telegram">gemeinsame Telegram-Verbindung</a>.</p>
   </div>
 </form>
+<h2 class="grp" id="publish">Veröffentlichen</h2>
+<p class="muted grp-desc">Den aktuellen Programmstand nach GitHub hochladen.</p>
+<div class="card">
+  <p class="muted" style="margin-top:0">Zeigt die geänderten Dateien, lässt die Versionsnummer
+  festlegen und lädt auf Knopfdruck hoch. Prüft vorher, dass keine Zugangsdaten und keine
+  Datenbank mitgehen.</p>
+  <a class="btn-primary" href="/upload">⬆ Zur Upload-Seite</a>
+</div>
+
 {% endblock %}

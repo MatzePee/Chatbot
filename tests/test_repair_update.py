@@ -116,12 +116,50 @@ def test_failed_install_restores_previous_helpers_and_rule(existing, destination
             raise RuntimeError('simulated failure')
         return ''
     monkeypatch.setattr(repair, 'run', execute)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match='simulated failure'):
         repair.install(existing)
     for path, (content, mode) in previous.items():
         assert path.read_bytes() == content
         assert path.stat().st_mode == mode
     assert not destinations['CHECKER'].exists()
+    if failure == 'permissions':
+        diagnostic = next(repair.BACKUPS.glob('fix-update-*/diagnose.txt')).read_text()
+        assert 'Passwortlose Berechtigungen' in diagnostic
+        assert 'simulated failure' in diagnostic
+        assert 'wiederhergestellt' in diagnostic
+
+
+def test_run_hides_service_details_but_exposes_controlled_checker_errors(monkeypatch):
+    def fail(args, **kwargs):
+        return subprocess.CompletedProcess(args, 1, stdout='Environment=PRIVATE_SECRET',
+                                           stderr='Passwortlose Freigabe nicht bestätigt: update')
+    monkeypatch.setattr(repair.subprocess, 'run', fail)
+    with pytest.raises(RuntimeError) as error:
+        repair.run(['systemctl', 'show'])
+    assert 'PRIVATE_SECRET' not in str(error.value)
+    assert 'nicht bestätigt' not in str(error.value)
+    with pytest.raises(RuntimeError, match='nicht bestätigt: update'):
+        repair.run(['runuser', 'checker'], include_error=True)
+
+
+def test_failed_rollback_reports_unrestored_file_and_keeps_original_error(existing, destinations, monkeypatch):
+    for path in destinations.values():
+        path.write_text('original')
+    original_write = repair.atomic_write
+    def write(path, content, mode):
+        if path == destinations['WRAPPER'] and content == 'original':
+            raise OSError('simulated restore failure')
+        original_write(path, content, mode)
+    def execute(args, **kw):
+        if args[0] == 'runuser':
+            raise RuntimeError('simulated check failure')
+        return ''
+    monkeypatch.setattr(repair, 'atomic_write', write)
+    monkeypatch.setattr(repair, 'run', execute)
+    with pytest.raises(RuntimeError, match='simulated check failure') as error:
+        repair.install(existing)
+    assert 'Wiederherstellung unvollständig: ' + str(destinations['WRAPPER']) in str(error.value)
+    assert all(destinations[name].read_text() == 'original' for name in ('SUPERVISOR', 'CHECKER', 'SUDOERS'))
 
 
 def test_health_check_uses_discovered_port(monkeypatch):
@@ -148,7 +186,7 @@ def test_bootstrap_downloads_pinned_files_before_running_installer(tmp_path, fai
 import os,pathlib,sys
 args=sys.argv[1:]
 url=next(a for a in args if a.startswith('https://'))
-assert url.startswith('https://raw.githubusercontent.com/MatzePee/Chatbot/v2.0.1/deploy/')
+assert url.startswith('https://raw.githubusercontent.com/MatzePee/Chatbot/v2.0.2/deploy/')
 name=url.rsplit('/',1)[1]
 if name==os.environ.get('TEST_FAIL'): sys.exit(22)
 out=pathlib.Path(args[args.index('-o')+1])

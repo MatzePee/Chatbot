@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=creatorstudio-layout-20260909'
-import { h, clear, card, field, empty, toast, guard, spinner, confirmDialog } from '../ui.js?v=creatorstudio-layout-20260909'
+import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
+import { h, clear, card, field, empty, toast, guard, spinner, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 const MODEL_TASKS = [
   ['openrouter_model_caption', 'Bildunterschriften', 'Texte zu Bildern'],

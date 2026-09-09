@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=creatorstudio-layout-20260909'
-import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard, append, confirmDialog } from '../ui.js?v=creatorstudio-layout-20260909'
+import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
+import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard, append, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 export default async function renderDashboard() {
   const data = await api.dashboard()
@@ -153,7 +153,7 @@ export default async function renderDashboard() {
     h('td', { class: 'hint' }, c.last_published_at ? fmtDateTime(c.last_published_at) : '—'),
   ))
   page.appendChild(card('Kanal-Status',
-    h('div', { style: { overflowX: 'auto' } },
+    h('div', { class: 'table-scroll', tabindex: 0, role: 'region', 'aria-label': 'Kanal-Status, seitlich scrollbar' },
       h('table', {},
         h('thead', {}, h('tr', {},
           ...['Kanal', 'Plattform', 'Status', 'Token gültig bis', 'Kontingent heute', 'Zuletzt gepostet']
@@ -180,9 +180,11 @@ export default async function renderDashboard() {
         }, 'Jetzt')),
       ))
       page.appendChild(card('Hintergrundjobs (' + jobs.mode + ')',
+        h('div', { class: 'table-scroll', tabindex: 0, role: 'region', 'aria-label': 'Hintergrundjobs, seitlich scrollbar' },
         h('table', {},
           h('thead', {}, h('tr', {}, ...['Job', 'Intervall', 'Läufe', 'Zuletzt', 'Ergebnis', ''].map((t) => h('th', {}, t)))),
           h('tbody', {}, ...jrows),
+        ),
         ),
       ))
     } else if (jobs.note) {

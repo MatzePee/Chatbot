@@ -13,7 +13,7 @@ input,select,textarea{background:#fafbfc;border-radius:11px;padding:11px 13px}in
 :focus-visible{outline:3px solid #0071e355;outline-offset:3px}.info::after{background:#fff;color:#1d1d1f;box-shadow:0 6px 22px #0002}
 table th{color:#6e6e73;font-size:12px}table td{padding-top:10px;padding-bottom:10px}.incoming{background:#f4f6f9}pre{background:#f2f4f7;color:#1d1d1f}footer{color:#86868b}
 @media(min-width:1000px){header{padding-left:36px;padding-right:36px}}
-@media(max-width:760px){main{padding:24px 16px}.workspace-heading span:last-child{display:none}h1{font-size:27px}.card{padding:18px}header{padding:14px 16px}header .status{text-align:left;margin-top:0}header nav a{padding:8px}.grid{grid-template-columns:1fr}}
+@media(max-width:760px){main{padding:24px 16px}.workspace-heading span:last-child{display:none}h1{font-size:27px}.card{padding:18px}header{padding:14px 16px}header .status{text-align:left;margin-top:0}header nav a{padding:8px}.grid{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 
 .pilot-welcome{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:8px 0 30px}.pilot-welcome p{margin:8px 0 0}.pilot-welcome a{white-space:nowrap}@media(max-width:760px){.pilot-welcome{align-items:flex-start;flex-direction:column;gap:16px}}

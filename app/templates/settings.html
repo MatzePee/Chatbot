@@ -2,7 +2,7 @@
 {% block content %}
 <h1>AutoChat-Einstellungen</h1>
 
-<p class="muted">Modelle, Antwortverhalten und Abläufe für AutoChat. Die gemeinsame <a href="/settings/shared#fanvue">Fanvue-Verbindung und Programm-Updates</a> findest du oben unter Einstellungen.</p>
+<p class="muted">Modelle, Antwortverhalten und Abläufe für AutoChat. Die <a href="/settings/shared">Fanvue- und Telegram-Verbindungen sowie Programm-Updates</a> findest du oben unter Einstellungen.</p>
 
 <div class="sect-tools">
   <a id="sect-all">alle aufklappen</a><span class="muted">·</span>
@@ -446,34 +446,10 @@
     <p class="muted">Meldet sofort, wenn ein Entwurf endgültig hängt – also alle automatischen
     Neuversuche aufgebraucht sind und ohne dich nichts mehr passiert. Jeder Entwurf wird
     genau einmal gemeldet.</p>
-    <details style="margin-bottom:10px">
-      <summary class="muted" style="cursor:pointer">Einrichtung in 3 Schritten</summary>
-      <ol class="muted" style="font-size:13px;line-height:1.7;margin:8px 0 0 0">
-        <li>In Telegram <code>@BotFather</code> anschreiben, <code>/newbot</code> senden,
-            Namen vergeben → du bekommst ein Token.</li>
-        <li>Token unten eintragen. Dann deinen <em>eigenen neuen Bot</em> in Telegram suchen
-            und ihm einmal kurz „hallo“ schreiben (vorher darf er dir nicht antworten).</li>
-        <li>Auf „Chat-ID ermitteln“ klicken, danach „Testnachricht senden“.</li>
-      </ol>
-    </details>
-    <div class="row">
-      <label class="chk"><input type="checkbox" name="telegram_enabled"
-        {% if s['telegram_enabled'] %}checked{% endif %}> Benachrichtigungen aktiv</label>
-      <label>Chat-ID <input name="telegram_chat_id" value="{{ s['telegram_chat_id'] }}"
-        placeholder="wird unten ermittelt"></label>
-    </div>
-    <label>Bot-Token (von @BotFather)
-      <input name="telegram_bot_token" type="password" value="{{ s['telegram_bot_token'] }}"
-        placeholder="123456789:ABCdef..."></label>
-    <label>Basis-URL dieser Oberfläche (für den Link in der Meldung)
-      <input name="app_base_url" value="{{ s['app_base_url'] }}"
-        placeholder="http://192.168.20.16:8000"></label>
-    <div class="draft-actions" style="margin-top:8px">
-      <button type="button" class="btn" id="tg-chatid">🔎 Chat-ID ermitteln</button>
-      <button type="button" class="btn" id="tg-test">📨 Testnachricht senden</button>
-    </div>
-    <p id="tg-out" class="muted" style="margin-top:8px"></p>
-
+    <p class="muted">Bot-Token, Chat-ID und Verbindungstest findest du in den
+    <a href="/settings/shared#telegram">gemeinsamen Telegram-Einstellungen</a>.</p>
+    <label class="chk"><input type="checkbox" name="telegram_enabled"
+      {% if s['telegram_enabled'] %}checked{% endif %}> AutoChat-Benachrichtigungen aktiv</label>
     <hr>
     <h3>Stichwort-Alarm auf eingehende Nachrichten</h3>
     <p class="muted small">Schreibt ein Fan eines dieser Wörter, bekommst du die <strong>komplette
@@ -491,35 +467,6 @@
     <p id="kw-out" class="muted" style="margin-top:8px"></p>
   </details>
 
-  <script>
-  (function () {
-    var out = document.getElementById('tg-out');
-    if (!out) return;
-    function post(url, extra) {
-      var body = new URLSearchParams(Object.assign({
-        token: document.querySelector('[name=telegram_bot_token]').value
-      }, extra || {}));
-      out.textContent = 'Verbinde mit Telegram…';
-      return fetch(url, {method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
-        .then(function (r) { return r.json(); })
-        .catch(function (e) { return {ok: false, msg: 'Fehler: ' + e}; });
-    }
-    document.getElementById('tg-chatid').addEventListener('click', function () {
-      post('/settings/telegram-chatid').then(function (d) {
-        if (d.ok && d.chat_id) {
-          document.querySelector('[name=telegram_chat_id]').value = d.chat_id;
-          out.textContent = '✅ ' + d.msg + ' – Chat-ID eingetragen. Nicht vergessen zu speichern.';
-        } else { out.textContent = '⚠ ' + d.msg; }
-      });
-    });
-    document.getElementById('tg-test').addEventListener('click', function () {
-      post('/settings/telegram-test',
-           {chat_id: document.querySelector('[name=telegram_chat_id]').value})
-        .then(function (d) { out.textContent = (d.ok ? '✅ ' : '⚠ ') + d.msg; });
-    });
-  })();
-  </script>
   <script>
   (function () {
     // Stichwort-Liste ausprobieren - prueft die Liste im Feld, also auch
@@ -573,17 +520,9 @@
   })();
   </script>
 
-  <button class="btn-primary big">Alle Einstellungen speichern</button>
+  <button class="btn-primary big">AutoChat-Einstellungen speichern</button>
 </form>
 
-<h2 class="grp">Veröffentlichen</h2>
-<p class="muted grp-desc">Den aktuellen Programmstand nach GitHub hochladen.</p>
-<div class="card">
-  <p class="muted" style="margin-top:0">Zeigt die geänderten Dateien, lässt die Versionsnummer
-  festlegen und lädt auf Knopfdruck hoch. Prüft vorher, dass keine Zugangsdaten und keine
-  Datenbank mitgehen.</p>
-  <a class="btn-primary" href="/upload">⬆ Zur Upload-Seite</a>
-</div>
 
 <script>
 (function () {

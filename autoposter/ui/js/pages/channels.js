@@ -1,6 +1,6 @@
-import { api } from '../api.js?v=creatorstudio-layout-20260909'
-import { watermarkEditor } from '../watermark.js?v=creatorstudio-layout-20260909'
-import { h, clear, empty, field, modal, toast, guard, fmtDateTime } from '../ui.js?v=creatorstudio-layout-20260909'
+import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
+import { watermarkEditor } from '../watermark.js?v=creatorstudio-mobile-system-20260909'
+import { h, clear, empty, field, modal, toast, guard, fmtDateTime } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 export default async function renderChannels() {
   let [channels, personas] = await Promise.all([api.channels(), api.personas()])

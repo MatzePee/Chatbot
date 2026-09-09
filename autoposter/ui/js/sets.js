@@ -1,8 +1,8 @@
 // Bild-Sets: Bilder, die zusammen in einem Post erscheinen sollen.
-import { api } from './api.js?v=creatorstudio-layout-20260909'
+import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
 import {
   h, append, clear, empty, field, modal, toast, guard, spinner, confirmDialog, attachPreview,
-} from './ui.js?v=creatorstudio-layout-20260909'
+} from './ui.js?v=creatorstudio-mobile-system-20260909'
 
 /** Set aus einer Auswahl anlegen. Reihenfolge ist die Reihenfolge im Post. */
 export function openCreateSetDialog({ assets, onDone = () => {} }) {

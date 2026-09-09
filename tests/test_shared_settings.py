@@ -17,12 +17,15 @@ def test_chat_settings_preserve_shared_values_and_tokens(client):
     values = {'fanvue_client_id': 'existing-client', 'fanvue_client_secret': 'existing-secret',
               'fanvue_redirect_uri': 'https://example.test/oauth/callback', 'fanvue_api_version': 'v1',
               'update_check_enabled': True, 'update_notify_telegram': True,
-              'update_check_interval_hours': 12}
+              'update_check_interval_hours': 12, 'telegram_bot_token': 'existing-token',
+              'telegram_chat_id': '12345', 'app_base_url': 'https://studio.example'}
     for key, value in values.items():
         db.set_setting(key, value)
     tokens = dict(db.get_tokens())
     response = client.post('/settings', data={'openrouter_model': 'new-chat-model',
-                           'fanvue_client_secret': 'must-be-ignored'}, follow_redirects=False)
+                           'fanvue_client_secret': 'must-be-ignored',
+                           'telegram_bot_token': 'must-be-ignored', 'telegram_chat_id': 'wrong-chat',
+                           'app_base_url': 'https://wrong.example'}, follow_redirects=False)
     assert response.status_code == 303
     assert db.get_setting('openrouter_model') == 'new-chat-model'
     assert {key: db.get_setting(key) for key in values} == values
@@ -78,6 +81,58 @@ def test_shared_controls_render_only_on_shared_page(client):
 def test_shared_mutations_stay_blocked_in_preview(client, monkeypatch):
     monkeypatch.setenv('MP_PREVIEW', '1')
     before = db.all_settings()
-    for path in ['/settings/shared/fanvue', '/settings/shared/updates']:
+    for path in ['/settings/shared/fanvue', '/settings/shared/updates', '/settings/shared/telegram',
+                 '/settings/shared/telegram-test', '/settings/shared/telegram-chatid']:
         assert client.post(path, data={'fanvue_client_id': 'blocked', 'update_check_interval_hours': '24'}).status_code == 403
+    assert db.all_settings() == before
+
+
+def test_telegram_connection_save_preserves_notification_choices(client):
+    db.set_setting('telegram_enabled', True)
+    db.set_setting('alert_keywords_enabled', True)
+    db.set_setting('alert_keywords', 'custom keyword')
+    db.set_setting('update_notify_telegram', True)
+    before = db.all_settings()
+    tokens = dict(db.get_tokens())
+    values = {'telegram_bot_token': 'new-token', 'telegram_chat_id': '-10012345',
+              'app_base_url': 'https://studio.example'}
+    response = client.post('/settings/shared/telegram', data={**values,
+                           'alert_keywords': 'must-be-ignored',
+                           'fanvue_client_secret': 'must-be-ignored'}, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers['location'] == '/settings/shared?saved=telegram#telegram'
+    assert db.all_settings() == {**before, **values}
+    assert dict(db.get_tokens()) == tokens
+    # A partial request must not clear an existing token or public URL.
+    client.post('/settings/shared/telegram', data={'telegram_chat_id': '67890'})
+    assert db.get_setting('telegram_bot_token') == 'new-token'
+    assert db.get_setting('app_base_url') == 'https://studio.example'
+
+
+def test_notification_options_and_publication_render_in_their_own_area(client):
+    shared = client.get('/settings/shared').text
+    chat = client.get('/settings').text
+    assert '<title>Einstellungen · MP CreatorStudio</title>' in shared
+    for name in ['telegram_enabled', 'alert_keywords_enabled', 'alert_keywords']:
+        assert f'name="{name}"' in chat
+        assert f'name="{name}"' not in shared
+    assert 'id="tg-chatid"' in shared and 'id="tg-chatid"' not in chat
+    assert 'id="kw-test"' in chat and 'id="kw-test"' not in shared
+    assert shared.count('>Veröffentlichen</h2>') == 1 and '>Veröffentlichen</h2>' not in chat
+    assert 'Zur Upload-Seite' in shared and 'Zur Upload-Seite' not in chat
+
+
+@pytest.mark.parametrize('prefix', ['/settings', '/settings/shared'])
+def test_connection_tools_use_entered_values_without_saving_or_real_messages(client, monkeypatch, prefix):
+    from app import notify
+    before = db.all_settings()
+    sent = []
+    monkeypatch.setattr(notify, 'get_me', lambda **kw: {'username': 'test_bot'})
+    monkeypatch.setattr(notify, 'send_or_raise', lambda text, **kw: sent.append((text, kw)))
+    monkeypatch.setattr(notify, 'discover_chat_id', lambda **kw: ('-10042', 'test chat'))
+    response = client.post(prefix + '/telegram-test', data={'token': 'entered-token', 'chat_id': '42'})
+    assert response.json()['ok'] is True
+    assert sent[0][1] == {'token': 'entered-token', 'chat_id': '42'}
+    assert 'MP CreatorStudio' in sent[0][0]
+    assert client.post(prefix + '/telegram-chatid', data={'token': 'entered-token'}).json()['chat_id'] == '-10042'
     assert db.all_settings() == before

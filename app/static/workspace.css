@@ -64,6 +64,21 @@
 .workspace-scroll::-webkit-scrollbar-track { background: #f5f5f7; }
 .workspace-scroll::-webkit-scrollbar-thumb { background: #dce0e6; border-radius: 6px; }
 main.workspace-content, .workspace-scroll #view { width: 100%; max-width: var(--workspace-content-width); margin: 0 auto; box-sizing: border-box; }
+/* Grid/flex children must be able to shrink below their content's natural width. */
+.workspace-content, #view, .modal { min-width: 0; overflow-wrap: anywhere; }
+.grid > *, .row > *, .page-head > *, .card, .field, .col, form { min-width: 0; }
+input, select, textarea { min-width: 0; max-width: 100%; }
+button, .btn, .btn-primary, .btn-danger { max-width: 100%; white-space: normal; }
+.workspace-content img, .workspace-content video { max-width: 100%; }
+.workspace-content pre { max-width: 100%; overflow-x: auto; }
+.workspace-content table.kv { table-layout: fixed; }
+.workspace-content table.kv td { overflow-wrap: anywhere; }
+.workspace-content table.kv td + td { padding-left: 12px; }
+/* Keep table headers and rows together; only the table region scrolls sideways. */
+.table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.table-scroll > table { min-width: 460px; }
+.table-scroll > table.table-compact { min-width: 0; }
+.table-scroll:focus-visible { outline-offset: -3px; }
 main.workspace-content { padding: 32px 36px 36px; }
 .workspace-scroll.main { max-width: none; margin: 0; padding: 0; }
 .workspace-scroll > .page, .workspace-scroll #view > .page { width: 100%; max-width: var(--workspace-content-width); margin: 0 auto; padding: 32px 36px 36px; }
@@ -74,13 +89,14 @@ main.workspace-content { padding: 32px 36px 36px; }
 .workspace-menu-button, .workspace-backdrop { display: none; }
 .workspace-frame :focus-visible { outline: 3px solid #0071e355; outline-offset: 3px; }
 .workspace-content [id] { scroll-margin-top: 24px; }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .workspace-frame { --workspace-header-height: 124px; }
   .workspace-topbar { flex-wrap: wrap; gap: 10px; padding: 12px 16px; align-content: center; }
   .workspace-topbar .workspace-brand { font-size: 18px; gap: 8px; }
   .workspace-brand img { width: 28px; height: 28px; }
   .workspace-topbar .workspace-switcher { order: 3; width: 100%; box-sizing: border-box; }
-  .workspace-topbar .workspace-switcher a { flex: 1; text-align: center; padding: 7px 10px; }
+  .workspace-topbar .workspace-switcher { gap: 2px; }
+  .workspace-topbar .workspace-switcher a { flex: 1 1 auto; text-align: center; padding: 10px 4px; font-size: 12px; }
   .workspace-menu-button {
     display: block; margin: 0 0 0 auto; padding: 7px 10px; min-height: 36px;
     border: 1px solid #e5e7eb; border-radius: 10px; font: inherit; font-size: 12px;
@@ -91,4 +107,13 @@ main.workspace-content { padding: 32px 36px 36px; }
   .workspace-menu-open .workspace-backdrop { display: block; position: absolute; inset: 0; z-index: 38; border: 0; border-radius: 0; background: #1c304b33; margin: 0; padding: 0; width: 100%; }
   main.workspace-content, .workspace-scroll > .page, .workspace-scroll #view > .page { padding: 24px 16px; }
   .workspace-scroll .preview-notice { padding: 12px 16px; }
+  /* Prevent iOS from zooming into compact input fields, including modal editors. */
+  input, select, textarea { font-size: 16px !important; }
+  .workspace-content .pager, .workspace-content .filter-foot,
+  .workspace-content .badges, .workspace-content .inline { flex-wrap: wrap; }
+  .workspace-content .mem-list li { flex-wrap: wrap; }
+  .workspace-content .mem-meta { flex: 1 1 100%; min-width: 0; flex-wrap: wrap; }
+  .workspace-content .mem-meta .mem-x { display: inline-flex; flex-wrap: wrap; min-width: 0; }
+  .workspace-content .mem-due-field { max-width: 100%; flex-wrap: wrap; }
+  .workspace-content .ppv-filter .row > label { min-width: 0; }
 }

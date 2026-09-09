@@ -1,0 +1,19 @@
+<div class="card" id="deployment-status" data-live-preserve hidden>
+  <h3>Update-Fortschritt</h3><p class="muted" id="deployment-message"></p>
+</div>
+<script>
+(() => {
+  const card = document.getElementById('deployment-status');
+  async function refreshDeployment() {
+    try {
+      const response = await fetch('/api/deployment-status', {cache: 'no-store'});
+      if (!response.ok) return;
+      const state = await response.json();
+      card.hidden = !state.message;
+      document.getElementById('deployment-message').textContent = state.message || '';
+      card.className = 'card' + (['failed', 'rolled_back'].includes(state.phase) ? ' warn' : state.phase === 'complete' ? ' ok' : '');
+    } catch { /* Service may be restarting; retry automatically. */ }
+  }
+  refreshDeployment(); setInterval(refreshDeployment, 5000);
+})();
+</script>

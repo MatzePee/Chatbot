@@ -1,9 +1,9 @@
 // Post-Editor als eigenes Modul – wird vom Kalender und vom Tagesdetail genutzt.
-import { api } from './api.js?v=creatorstudio-layout-20260909'
+import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
 import {
   h, append, clear, empty, field, modal, toast, guard, spinner,
   toLocalInput, attachPreview, confirmDialog,
-} from './ui.js?v=creatorstudio-layout-20260909'
+} from './ui.js?v=creatorstudio-mobile-system-20260909'
 
 export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
   const channel = channels.find((c) => c.id === post.channel_id)

@@ -1,6 +1,6 @@
 // Wasserzeichen eines Kanals: hochladen, platzieren, in echt ansehen.
-import { api } from './api.js?v=creatorstudio-layout-20260909'
-import { h, append, clear, field, toast, guard, spinner, confirmDialog, debounce } from './ui.js?v=creatorstudio-layout-20260909'
+import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
+import { h, append, clear, field, toast, guard, spinner, confirmDialog, debounce } from './ui.js?v=creatorstudio-mobile-system-20260909'
 
 // Reihenfolge des 3×3-Rasters, so wie es auf dem Bildschirm liegt.
 const ANCHORS = [

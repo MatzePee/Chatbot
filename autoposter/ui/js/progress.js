@@ -1,6 +1,6 @@
 // Fortschritt eines Hintergrundlaufs: Balken, Schritttext, Restzeit, Abbruch.
-import { api } from './api.js?v=creatorstudio-layout-20260909'
-import { h, append, clear, toast } from './ui.js?v=creatorstudio-layout-20260909'
+import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
+import { h, append, clear, toast } from './ui.js?v=creatorstudio-mobile-system-20260909'
 
 const seconds = (value) => {
   if (value === null || value === undefined) return ''

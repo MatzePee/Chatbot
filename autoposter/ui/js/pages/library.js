@@ -1,10 +1,10 @@
-import { api } from '../api.js?v=creatorstudio-layout-20260909'
-import { openUploadDialog } from '../upload.js?v=creatorstudio-layout-20260909'
-import { openCreateSetDialog, openSetDialog } from '../sets.js?v=creatorstudio-layout-20260909'
+import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
+import { openUploadDialog } from '../upload.js?v=creatorstudio-mobile-system-20260909'
+import { openCreateSetDialog, openSetDialog } from '../sets.js?v=creatorstudio-mobile-system-20260909'
 import {
   h, append, clear, card, empty, field, modal, toast, guard, spinner,
   mediaTile, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, fmtDateTime, fmtBytes, debounce, attachPreview,
-} from '../ui.js?v=creatorstudio-layout-20260909'
+} from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 export default async function renderLibrary({ query }) {
   const [channels, views, tagList] = await Promise.all([api.channels(), api.views(), api.tags()])
@@ -21,7 +21,7 @@ export default async function renderLibrary({ query }) {
   }
 
   const grid = h('div', { class: 'tiles' })
-  const tableBox = h('div', { style: { display: 'none' } })
+  const tableBox = h('div', { class: 'table-scroll', tabindex: 0, role: 'region', 'aria-label': 'Medientabelle, seitlich scrollbar', style: { display: 'none' } })
   const moreBtn = h('button', { style: { width: '100%', justifyContent: 'center', marginTop: '14px', display: 'none' } }, 'Mehr laden')
   const bulkBar = h('div', { class: 'row', style: { display: 'none', padding: '8px 20px', background: 'rgba(99,102,241,.12)', borderBottom: '1px solid var(--line)' } })
   const sideCounts = h('div')
@@ -434,7 +434,7 @@ export default async function renderLibrary({ query }) {
   moreBtn.addEventListener('click', guard(() => load(true)))
 
   const sidebar = h('aside', {
-    style: { width: '215px', flex: '0 0 215px', borderRight: '1px solid var(--line)', overflowY: 'auto', padding: '12px' },
+    class: 'library-sidebar', id: 'library-filters',
   },
     h('label', { class: 'lbl' }, 'Lebenszyklus'), sideCounts,
     h('label', { class: 'lbl', style: { marginTop: '14px' } }, 'Sets'), sideSets,
@@ -443,22 +443,29 @@ export default async function renderLibrary({ query }) {
     h('label', { class: 'lbl', style: { marginTop: '14px' } }, 'Tags'), tagSelect,
   )
 
-  const content = h('div', { style: { flex: '1', display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+  const filtersToggle = h('button', { class: 'library-filter-toggle', type: 'button', 'aria-expanded': 'false', 'aria-controls': 'library-filters',
+    onClick: () => {
+      const expanded = filtersToggle.getAttribute('aria-expanded') !== 'true'
+      filtersToggle.setAttribute('aria-expanded', String(expanded))
+      sidebar.classList.toggle('is-open', expanded)
+    },
+  }, 'Filter')
+  const content = h('div', { class: 'library-content' },
     h('div', { class: 'page-head', style: { padding: '14px 20px', margin: 0, borderBottom: '1px solid var(--line)' } },
-      h('h1', {}, 'Bibliothek'),
+      h('h1', {}, 'Bibliothek'), filtersToggle,
       h('div', { style: { width: '230px' } }, searchInput),
       sortSelect, hideBtn,
       h('div', { class: 'spacer' }),
       viewBtn,
       h('button', { class: 'primary', onClick: openUpload }, 'Hochladen'),
     ),
-    bulkBar,
-    h('div', { style: { flex: '1', overflowY: 'auto', padding: '16px' } }, grid, tableBox, moreBtn),
+    sidebar, bulkBar,
+    h('div', { class: 'library-media' }, grid, tableBox, moreBtn),
   )
 
   await Promise.all([load(), refreshCounts(), refreshSets()])
 
-  const livePage = h('div', { style: { display: 'flex', height: 'calc(100dvh - var(--workspace-header-height))', overflow: 'hidden' } }, sidebar, content)
+  const livePage = h('div', { class: 'library-layout' }, content)
   livePage.refresh = async () => {
     if (state.selected.size) return false
     const wanted = state.items.length, q = { ...effectiveQuery(), limit: 120 }

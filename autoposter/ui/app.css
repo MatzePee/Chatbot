@@ -86,9 +86,9 @@ a { color: #818cf8; }
 .card > h2 { font-size: 13px; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
 
 .grid { display: grid; gap: 12px; }
-.grid.c2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-.grid.c3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-.grid.c6 { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.grid.c2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.grid.c3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.grid.c6 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .col { display: flex; flex-direction: column; gap: 8px; }
 .stack > * + * { margin-top: 14px; }
@@ -626,6 +626,54 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
 :root{color-scheme:light;--bg:#f5f5f7;--bg-1:#fff;--bg-2:#f2f4f7;--bg-3:#eaf0f7;--line:#e3e6eb;--line-soft:#eceef2;--text:#1d1d1f;--muted:#6e6e73;--dim:#70757f;--accent:#0071e3;--accent-soft:#eaf3ff;--ok:#16834b;--warn:#986110;--err:#c63740;--radius:14px}
 body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}a{color:#0066cc}.sidebar{width:236px;flex-basis:236px;background:#ffffffd9}.brand{padding:26px 20px}.brand b{font-size:21px;letter-spacing:-.045em}.brand small{margin-top:8px;letter-spacing:.12em}.nav{padding:16px 12px}.nav a{padding:11px 12px;border-radius:11px}.nav a.active{color:#0066cc;border-color:transparent}.page{padding:34px;max-width:1550px;margin:auto}.page>h1,.page-head h1{font-size:30px;letter-spacing:-.04em}.card{border-radius:20px;box-shadow:0 4px 22px #182b4505}.card.pad{padding:23px}button,.btn,input,select,textarea{border-radius:10px}.banner.dry{color:#80570d;background:#fff7e8;border-color:#ead5a9}.banner.pause{color:#9f2932;background:#fff0f1;border-color:#f2cdd1}.modal{background:#fff;color:#1d1d1f;border-radius:20px}input:focus,textarea:focus,select:focus{outline:3px solid #0071e325}:focus-visible{outline:3px solid #0071e355;outline-offset:3px}
 @media(max-width:760px){.page{padding:20px 14px}.sidebar{width:174px;flex-basis:174px}.brand{padding:20px 12px}.brand b{font-size:17px}}
+
+/* Responsive editors and library: filters remain reachable on phones. */
+.persona-layout { display: flex; gap: 20px; }
+.persona-list { width: 210px; flex: 0 0 210px; min-width: 0; }
+.persona-editor { flex: 1; min-width: 0; }
+.library-content {
+  display: grid; min-width: 0; height: calc(100dvh - var(--workspace-header-height));
+  grid-template-columns: 215px minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr);
+}
+.library-content > .page-head { grid-column: 2; grid-row: 1; }
+.library-content > .row { grid-column: 2; grid-row: 2; }
+.library-sidebar { grid-column: 1; grid-row: 1 / 4; min-width: 0; border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; }
+.library-media { grid-column: 2; grid-row: 3; min-width: 0; overflow-y: auto; padding: 16px; }
+.library-filter-toggle { display: none; }
+.board { min-width: 0; }
+.pool { min-width: 0; }
+.modal { min-width: 0; }
+.modal-head { gap: 8px; }
+.modal-head h3 { min-width: 0; }
+.modal-head > button { flex: none; }
+.monthgrid { min-width: 700px; }
+.calendar-scroll { overflow-x: auto; max-width: 100%; }
+.inline input[type=checkbox] { flex-shrink: 0; }
+
+@media (max-width: 1100px) {
+  .persona-layout { flex-direction: column; }
+  .persona-list { width: 100%; flex: none; }
+  .library-content { display: flex; flex-direction: column; height: auto; }
+  .library-sidebar { display: none; border-right: 0; border-bottom: 1px solid var(--line); }
+  .library-sidebar.is-open { display: block; }
+  .library-filter-toggle { display: inline-flex; }
+  .library-media { overflow: visible; }
+  .workspace-scroll .assign { height: auto; overflow: visible; flex-direction: column; }
+  .pool { width: 100%; flex: none; border-right: 0; border-bottom: 1px solid var(--line); }
+  .pool-body { flex: auto; max-height: 40dvh; }
+  .board { flex: none; width: 100%; }
+  .columns { min-height: 240px; }
+}
+@media (max-width: 900px) {
+  .modal-bg { padding: 12px; }
+  .modal-body { padding: 12px; }
+  .card.pad { padding: 18px; }
+  button, .btn { min-height: 44px; }
+  .chip, .dayadd, .daymore { min-height: 32px; }
+  .page-head .spacer { display: none; }
+  .library-content > .page-head > div { max-width: 100%; }
+  .dayrow { flex-wrap: wrap; }
+}
 
 .sidebar .brand b{font-size:18px;white-space:nowrap}
 

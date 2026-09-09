@@ -1,7 +1,7 @@
 // Bilder-Upload per Drag & Drop, mit Fortschritt je Datei und
 // anschließender Zuordnung zu Kanälen.
-import { api } from './api.js?v=creatorstudio-layout-20260909'
-import { h, clear, append, field, modal, toast, guard, spinner, fmtBytes } from './ui.js?v=creatorstudio-layout-20260909'
+import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
+import { h, clear, append, field, modal, toast, guard, spinner, fmtBytes } from './ui.js?v=creatorstudio-mobile-system-20260909'
 
 const ACCEPT = ['image/jpeg', 'image/png', 'image/webp']
 //: Wie viele Dateien pro Anfrage. Kleine Bündel halten die Rückmeldung flüssig

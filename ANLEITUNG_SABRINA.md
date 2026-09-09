@@ -2,7 +2,9 @@
 
 Du brauchst einmalig einen Befehl auf deinem bisherigen Linux-Server. Das Skript erkennt deinen Dienstbenutzer, Programmordner, Dienstnamen und Port automatisch. Dateien von Hand bearbeiten oder ein ZIP übertragen ist nicht nötig.
 
-**Voraussetzung:** Matze hat **v2.0.1 einschließlich Versions-Tag** nach GitHub hochgeladen. Vorher ist der folgende Download noch nicht verfügbar.
+**Voraussetzung:** Matze hat **v2.0.2 einschließlich Versions-Tag** nach GitHub hochgeladen. Vorher ist der folgende Download noch nicht verfügbar.
+
+Verwende den unten stehenden Befehl mit **v2.0.2** auch dann, wenn du die Reparatur mit v2.0.1 bereits versucht hast. Die neue Fassung korrigiert die Berechtigungsprüfung für sudo-rs; der alte Downloadlink lädt weiterhin die alte Fassung.
 
 ## 1. Auf deinem Server anmelden
 
@@ -11,7 +13,7 @@ Du brauchst einmalig einen Befehl auf deinem bisherigen Linux-Server. Das Skript
 ## 2. Diesen Befehl kopieren und ausführen
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/v2.0.1/deploy/fix-update.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/MatzePee/Chatbot/v2.0.2/deploy/fix-update.sh | sudo bash
 ```
 
 Wenn sudo nach einem Passwort fragt, gib dein eigenes Serverpasswort ein. Während der Eingabe werden keine Zeichen angezeigt.
@@ -32,7 +34,7 @@ Danach heißt die Oberfläche **MP CreatorStudio**:
 - **AutoPost** startet bei einer neuen Einrichtung leer, pausiert und im Trockenlauf. Für Fanvue verwendet es dieselbe Verbindung wie AutoChat.
 - Matzes Zugangsdaten, Nachrichten, Medien und Kanaleinstellungen werden nicht mitgeliefert.
 
-Öffne deine normale Serveradresse anschließend neu, ohne einen alten `?sys_err=…`-Zusatz. Unter **Einstellungen → Allgemein** siehst du den Updatezustand.
+Öffne deine normale Serveradresse anschließend neu, ohne einen alten `?sys_err=…`-Zusatz. Unter **System** siehst du den Updatezustand.
 
 ## Falls eine Fehlermeldung erscheint
 
@@ -41,5 +43,7 @@ Bei einer fehlenden Voraussetzung oder nicht eindeutig erkannten Installation be
 Findet es mehrere Bot-Dienste, zeigt es deren Namen an. Dann kann die zuständige Person den gewünschten Dienst ausdrücklich mit `--service DIENSTNAME` auswählen. Bei einer üblichen Einzelinstallation ist das nicht nötig.
 
 Die Reparatur sichert vorhandene Helfer und Berechtigungen unter `/var/backups/mp-creatorstudio/fix-update-*`. Falls ihre abschließende Berechtigungsprüfung scheitert, stellt sie diese Dateien wieder her. Die spätere Programmaktualisierung sichert vorhandene Datenbanken und Konfigurationen unter `data/backups/before-update-*` und versucht bei einem Startfehler, den vorherigen Code samt Python-Umgebung wieder zu starten.
+
+Ab v2.0.2 nennt ein Fehler während der Einrichtung den betroffenen Schritt und die Ursache. Diese Meldung wird außerdem als `diagnose.txt` im angegebenen Sicherungsordner gespeichert. Falls eine Datei nicht wiederhergestellt werden konnte, wird ihr Pfad ausdrücklich genannt.
 
 Gib für Unterstützung nur die Fehlermeldung weiter, keine Passwörter, Tokens oder Datenbankdateien. Nach erfolgreicher einmaliger Einrichtung verwendest du wieder den normalen Updateknopf.

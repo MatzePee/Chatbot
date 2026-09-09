@@ -16,7 +16,8 @@
 
 <div class="card">
   <h3>7-Tage-Trend</h3>
-  <table class="logs">
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+    <table class="logs">
     <thead><tr><th>Tag</th><th>Nachr.</th><th>Angeb.</th><th>Gekauft</th><th>Umsatz</th><th></th></tr></thead>
     <tbody>
       {% for t in trend %}
@@ -30,12 +31,14 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 
 <div class="grid">
   <div class="card">
     <h3>Top-Sets nach Umsatz</h3>
-    <table class="logs">
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+      <table class="logs table-compact">
       <thead><tr><th>Set</th><th>Gekauft</th><th>Umsatz</th></tr></thead>
       <tbody>
         {% for c in by_revenue %}
@@ -43,10 +46,12 @@
         {% else %}<tr><td colspan="3" class="muted">Keine Daten.</td></tr>{% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   <div class="card">
     <h3>Beste Conversion (≥ 3 Angebote)</h3>
-    <table class="logs">
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+      <table class="logs">
       <thead><tr><th>Set</th><th>Angeb.</th><th>Gekauft</th><th>Conv.</th></tr></thead>
       <tbody>
         {% for c in by_conversion %}
@@ -54,6 +59,7 @@
         {% else %}<tr><td colspan="4" class="muted">Keine Daten.</td></tr>{% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 
@@ -61,7 +67,8 @@
   <div class="card">
     <h3>Nie gekaufte Sets</h3>
     <p class="muted small">Angeboten, aber nie gekauft – Kandidaten zum Überarbeiten/Aussortieren.</p>
-    <table class="logs">
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+      <table class="logs table-compact">
       <thead><tr><th>Set</th><th>Angeboten</th></tr></thead>
       <tbody>
         {% for c in never_bought %}
@@ -69,10 +76,12 @@
         {% else %}<tr><td colspan="2" class="muted">Keine.</td></tr>{% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   <div class="card">
     <h3>Nicht-Käufer (≥ 3 Angebote, 0 Käufe)</h3>
-    <table class="logs">
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+      <table class="logs table-compact">
       <thead><tr><th>Subscriber</th><th>Angeboten</th></tr></thead>
       <tbody>
         {% for s in non_buyers %}
@@ -80,13 +89,15 @@
         {% else %}<tr><td colspan="2" class="muted">Keine.</td></tr>{% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 
 <div class="card">
   <h3>Inaktive Zahler (Käufer, seit {{ inactive_days }}+ Tagen still)</h3>
   <p class="muted small">Frühere Käufer, die länger nichts geschrieben haben – ideal für gezielte Reaktivierung.</p>
-  <table class="logs">
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+    <table class="logs">
     <thead><tr><th>Subscriber</th><th>Umsatz</th><th>Käufe</th><th>Letzte Nachricht</th></tr></thead>
     <tbody>
       {% for s in inactive_payers %}
@@ -99,6 +110,7 @@
       {% else %}<tr><td colspan="4" class="muted">Keine.</td></tr>{% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 
 <style>

@@ -1,14 +1,14 @@
-import { api } from '../api.js?v=creatorstudio-layout-20260909'
-import { h, clear, empty, field, card, toast, guard, spinner } from '../ui.js?v=creatorstudio-layout-20260909'
-import { rhythmEditor } from '../rhythm.js?v=creatorstudio-layout-20260909'
-import { examplesEditor } from '../examples.js?v=creatorstudio-layout-20260909'
+import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
+import { h, clear, empty, field, card, toast, guard, spinner } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { rhythmEditor } from '../rhythm.js?v=creatorstudio-mobile-system-20260909'
+import { examplesEditor } from '../examples.js?v=creatorstudio-mobile-system-20260909'
 
 export default async function renderPersonas() {
   let [personas, channels] = await Promise.all([api.personas(), api.channels()])
   const state = { active: personas[0] || null }
 
-  const listBox = h('aside', { style: { width: '210px', flex: '0 0 210px' } })
-  const detailBox = h('div', { style: { flex: '1' } })
+  const listBox = h('aside', { class: 'persona-list' })
+  const detailBox = h('div', { class: 'persona-editor' })
 
   function drawList() {
     clear(listBox)
@@ -148,7 +148,7 @@ export default async function renderPersonas() {
 
   drawList(); drawDetail()
 
-  const livePage = h('div', { class: 'page', style: { display: 'flex', gap: '20px' } }, listBox, detailBox)
+  const livePage = h('div', { class: 'page persona-layout' }, listBox, detailBox)
   livePage.refresh = async () => {
     const data = await Promise.all([api.personas(), api.channels()])
     if (window.CreatorStudioLive.busy()) return false

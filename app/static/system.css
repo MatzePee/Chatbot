@@ -1,0 +1,33 @@
+
+.si-row { display:flex; align-items:center; gap:10px; margin:9px 0; font-size:13px; }
+.si-label { width:132px; flex:none; color:var(--muted); }
+/* display:block ist hier NICHT optional: als <span> waeren beide inline, und
+   auf Inline-Elemente wirken width/height nicht - der Balken bliebe leer. */
+.si-bar { display:block; flex:1; height:9px; border-radius:5px;
+  background:rgba(127,127,127,.18); overflow:hidden; }
+.si-fill { display:block; height:100%; border-radius:5px; min-width:2px;
+  transition:width .4s ease, background .4s ease; }
+.si-fill[style*="width:0%"] { min-width:0; }
+.si-fill.ok   { background:#3fa96b; }
+.si-fill.warn { background:#d9a441; }
+.si-fill.crit { background:#d95757; }
+.si-val { width:150px; flex:none; text-align:right; font-variant-numeric:tabular-nums; }
+.si-meta { display:flex; flex-wrap:wrap; gap:6px 20px; margin-top:12px;
+  font-size:12.5px; color:var(--muted); }
+/* Auf dem Handy passen 132px Label + Balken + 150px Wert nicht nebeneinander.
+   Label und Wert kommen deshalb in eine Zeile, der Balken darunter. */
+@media (max-width: 560px) {
+  .si-row { flex-wrap:wrap; gap:2px 10px; margin:12px 0; }
+  .si-label { width:auto; flex:1 1 auto; }
+  .si-val { width:auto; flex:0 0 auto; }
+  .si-bar { flex:1 1 100%; order:3; }
+  .si-meta { gap:4px 14px; }
+  .si-meta span { white-space:nowrap; }
+}
+
+
+.upd-new { background: rgba(109,94,252,.12); border-left: 3px solid var(--primary);
+  padding: 10px 12px; margin-bottom: 10px; }
+.upd-log { margin: 8px 0 0; padding-left: 20px; font-size: 13px; color: var(--muted); }
+.upd-log li { margin: 2px 0; }
+

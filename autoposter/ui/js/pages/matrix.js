@@ -1,6 +1,6 @@
 // Matrix: Bilder × Kanäle. Beantwortet auf einen Blick "was fehlt wo noch".
-import { api } from '../api.js?v=creatorstudio-layout-20260909'
-import { h, clear, empty, toast, guard, attachPreview, fmtDate, spinner } from '../ui.js?v=creatorstudio-layout-20260909'
+import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
+import { h, clear, empty, toast, guard, attachPreview, fmtDate, spinner } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 const CELL = {
   none: {

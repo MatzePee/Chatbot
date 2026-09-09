@@ -97,7 +97,7 @@ def run(source: Path):
         from app.main import app
         from fastapi.testclient import TestClient
         with TestClient(app) as client:
-            for path in ['/health', '/api/creatorpilot/health', '/settings/shared', '/autoposter/', '/api/v1/dashboard']:
+            for path in ['/health', '/api/creatorpilot/health', '/settings/shared', '/system', '/autoposter/', '/api/v1/dashboard']:
                 result = client.get(path)
                 assert result.status_code == 200, f'Startup route failed: {path} ({result.status_code})'
             assert started == [True], 'Production AutoChat worker would not start.'

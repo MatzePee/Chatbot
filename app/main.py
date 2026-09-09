@@ -100,7 +100,8 @@ def _static_version() -> str:
 def _base_ctx(request: Request) -> dict:
     return {
         "request": request,
-        "workspace_area": "settings" if request.url.path.startswith(("/settings/shared", "/upload")) else "autochat",
+        "workspace_area": ("system" if request.url.path == "/system" else
+                           "settings" if request.url.path.startswith(("/settings/shared", "/upload")) else "autochat"),
         "css_v": _static_version(),
         "connected": fanvue.is_connected(),
         "running": db.get_setting("bot_running", False) and not preview_enabled() and not deployment.pending(),
@@ -197,6 +198,13 @@ def api_update_check(force: bool = False):
     return state
 
 
+@app.get("/system", response_class=HTMLResponse)
+def system_page(request: Request, sys: str = "", sys_err: str = ""):
+    ctx = _base_ctx(request)
+    ctx.update(sys=sys, sys_err=sys_err)
+    return templates.TemplateResponse("system.html", ctx)
+
+
 @app.post("/system/update")
 def system_update():
     """Installiert die neueste markierte Version und startet den Dienst neu."""
@@ -204,13 +212,13 @@ def system_update():
     from . import updater
     ok, msg = updater.install()
     if ok:
-        return RedirectResponse("/?sys=update", status_code=303)
-    return RedirectResponse(f"/?sys_err={_q(msg[:200])}", status_code=303)
+        return RedirectResponse("/system?sys=update", status_code=303)
+    return RedirectResponse(f"/system?sys_err={_q(msg[:200])}", status_code=303)
 
 
 @app.get("/api/sysinfo")
 def api_sysinfo():
-    """Server-Auslastung als JSON – das Dashboard aktualisiert damit ohne Reload."""
+    """Server-Auslastung als JSON – die System-Seite aktualisiert damit ohne Reload."""
     from . import sysinfo
     snap = sysinfo.snapshot(data_path=db.DATA_DIR, db_path=db.DB_PATH)
     snap["mem_used_h"] = sysinfo.human_bytes(snap.get("mem_used"))
@@ -225,12 +233,13 @@ def api_sysinfo():
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, sys: str = "", sys_err: str = ""):
+    # Links aus älteren Versionen weiterhin zum Ergebnis der System-Aktion führen.
+    if sys or sys_err:
+        return RedirectResponse(f"/system?sys={_q(sys)}&sys_err={_q(sys_err)}", status_code=303)
     ctx = _base_ctx(request)
     ctx["logs"] = db.list_logs(limit=15)
     ctx["sent_count"] = db.count_drafts("sent")
     ctx["failed_count"] = db.count_drafts("failed")
-    ctx["sys"] = sys
-    ctx["sys_err"] = sys_err
 
     # Zeitraeume (lokale Mitternacht)
     now = datetime.now()
@@ -767,12 +776,12 @@ def system_restart():
     try:
         _run_admin("restart-service")
         db.log("info", "system", "Dienst-Neustart über GUI ausgelöst")
-        return RedirectResponse("/?sys=restart", status_code=303)
+        return RedirectResponse("/system?sys=restart", status_code=303)
     except Exception as exc:  # noqa: BLE001
         detail = getattr(exc, "stderr", b"")
         detail = detail.decode(errors="replace") if isinstance(detail, bytes) else str(exc)
         db.log("error", "system", "Dienst-Neustart fehlgeschlagen", detail or str(exc))
-        return RedirectResponse(f"/?sys_err={_q((detail or str(exc))[:200])}", status_code=303)
+        return RedirectResponse(f"/system?sys_err={_q((detail or str(exc))[:200])}", status_code=303)
 
 
 @app.post("/system/reboot")
@@ -781,12 +790,12 @@ def system_reboot():
     try:
         _run_admin("reboot")
         db.log("warn", "system", "Server-Neustart (reboot) über GUI ausgelöst")
-        return RedirectResponse("/?sys=reboot", status_code=303)
+        return RedirectResponse("/system?sys=reboot", status_code=303)
     except Exception as exc:  # noqa: BLE001
         detail = getattr(exc, "stderr", b"")
         detail = detail.decode(errors="replace") if isinstance(detail, bytes) else str(exc)
         db.log("error", "system", "Server-Neustart fehlgeschlagen", detail or str(exc))
-        return RedirectResponse(f"/?sys_err={_q((detail or str(exc))[:200])}", status_code=303)
+        return RedirectResponse(f"/system?sys_err={_q((detail or str(exc))[:200])}", status_code=303)
 
 
 # ------------------------------------------------------------- Freigabe-Queue
@@ -1766,7 +1775,8 @@ def reactivate_now_route(user_uuid: str, handle: str = Form(""), display_name: s
 # ------------------------------------------------------------------ Settings
 _SHARED_FANVUE_KEYS = frozenset({"fanvue_client_id", "fanvue_client_secret", "fanvue_redirect_uri", "fanvue_api_version"})
 _SHARED_UPDATE_KEYS = frozenset({"update_check_enabled", "update_notify_telegram", "update_check_interval_hours"})
-_SHARED_SETTINGS_KEYS = _SHARED_FANVUE_KEYS | _SHARED_UPDATE_KEYS
+_SHARED_TELEGRAM_KEYS = frozenset({"telegram_bot_token", "telegram_chat_id", "app_base_url"})
+_SHARED_SETTINGS_KEYS = _SHARED_FANVUE_KEYS | _SHARED_UPDATE_KEYS | _SHARED_TELEGRAM_KEYS
 
 
 @app.get("/settings/shared", response_class=HTMLResponse)
@@ -1784,6 +1794,16 @@ async def save_shared_fanvue(request: Request):
             db.set_setting(key, str(form[key]).strip())
     db.log("info", "system", "Gemeinsame Fanvue-Einstellungen gespeichert")
     return RedirectResponse("/settings/shared?saved=fanvue#fanvue", status_code=303)
+
+
+@app.post("/settings/shared/telegram")
+async def save_shared_telegram(request: Request):
+    form = await request.form()
+    for key in _SHARED_TELEGRAM_KEYS:
+        if key in form:
+            db.set_setting(key, str(form[key]).strip())
+    db.log("info", "system", "Gemeinsame Telegram-Verbindung gespeichert")
+    return RedirectResponse("/settings/shared?saved=telegram#telegram", status_code=303)
 
 
 @app.post("/settings/shared/updates")
@@ -1826,6 +1846,7 @@ def settings_page(request: Request):
     return templates.TemplateResponse("settings.html", ctx)
 
 
+@app.post("/settings/shared/telegram-test")
 @app.post("/settings/telegram-test")
 async def settings_telegram_test(request: Request):
     """Testnachricht senden. Nutzt die Werte aus dem Formular, damit man vor
@@ -1837,8 +1858,8 @@ async def settings_telegram_test(request: Request):
     try:
         bot = notify.get_me(token=token)
         notify.send_or_raise(
-            "✅ <b>AutoChat</b>\nDie Verbindung steht. Ab jetzt meldet sich der Bot hier, "
-            "wenn ein Entwurf in der Freigabe-Queue endgültig hängen bleibt.",
+            "✅ <b>MP CreatorStudio</b>\nDie Telegram-Verbindung steht. "
+            "Welche Benachrichtigungen du erhältst, legst du in den Einstellungen fest.",
             chat_id=chat_id, token=token)
         return {"ok": True,
                 "msg": f"Testnachricht gesendet über @{bot.get('username', '?')}."}
@@ -1846,6 +1867,7 @@ async def settings_telegram_test(request: Request):
         return {"ok": False, "msg": str(exc)}
 
 
+@app.post("/settings/shared/telegram-chatid")
 @app.post("/settings/telegram-chatid")
 async def settings_telegram_chatid(request: Request):
     """Chat-ID aus den letzten Bot-Updates ermitteln."""

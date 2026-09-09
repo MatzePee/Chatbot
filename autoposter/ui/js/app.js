@@ -1,16 +1,16 @@
-import '/static/live-refresh.js?v=creatorstudio-layout-20260909'
+import '/static/live-refresh.js?v=creatorstudio-mobile-system-20260909'
 // Einstiegspunkt: Anmeldung prüfen, Rahmen aufbauen, Hash-Router.
-import { api } from './api.js?v=creatorstudio-layout-20260909'
-import { h, clear, append, toast } from './ui.js?v=creatorstudio-layout-20260909'
+import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
+import { h, clear, append, toast } from './ui.js?v=creatorstudio-mobile-system-20260909'
 
-import renderDashboard from './pages/dashboard.js?v=creatorstudio-layout-20260909'
-import renderLibrary from './pages/library.js?v=creatorstudio-layout-20260909'
-import renderAssign from './pages/assign.js?v=creatorstudio-layout-20260909'
-import renderMatrix from './pages/matrix.js?v=creatorstudio-layout-20260909'
-import renderCalendar from './pages/calendar.js?v=creatorstudio-layout-20260909'
-import renderChannels from './pages/channels.js?v=creatorstudio-layout-20260909'
-import renderPersonas from './pages/personas.js?v=creatorstudio-layout-20260909'
-import renderSettings from './pages/settings.js?v=creatorstudio-layout-20260909'
+import renderDashboard from './pages/dashboard.js?v=creatorstudio-mobile-system-20260909'
+import renderLibrary from './pages/library.js?v=creatorstudio-mobile-system-20260909'
+import renderAssign from './pages/assign.js?v=creatorstudio-mobile-system-20260909'
+import renderMatrix from './pages/matrix.js?v=creatorstudio-mobile-system-20260909'
+import renderCalendar from './pages/calendar.js?v=creatorstudio-mobile-system-20260909'
+import renderChannels from './pages/channels.js?v=creatorstudio-mobile-system-20260909'
+import renderPersonas from './pages/personas.js?v=creatorstudio-mobile-system-20260909'
+import renderSettings from './pages/settings.js?v=creatorstudio-mobile-system-20260909'
 
 
 const ROUTES = [
@@ -63,7 +63,8 @@ function buildShell() {
       h('nav', { class: 'workspace-switcher', 'aria-label': 'Programmbereiche' },
         h('a', { href: '/' }, 'AutoChat'),
         h('a', { href: '/autoposter/', class: 'active', 'aria-current': 'true' }, 'AutoPost'),
-        h('a', { href: '/settings/shared' }, 'Einstellungen')),
+        h('a', { href: '/settings/shared' }, 'Einstellungen'),
+        h('a', { href: '/system' }, 'System')),
       h('button', { class: 'workspace-menu-button', type: 'button', 'aria-expanded': 'false', 'aria-controls': 'workspace-sidebar' }, '☰ Menü')),
     h('div', { class: 'workspace-body shell' },
       h('button', { class: 'workspace-backdrop', type: 'button', 'aria-label': 'Menü schließen', tabindex: '-1' }),
@@ -169,7 +170,7 @@ async function start() {
       )
       return
     }
-    const { default: renderLogin } = await import('./pages/login.js?v=creatorstudio-layout-20260909')
+    const { default: renderLogin } = await import('./pages/login.js?v=creatorstudio-mobile-system-20260909')
     shell = null
     clear(root).appendChild(renderLogin({ onLogin: (user) => { state.user = user; start() } }))
     return

@@ -100,7 +100,8 @@ das Ergebnis, <strong>ohne etwas zu senden</strong> oder den Fan-Status zu ände
 <div class="card">
   <h3>Set-Diagnose</h3>
   <p class="muted small">Tag-Score = Übereinstimmung mit den erkannten Vorlieben. „Freigeschaltet" = würde bei dieser Nachricht berücksichtigt.</p>
-  <table class="logs">
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+    <table class="logs">
     <thead><tr><th>Set</th><th>Medientyp</th><th>Nur auf Anfrage</th><th>Tag-Score</th><th>Freigeschaltet</th></tr></thead>
     <tbody>
       {% for f in result['diagnostics'] %}
@@ -114,6 +115,7 @@ das Ergebnis, <strong>ohne etwas zu senden</strong> oder den Fan-Status zu ände
       {% else %}<tr><td colspan="5" class="muted">Keine aktiven Sets.</td></tr>{% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endif %}
 

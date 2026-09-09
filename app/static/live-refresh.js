@@ -40,7 +40,7 @@
 
   if (document.getElementById('root')) return; // AutoPost supplies its own refresh callbacks.
   const main = document.querySelector('main');
-  if (!main || !/^\/(?:$|queue$|chats(?:\/|$)|ppv(?:\/|$)|reports$|test$|settings(?:\/shared)?$|logs$|upload$|doku(?:\/|$))/.test(location.pathname)) return;
+  if (!main || !/^\/(?:$|queue$|chats(?:\/|$)|ppv(?:\/|$)|reports$|system$|test$|settings(?:\/shared)?$|logs$|upload$|doku(?:\/|$))/.test(location.pathname)) return;
   const protectedSelector = 'script,style,canvas,[data-live-preserve],#si-body,#si-age,#si-scope,#upd-card,#ppv-picker,#pk-zoom,#backfill-status,.mem-live,.ppv-thumbs,.live-status';
   function key(n) {
     if (n.nodeType !== 1) return '';

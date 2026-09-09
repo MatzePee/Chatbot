@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}System · MP CreatorStudio{% endblock %}
+{% block content %}
+<h1>System</h1>
+{% if sys == 'restart' %}
+<div class="card ok">✓ Dienst‑Neustart ausgelöst – die App ist in wenigen Sekunden wieder da. Lade die Seite dann neu.</div>
+{% elif sys == 'reboot' %}
+<div class="card ok">✓ Server‑Neustart ausgelöst – der Server fährt jetzt hoch. Das kann 1–2 Minuten dauern.</div>
+{% elif sys == 'update' %}
+<div class="card ok">Update gestartet. Die neue Version wird zuerst geprüft; anschließend startet der Dienst neu. Den Fortschritt siehst du unter <a href="/system#deployment-status">System</a>.</div>
+{% elif sys_err %}
+<div class="card warn">⚠ System‑Aktion fehlgeschlagen: {{ sys_err }}<br>
+<span class="muted small">Vermutlich ist die sudo‑Regel/das Helferskript auf dem Server noch nicht eingerichtet (siehe DEPLOY.md).</span></div>
+{% endif %}
+
+{% include "_deployment_status.html" %}
+<div class="card" id="upd-card">
+  <h3>Version <span class="muted small" id="upd-current"></span></h3>
+  <div id="upd-body"><p class="muted">Wird geprüft…</p></div>
+</div>
+
+<div class="card" id="server-load">
+  <h3>Server-Auslastung <span class="muted small" id="si-age"></span></h3>
+  <div id="si-body"><p class="muted">Werte werden geladen…</p></div>
+  <p class="muted small" id="si-scope">Aktualisiert sich alle 10 Sekunden.</p>
+</div>
+
+<div class="card" id="server-controls">
+  <h3>Server</h3>
+  <p class="muted">Steuert den Ubuntu-Server, auf dem der Bot läuft.</p>
+  <div class="draft-actions">
+    <form method="post" action="/system/restart-service"
+          onsubmit="return confirm('Dienst wirklich neu starten? Die App ist kurz nicht erreichbar.');">
+      <button class="btn">🔄 Dienst neu starten</button>
+    </form>
+    <form method="post" action="/system/reboot"
+          onsubmit="return confirm('Den GANZEN Server neu starten (reboot)? Das dauert 1–2 Minuten.');">
+      <button class="btn-danger">⏻ Server neu starten</button>
+    </form>
+  </div>
+  <p class="muted small">Erfordert die einmalige Server-Einrichtung aus <code>DEPLOY.md</code> (Helferskript + sudo-Regel).</p>
+</div>
+
+<link rel="stylesheet" href="/static/system.css?v={{ css_v }}">
+<script src="/static/system.js?v={{ css_v }}" defer></script>
+{% endblock %}

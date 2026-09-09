@@ -1,11 +1,11 @@
 // Kalender: ganzer Monat auf einer Seite, mit Planer, Tagesdetail und Sammelaktionen.
-import { api } from '../api.js?v=creatorstudio-layout-20260909'
+import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
 import {
   h, append, clear, empty, field, modal, toast, guard, spinner, confirmDialog,
   fmtTime, fmtDate, fmtDateTime, toLocalInput, attachPreview,
-} from '../ui.js?v=creatorstudio-layout-20260909'
-import { openPostEditor } from '../posteditor.js?v=creatorstudio-layout-20260909'
-import { runProgress } from '../progress.js?v=creatorstudio-layout-20260909'
+} from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { openPostEditor } from '../posteditor.js?v=creatorstudio-mobile-system-20260909'
+import { runProgress } from '../progress.js?v=creatorstudio-mobile-system-20260909'
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 const WEEKDAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
@@ -768,7 +768,7 @@ export default async function renderCalendar() {
     h('div', { class: 'col', style: { gap: '6px' } }, chanRow, statRow),
     selBar,
     runBox,
-    grid,
+    h('div', { class: 'calendar-scroll', tabindex: 0, role: 'region', 'aria-label': 'Monatskalender, seitlich scrollbar' }, grid),
     h('div', { class: 'row', style: { fontSize: '11px', color: 'var(--dim)', gap: '14px' } },
       h('span', {}, '▣ Bildpost'),
       h('span', {}, '¶ Textpost'),

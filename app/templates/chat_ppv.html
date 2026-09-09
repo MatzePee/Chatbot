@@ -60,7 +60,8 @@
   {% if not table %}
   <div class="muted">Keine PPV-Sets vorhanden. Aktiviere Sets unter <a href="/ppv">PPV</a>.</div>
   {% else %}
-  <table class="ppv-table">
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+    <table class="ppv-table">
     <thead>
       <tr><th>PPV-Set</th><th>Preis</th><th>Status</th><th>Angeboten / Gekauft am</th><th>Setzen</th></tr>
     </thead>
@@ -94,6 +95,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% endif %}
 </div>
 

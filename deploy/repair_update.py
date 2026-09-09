@@ -25,12 +25,14 @@ PROPERTIES = ('Id', 'LoadState', 'User', 'WorkingDirectory', 'ExecStart',
               'MainPID', 'NoNewPrivileges', 'DynamicUser', 'Environment')
 
 
-def run(args, timeout=30):
+def run(args, timeout=30, include_error=False):
     result = subprocess.run([str(arg) for arg in args], capture_output=True,
                             text=True, timeout=timeout, env={**os.environ, 'LC_ALL': 'C'})
     if result.returncode:
         # Never dump Environment/ExecStart: a unit could contain credentials.
-        raise RuntimeError(f'{Path(str(args[0])).name}: Prüfung fehlgeschlagen (Status {result.returncode}).')
+        detail = (result.stderr or result.stdout or '').strip()[:1600] if include_error else ''
+        raise RuntimeError(f'{Path(str(args[0])).name}: Prüfung fehlgeschlagen (Status {result.returncode}).'
+                           + (f' {detail}' if detail else ''))
     return result.stdout.strip()
 
 
@@ -197,22 +199,37 @@ def install(installation):
     run(['visudo', '-c', '-q', '-f', staged_rule])
     run(['bash', '-n', staged_wrapper])
     changed = []
+    stage = 'Update-Helfer und sudo-Regel installieren'
     try:
         for target, (content, mode) in files.items():
             atomic_write(target, content, mode)
             changed.append(target)
+        stage = 'sudo-Konfiguration prüfen'
         run(['visudo', '-c', '-q'])
-        run(['runuser', '-u', installation.user, '--', '/usr/bin/python3', CHECKER])
-    except Exception:
+        stage = f'Passwortlose Berechtigungen für {installation.user} prüfen'
+        # This checker prints only controlled diagnostics, never service settings.
+        run(['runuser', '-u', installation.user, '--', '/usr/bin/python3', CHECKER], include_error=True)
+    except Exception as exc:
+        failures = []
         for target in reversed(changed):
             old = previous[target]
-            if old:
-                saved, uid, gid = old
-                atomic_write(target, saved.read_text(), saved.stat().st_mode & 0o777)
-                os.chown(target, uid, gid)
-            else:
-                target.unlink(missing_ok=True)
-        raise RuntimeError(f'Einrichtung fehlgeschlagen. Vorherige Helfer und sudo-Regel wurden wiederhergestellt. Sicherung: {backup}')
+            try:
+                if old:
+                    saved, uid, gid = old
+                    atomic_write(target, saved.read_text(), saved.stat().st_mode & 0o777)
+                    os.chown(target, uid, gid)
+                else:
+                    target.unlink(missing_ok=True)
+            except OSError:
+                failures.append(str(target))
+        recovery = ('Wiederherstellung unvollständig: ' + ', '.join(failures) if failures else
+                    'Vorherige Helfer und sudo-Regel wurden wiederhergestellt.')
+        detail = f'Einrichtung fehlgeschlagen: {stage}. Ursache: {exc}\n{recovery}\nSicherung: {backup}'
+        try:
+            (backup / 'diagnose.txt').write_text(detail + '\n')
+        except OSError:
+            detail += '\nDiagnosedatei konnte nicht gespeichert werden.'
+        raise RuntimeError(detail) from exc
     return backup
 
 
