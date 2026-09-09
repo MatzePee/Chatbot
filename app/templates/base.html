@@ -3,59 +3,74 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Fanvue Chatbot{% endblock %}</title>
+  <title>{% block title %}MP CreatorStudio{% endblock %}</title>
   {# ?v=<mtime> erzwingt nach jeder Aenderung frische statische Dateien #}
   <link rel="stylesheet" href="/static/style.css?v={{ css_v | default('0') }}">
-  <link rel="icon" type="image/svg+xml" href="/static/fanvue-logo.svg?v={{ css_v | default('0') }}">
+  <link rel="icon" type="image/svg+xml" href="/static/creatorpilot.svg?v={{ css_v | default('0') }}">
+  <link rel="stylesheet" href="/static/creatorpilot.css?v={{ css_v }}">
+  <link rel="stylesheet" href="/static/workspace.css?v={{ css_v }}">
+  <script src="/static/workspace.js?v={{ css_v }}" defer></script>
 </head>
-<body>
+<body class="workspace-frame">
 {# Ladeanzeige. Manche Seiten - allen voran "Subs" - muessen Listen erst
    seitenweise von Fanvue holen; bis die Antwort da ist, passiert im Browser
    sichtbar nichts und die Seite wirkt haengengeblieben. Der Balken laeuft ab
    dem Klick und verschwindet mit der neuen Seite von selbst. #}
 <div id="pageload" class="pageload" role="progressbar" aria-hidden="true"><span></span></div>
-<header>
-  <div class="brand">
-    <img class="brand-logo" src="/static/fanvue-logo.svg?v={{ css_v | default('0') }}" alt="" width="26" height="26">
-    <span>Fanvue&nbsp;Chatbot</span>
-  </div>
-  {# Auf dem Handy einklappbar: 9 Links wuerden sonst den halben Bildschirm
-     fuellen. Checkbox statt <details> oder JavaScript - das Auf-/Zuklappen
-     haengt damit allein an eigenem CSS und nicht am Browser-Standardstil.
-     Die Checkbox bleibt fokussierbar (nur optisch versteckt), das Label ist
-     also auch per Tastatur bedienbar. Ab 761px wird sie komplett ignoriert. #}
-  <input type="checkbox" id="navtoggle" class="navtoggle-cb">
-  <label for="navtoggle" class="navtoggle">☰ Menü</label>
-  <nav>
-    <a href="/">Dashboard</a>
-    <a href="/queue">Freigabe {% if pending_count %}<span class="badge">{{ pending_count }}</span>{% endif %}</a>
-    <a href="/chats">Subs</a>
-    <a href="/ppv">PPV</a>
-    <a href="/reports">Reports</a>
-    <a href="/test">Test</a>
-    <a href="/settings">Einstellungen</a>
-    <a href="/logs">Logs</a>
-    <a href="/doku">Doku</a>
+{% set shared = workspace_area == 'settings' %}
+<header class="workspace-topbar">
+  <a class="workspace-brand" href="/" aria-label="MP CreatorStudio – Startseite">
+    <img src="/static/creatorpilot.svg?v={{ css_v }}" alt="" width="32" height="32">
+    <span>MP CreatorStudio</span>
+  </a>
+  <nav class="workspace-switcher" aria-label="Programmbereiche">
+    <a href="/"{% if not shared %} class="active" aria-current="true"{% endif %}>AutoChat</a>
+    <a href="/autoposter/">AutoPost</a>
+    <a href="/settings/shared"{% if shared %} class="active" aria-current="true"{% endif %}>Einstellungen</a>
   </nav>
-  <div class="status">
-    {% if connected %}<span class="dot green"></span>Verbunden{% else %}<span class="dot red"></span>Getrennt{% endif %}
-    <span class="sep">|</span>
-    {% if running %}<span class="dot green"></span>Läuft ({{ mode }}){% else %}<span class="dot gray"></span>Pausiert{% endif %}
-  </div>
+  <button class="workspace-menu-button" type="button" aria-expanded="false" aria-controls="workspace-sidebar">☰ Menü</button>
 </header>
-<main>
-  {% if account_missing %}
-  <div class="card warn">
-    <strong>⚠ Eigene Konto-Kennung fehlt.</strong>
-    Der Bot kann seine eigenen Nachrichten nicht von Fan-Nachrichten unterscheiden —
-    das Modell bekommt den gesamten Verlauf als Fan-Text und weiß nicht, was es
-    bereits geschrieben hat. Abhilfe: in den <a href="/settings">Einstellungen</a>
-    die Fanvue-Verbindung einmal trennen und neu verbinden.
+<div class="workspace-body">
+  <button class="workspace-backdrop" type="button" aria-label="Menü schließen" tabindex="-1"></button>
+  <aside class="workspace-sidebar" id="workspace-sidebar" aria-label="{% if shared %}Gemeinsame Einstellungen{% else %}AutoChat{% endif %}">
+    <div class="workspace-section"><strong>{% if shared %}Einstellungen{% else %}AutoChat{% endif %}</strong></div>
+    <nav class="workspace-nav" aria-label="{% if shared %}Einstellungsseiten{% else %}AutoChat-Seiten{% endif %}">
+      {% if shared %}
+        {% set links = [('/settings/shared', '⚙', 'Allgemein'), ('/upload', '↥', 'Version & GitHub')] %}
+      {% else %}
+        {% set links = [('/', '◫', 'Dashboard'), ('/queue', '☷', 'Vorschläge' if preview else 'Freigabe'), ('/chats', '◉', 'Subs'), ('/ppv', '▦', 'PPV'), ('/reports', '▤', 'Reports'), ('/test', '▷', 'Test'), ('/logs', '≡', 'Logs'), ('/settings', '⚙', 'AutoChat-Einstellungen')] %}
+      {% endif %}
+      {% for href, icon, label in links %}
+        {% set active = request.url.path == href or (href not in ['/', '/settings', '/settings/shared'] and request.url.path.startswith(href + '/')) %}
+        <a href="{{ href }}"{% if active %} class="active" aria-current="page"{% endif %}><span class="workspace-icon" aria-hidden="true">{{ icon }}</span><span>{{ label }}</span>{% if href == '/queue' and pending_count %}<span class="badge">{{ pending_count }}</span>{% endif %}</a>
+      {% endfor %}
+    </nav>
+    <div class="workspace-sidefoot">
+      <div class="status" id="workspace-status">
+        <div>{% if connected %}<span class="dot green"></span>Fanvue verbunden{% else %}<span class="dot red"></span>Fanvue getrennt{% endif %}</div>
+        <div>{% if preview %}Mitlesen · Versand gesperrt{% elif running %}Läuft ({{ mode }}){% else %}AutoChat pausiert{% endif %}</div>
+      </div>
+    </div>
+  </aside>
+  <div class="workspace-scroll">
+    <div class="workspace-notices">
+      {% if deployment_pending %}<div class="preview-notice" role="status">Update wird geprüft. AutoChat und AutoPost pausieren bis zur erfolgreichen Startprüfung.</div>{% endif %}
+      {% if preview %}<div class="preview-notice" role="status"><strong>Geschützter Mitlesemodus</strong> · Live lesen &amp; Antwortvorschläge erzeugen. Senden, Posts, Lesebestätigungen und Token-Erneuerungen sind gesperrt. Dein bisheriger Bot läuft unabhängig weiter.</div>{% endif %}
+      {% if preview and poller_status.last_error %}<div class="preview-notice" role="alert">{{ poller_status.last_error }}</div>{% endif %}
+    </div>
+    <main class="workspace-content">
+      {% if account_missing %}
+      <div class="card warn">
+        <strong>⚠ Eigene Konto-Kennung fehlt.</strong>
+        AutoChat kann seine eigenen Nachrichten nicht von Fan-Nachrichten unterscheiden.
+        Prüfe die <a href="/settings/shared#fanvue">gemeinsame Fanvue-Verbindung</a>.
+      </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+    <footer>MP CreatorStudio · Dein Creator Workspace</footer>
   </div>
-  {% endif %}
-  {% block content %}{% endblock %}
-</main>
-<footer>Daten in <code>data/bot.db</code></footer>
+</div>
 <script>
 /* Ladeanzeige fuer normale Seitenwechsel.
    Der Balken kann nicht wissen, wie weit der Server ist - er waechst deshalb
@@ -114,5 +129,22 @@
   window.addEventListener('pagehide', stop);
 })();
 </script>
-</body>
+<script src="/static/live-refresh.js?v={{ css_v }}" defer></script>
+{% if preview %}<script>
+function protectPreviewForms() {
+  const allowed = path => ['/test', '/upload/publish', '/upload/settings'].includes(path) || /^\/queue\/\d+\/(regenerate|save|reject)$/.test(path);
+  document.querySelectorAll('form[method="post"] button, form[method="post"] input[type="submit"]').forEach(button => {
+    if (button.type === 'button') return;
+    const path = new URL(button.getAttribute('formaction') || button.form.action, location.href).pathname;
+    if (!allowed(path)) { button.disabled = true; button.title = 'Im Mitlesemodus gesperrt'; }
+  });
+}
+protectPreviewForms();
+document.addEventListener('creatorpilot:refresh', protectPreviewForms);
+document.addEventListener('submit', event => {
+  const button = event.submitter;
+  const path = new URL(button?.getAttribute('formaction') || event.target.action, location.href).pathname;
+  if (event.target.method === 'post' && !['/test', '/upload/publish', '/upload/settings'].includes(path) && !/^\/queue\/\d+\/(regenerate|save|reject)$/.test(path)) event.preventDefault();
+});
+</script>{% endif %}</body>
 </html>

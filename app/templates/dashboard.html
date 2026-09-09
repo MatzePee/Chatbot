@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Dashboard</h1>
+<h1>Übersicht</h1>
 
 {% if not connected %}
 <div class="card warn">
   <strong>Noch nicht mit Fanvue verbunden.</strong>
-  Trage in den <a href="/settings">Einstellungen</a> deine OAuth-Daten ein und klicke „Mit Fanvue verbinden".
+  Trage in den <a href="/settings/shared#fanvue">gemeinsamen Einstellungen</a> deine OAuth-Daten ein und klicke „Mit Fanvue verbinden".
 </div>
 {% endif %}
 
@@ -14,7 +14,7 @@
 {% elif sys == 'reboot' %}
 <div class="card ok">✓ Server‑Neustart ausgelöst – der Server fährt jetzt hoch. Das kann 1–2 Minuten dauern.</div>
 {% elif sys == 'update' %}
-<div class="card ok">✓ Update wird eingespielt – der Dienst startet gleich neu. Lade die Seite in etwa einer Minute neu.</div>
+<div class="card ok">Update gestartet. Die neue Version wird zuerst geprüft; anschließend startet der Dienst neu. Den Fortschritt siehst du unter <a href="/settings/shared#deployment-status">Einstellungen</a>.</div>
 {% elif sys_err %}
 <div class="card warn">⚠ System‑Aktion fehlgeschlagen: {{ sys_err }}<br>
 <span class="muted small">Vermutlich ist die sudo‑Regel/das Helferskript auf dem Server noch nicht eingerichtet (siehe DEPLOY.md).</span></div>
@@ -23,6 +23,7 @@
 <div class="grid">
   <div class="card">
     <h3>Master-Schalter</h3>
+    {% if preview %}<p><strong class="green-t">Mitlesen und Vorschläge aktiv.</strong></p><p class="muted">Der Versand bleibt technisch gesperrt. Der bisherige Server-Bot antwortet weiterhin.</p>{% else %}
     <p>Der Bot {% if running %}<strong class="green-t">läuft</strong>{% else %}ist <strong>pausiert</strong>{% endif %}.</p>
     <form method="post" action="/toggle-running">
       <button class="{% if running %}btn-danger{% else %}btn-primary{% endif %}">
@@ -30,6 +31,7 @@
       </button>
     </form>
     <p class="muted">Modus: <strong>{{ mode }}</strong> · in Einstellungen änderbar.</p>
+    {% endif %}
   </div>
 
   <div class="card">

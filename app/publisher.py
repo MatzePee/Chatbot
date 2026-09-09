@@ -21,11 +21,13 @@ import re
 import stat
 import subprocess
 import tempfile
+import threading
 from typing import Any, Optional
 
 from . import db, updater
 
 REPO_DIR = updater.REPO_DIR
+_publish_lock = threading.Lock()
 
 # Muster echter Anbieter-Schluessel. Bewusst eng, damit Platzhalter in
 # .env.example ("dein-key-hier") keinen Fehlalarm ausloesen.
@@ -37,7 +39,7 @@ _SECRET_PATTERNS = re.compile(
     r"|github_pat_[A-Za-z0-9_]{30,}"
     r"|-----BEGIN [A-Z ]*PRIVATE KEY-----"
 )
-_FORBIDDEN_PATHS = re.compile(r"^(\.env$|data/|\.venv/|exports/)")
+_FORBIDDEN_PATHS = re.compile(r"^(\.env(?!\.example$)(?:$|\.)|data/|\.venv(?:$|/|-)|exports/|\.askpass-)")
 
 
 # ------------------------------------------------------------------ Git-Helfer
@@ -89,6 +91,8 @@ def normalize_tag(tag: str) -> str:
     Update auftauchen - der Fehler faellt erst Wochen spaeter auf.
     """
     raw = re.sub(r"^V", "v", (tag or "").strip())    # auch grosses V annehmen
+    if not re.fullmatch(r"v?\d+\.\d+\.\d+", raw):
+        return ""
     parsed = updater.parse_version(raw)
     return f"v{parsed[0]}.{parsed[1]}.{parsed[2]}" if parsed else ""
 
@@ -197,7 +201,10 @@ def guard() -> list[str]:
     if ok:
         for rel in files.splitlines():
             rel = rel.strip()
-            if not rel or _FORBIDDEN_PATHS.match(rel):
+            if not rel:
+                continue
+            if _FORBIDDEN_PATHS.match(rel):
+                problems.append(f"Privater Pfad in der Veröffentlichung: {rel}")
                 continue
             full = os.path.join(REPO_DIR, rel)
             try:
@@ -239,29 +246,19 @@ def _askpass_env() -> tuple[dict[str, str], Optional[str]]:
 
 
 def _set_tag(tag: str, log: list, result: dict) -> bool:
-    """Setzt das Versions-Tag auf HEAD. Rueckgabe: weitermachen?
-
-    Sonderfall: Das Tag existiert bereits, zeigt aber auf einen Commit, der
-    nicht mehr im Branch liegt. Das passiert nach einem Rebase - etwa wenn ein
-    frueherer Upload scheiterte, Commit und Tag aber schon erzeugt waren. Ein
-    solches Tag ist ein Ueberbleibsel und wird auf HEAD nachgezogen; ein Tag,
-    das bereits auf GitHub liegt, bleibt unangetastet.
-    """
-    exists, _ = _git("rev-parse", "--verify", f"refs/tags/{tag}")
+    """Never silently publish an old commit or move an existing release tag."""
+    exists, commit = _git("rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}")
     if exists:
-        reachable, _ = _git("merge-base", "--is-ancestor", f"{tag}^{{commit}}", "HEAD")
-        if reachable:
-            log.append(f"Tag {tag} existierte bereits – übersprungen")
+        ok, head = _git("rev-parse", "HEAD")
+        if ok and commit == head:
+            log.append(f"Tag {tag} zeigt bereits auf diesen Stand")
             return True
-        on_remote, _ = _git("ls-remote", "--exit-code", "--tags", "origin", f"refs/tags/{tag}")
-        if on_remote:
-            result["error"] = (
-                f"Version {tag} liegt bereits auf GitHub, zeigt hier aber auf einen "
-                f"anderen Stand. Bitte eine neue Versionsnummer wählen.")
-            return False
-        _git("tag", "-d", tag)
-        log.append(f"Verwaistes Tag {tag} aus einem früheren Versuch neu gesetzt")
-
+        result["error"] = f"Version {tag} gehört zu einem anderen Stand. Bitte eine neue Versionsnummer wählen."
+        return False
+    newest = latest_tag()
+    if newest and updater.parse_version(tag) <= updater.parse_version(newest):
+        result["error"] = f"Die neue Version muss höher als {newest} sein."
+        return False
     ok, out = _git("tag", "-a", tag, "-m", tag)
     if not ok:
         result["error"] = f"Tag fehlgeschlagen: {_scrub(out)[:300]}"
@@ -270,8 +267,21 @@ def _set_tag(tag: str, log: list, result: dict) -> bool:
     return True
 
 
-# ------------------------------------------------------------ Veroeffentlichen
+def valid_github_remote(remote: str) -> bool:
+    return bool(re.fullmatch(r"(?:https://github\.com/|git@github\.com:)[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?", remote))
+
+
 def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]:
+    if not _publish_lock.acquire(blocking=False):
+        return {"ok": False, "error": "Eine Veröffentlichung läuft bereits.", "log": []}
+    try:
+        return _publish(message, tag, do_push)
+    finally:
+        _publish_lock.release()
+
+
+# ------------------------------------------------------------ Veroeffentlichen
+def _publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]:
     """Committet den aktuellen Stand, setzt optional ein Tag und laedt hoch."""
     log: list[str] = []
     result = {"ok": False, "log": log}
@@ -292,6 +302,16 @@ def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]
             result["error"] = ("Ungültige Version. Erwartet wird vX.Y.Z, z.B. v1.2.0.")
             return result
 
+    remote = str(db.get_setting("git_remote_url", "") or "").strip()
+    if do_push:
+        if not remote:
+            ok, remote = _git("remote", "get-url", "origin")
+            if not ok:
+                remote = ""
+        if not valid_github_remote(remote):
+            result["error"] = "Bitte eine GitHub-Repository-URL ohne eingebettete Zugangsdaten hinterlegen."
+            return result
+
     # Identitaet nur setzen, wenn hinterlegt und noch nicht konfiguriert
     for key, cfg in (("git_user_name", "user.name"), ("git_user_email", "user.email")):
         val = str(db.get_setting(key, "") or "").strip()
@@ -303,6 +323,10 @@ def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]
         result["error"] = f"Vormerken fehlgeschlagen: {_scrub(out)[:300]}"
         return result
 
+    problems = guard()
+    if problems:
+        result.update(error="Sicherheitsprüfung vor dem Commit fehlgeschlagen.", problems=problems)
+        return result
     ok, staged = _git("diff", "--cached", "--name-only")
     if staged.strip():
         ok, out = _git("commit", "-m", message or "Aktueller Stand")
@@ -320,7 +344,6 @@ def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]
         log.append("Nur lokal festgehalten – nicht hochgeladen")
         return result
 
-    remote = str(db.get_setting("git_remote_url", "") or "").strip()
     if remote:
         ok, cur = _git("remote", "get-url", "origin")
         if not ok:
@@ -337,6 +360,9 @@ def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]
         # Die Reihenfolge ist wichtig: ein vor dem Rebase gesetztes Tag würde auf
         # einem Commit hängenbleiben, der danach nicht mehr im Branch liegt.
         ok, out = _git("fetch", "origin", branch, timeout=120, env_extra=env_extra)
+        if not ok:
+            result["error"] = "GitHub-Abgleich fehlgeschlagen: " + _scrub(out)[:400]
+            return result
         if ok:
             ok2, counts = _git("rev-list", "--left-right", "--count",
                                f"origin/{branch}...HEAD")
@@ -354,6 +380,10 @@ def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]
                     return result
                 log.append(f"{behind} Commit(s) von GitHub geholt und aufgesetzt")
 
+        problems = guard()
+        if problems:
+            result.update(error="Sicherheitsprüfung nach dem GitHub-Abgleich fehlgeschlagen.", problems=problems)
+            return result
         if tag and not _set_tag(tag, log, result):
             return result
 
@@ -365,8 +395,10 @@ def publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any]
         log.append(f"Nach origin/{branch} hochgeladen")
         if tag:
             ok, out = _git("push", "origin", tag, timeout=120, env_extra=env_extra)
-            log.append(f"Tag {tag} hochgeladen" if ok
-                       else f"Tag konnte nicht hochgeladen werden: {_scrub(out)[:200]}")
+            if not ok:
+                result["error"] = f"Programmcode hochgeladen, aber Versions-Tag {tag} fehlt auf GitHub: {_scrub(out)[:200]}. Upload mit derselben Version erneut versuchen."
+                return result
+            log.append(f"Tag {tag} hochgeladen")
     finally:
         if askpass_path:
             try:

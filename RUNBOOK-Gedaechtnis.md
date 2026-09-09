@@ -1,4 +1,4 @@
-# Runbook: Gesprächsgedächtnis für den Fanvue-Chatbot
+# Runbook: Gesprächsgedächtnis für den AutoChat
 
 **Stand:** 06.09.2026 · **Status:** umgebaut auf zwei Schichten, noch nicht scharf
 

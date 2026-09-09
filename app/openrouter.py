@@ -155,7 +155,7 @@ def generate(messages: list[dict[str, str]], model: str = "", api_key: str = "",
         "Content-Type": "application/json",
         # Von OpenRouter empfohlene (optionale) Attribution-Header:
         "HTTP-Referer": "http://localhost",
-        "X-Title": "Fanvue Chatbot",
+        "X-Title": "AutoChat",
     }
     # Netzwerkfehler (Timeout, SSL-Handshake, DNS ...) als OpenRouterError
     # kapseln. Sonst fliegen sie an generate_retry vorbei, das nur
@@ -286,7 +286,7 @@ def analyze_image(image_url: str, instruction: str = "") -> list[str]:
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "HTTP-Referer": "http://localhost",
-        "X-Title": "Fanvue Chatbot",
+        "X-Title": "AutoChat",
     }
     resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
     if resp.status_code != 200:
@@ -335,7 +335,7 @@ def analyze_incoming_image(image_url: str) -> dict:
         "usage": {"include": True},
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-               "HTTP-Referer": "http://localhost", "X-Title": "Fanvue Chatbot"}
+               "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
     try:
         resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
         if resp.status_code != 200:
@@ -428,7 +428,7 @@ def classify_message(text: str, notes: str = "") -> dict:
         "usage": {"include": True},
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-               "HTTP-Referer": "http://localhost", "X-Title": "Fanvue Chatbot"}
+               "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
     try:
         resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=45)
         if resp.status_code != 200:
@@ -516,7 +516,7 @@ def confirm_ppv(messages_chrono: list, me_uuid: str, reason: str,
                             {"role": "user", "content": frage}],
                "temperature": 0, "max_tokens": 200}
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-               "HTTP-Referer": "http://localhost", "X-Title": "Fanvue Chatbot"}
+               "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
     try:
         resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=45)
         if resp.status_code != 200:
@@ -699,7 +699,7 @@ def consolidate_memory(current: dict, new_messages: list[dict],
         "usage": {"include": True},
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-               "HTTP-Referer": "http://localhost", "X-Title": "Fanvue Chatbot"}
+               "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
     roh = ""      # fuer die Fehlermeldung, siehe unten
     try:
         resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
@@ -724,7 +724,7 @@ def consolidate_memory(current: dict, new_messages: list[dict],
                       f"{((full.get('usage') or {}).get('completion_tokens'))} "
                       f"model={model}")
             if "content_filter" in grund:
-                # Bewusst nur "info": bei diesem Chatbot filtert der Anbieter
+                # Bewusst nur "info": bei diesem AutoChat filtert der Anbieter
                 # gelegentlich einen Block weg, das ist erwartet und nicht zu
                 # beheben. Verloren geht nur dieser eine Block, der bisherige
                 # Stand bleibt unangetastet. Als Warnung wuerde es die

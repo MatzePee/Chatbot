@@ -33,7 +33,7 @@ Preis fest und vergib Ordner-Tags. Bild-Tags pro Foto (inkl. LLM-Analyse) unter 
 {% endif %}
 
 {% if not connected %}
-<div class="card warn">Nicht mit Fanvue verbunden. Verbinde dich zuerst in den <a href="/settings">Einstellungen</a>.
+<div class="card warn">Nicht mit Fanvue verbunden. Verbinde dich zuerst in den <a href="/settings/shared#fanvue">gemeinsamen Einstellungen</a>.
 Für PPV wird der Scope <code>read:media</code> benötigt – falls die Ordner leer bleiben, bitte einmal neu verbinden.</div>
 {% elif error %}
 <div class="card warn">Ordner konnten nicht geladen werden: {{ error }}</div>
@@ -90,18 +90,19 @@ Für PPV wird der Scope <code>read:media</code> benötigt – falls die Ordner l
 </style>
 <script>
 (function () {
-  const cards = Array.from(document.querySelectorAll('.ppv-card'));
-  const fName = document.getElementById('filter-name');
-  const fStatus = document.getElementById('filter-status');
-  const fSearch = document.getElementById('filter-search');
-  const counter = document.getElementById('filter-count');
-  if (!cards.length) return;
+  let cards = Array.from(document.querySelectorAll('.ppv-card'));
+  document.addEventListener('creatorpilot:refresh', () => { cards = Array.from(document.querySelectorAll('.ppv-card')); fName = document.getElementById('filter-name'); fStatus = document.getElementById('filter-status'); fSearch = document.getElementById('filter-search'); counter = document.getElementById('filter-count'); applyFilter(); });
+  let fName = document.getElementById('filter-name');
+  let fStatus = document.getElementById('filter-status');
+  let fSearch = document.getElementById('filter-search');
+  let counter = document.getElementById('filter-count');
 
   function visibleCards() {
     return cards.filter(c => c.style.display !== 'none');
   }
 
   function applyFilter() {
+    if (!fName || !fStatus || !fSearch || !counter) return;
     const nameMode = fName.value;      // 'ppv' | 'all'
     const status = fStatus.value;      // 'all' | '1' | '0'
     const q = (fSearch.value || '').trim().toLowerCase();
@@ -193,9 +194,8 @@ Für PPV wird der Scope <code>read:media</code> benötigt – falls die Ordner l
     loadThumbs().then(() => { forceRefresh = false; });
   });
 
-  fName.addEventListener('change', applyFilter);
-  fStatus.addEventListener('change', applyFilter);
-  fSearch.addEventListener('input', applyFilter);
+  document.addEventListener('change', e => { if (e.target.matches('#filter-name,#filter-status')) applyFilter(); });
+  document.addEventListener('input', e => { if (e.target.matches('#filter-search')) applyFilter(); });
   applyFilter();
 })();
 

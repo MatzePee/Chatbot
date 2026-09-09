@@ -187,6 +187,8 @@ sed -e "s|^REPO=.*|REPO=\"$INSTALL_DIR\"|" \
     "$INSTALL_DIR/deploy/fanvue-admin" > /usr/local/bin/fanvue-admin
 chown root:root /usr/local/bin/fanvue-admin
 chmod 755 /usr/local/bin/fanvue-admin
+install -d -m 755 /usr/local/libexec
+install -o root -g root -m 755 "$INSTALL_DIR/deploy/creatorstudio_update.py" /usr/local/libexec/mp-creatorstudio-update
 ok "/usr/local/bin/fanvue-admin installiert"
 
 SUDOERS=/etc/sudoers.d/fanvue-admin

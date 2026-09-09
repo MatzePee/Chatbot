@@ -8,7 +8,7 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
 {% if msg %}<div class="card stale">{{ msg }}</div>{% endif %}
 
 {% for d in drafts %}
-<div class="card draft{% if d['stale_note'] %} is-stale{% endif %}">
+<div id="draft-{{ d['id'] }}" class="card draft{% if d['stale_note'] %} is-stale{% endif %}">
   <div class="draft-head">
     <strong>{{ d['display_name'] or d['handle'] or d['user_uuid'] }}</strong>
     {% if d['is_ppv'] %}<span class="tag">💰 PPV · ${{ (d['ppv_price_cents'] or 0)/100 }} · Set „{{ d['ppv_folder'] }}"</span>{% endif %}
@@ -27,11 +27,11 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
   {% endif %}
   {% for m in contexts.get(d['id'], []) %}
   <div class="ctx {{ 'me' if m['who']=='Ich' else '' }}">
-    <span class="tag">{{ m['who'] }}</span> {{ m['text'] }}{% if m['media'] %} 📎{% endif %}
+    <div class="message-meta"><strong>{{ m['who'] }}</strong><time>{{ m['sent_at'] | message_time }}</time></div><div class="message-text">{{ m['text'] }}</div>{% if m['media'] %} 📎{% endif %}
   </div>
   {% endfor %}
   {% if d['incoming_text'] %}
-  <div class="incoming"><span class="tag">Fan</span> {{ d['incoming_text'] }}</div>
+  <div class="incoming"><div class="message-meta"><strong>Fan</strong><time>{{ incoming_times.get(d['id']) | message_time }}</time></div><div class="message-text">{{ d['incoming_text'] }}</div></div>
   {% endif %}
   {% if d['guardrail_note'] %}
   <div class="guard">⚠ {{ d['guardrail_note'] }}</div>
@@ -228,17 +228,14 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
       .catch(function () { btn.disabled = false; btn.textContent = 'Anhängen'; });
   }
 
-  document.querySelectorAll('.ppv-add').forEach(function (b) {
-    b.addEventListener('click', function () { open(b.closest('.ppv-bar').dataset.draft); });
-  });
-  document.querySelectorAll('.ppv-remove').forEach(function (b) {
-    b.addEventListener('click', function () {
-      if (!confirm('PPV aus diesem Entwurf entfernen? Der Text bleibt stehen.')) return;
-      b.disabled = true;
-      fetch('/queue/' + b.closest('.ppv-bar').dataset.draft + '/ppv/remove', { method: 'POST' })
-        .then(function () { location.reload(); })
-        .catch(function () { b.disabled = false; });
-    });
+  document.addEventListener('click', function(e) {
+    var b = e.target.closest('.ppv-add, .ppv-remove');
+    if (!b || b.disabled) return;
+    if (b.matches('.ppv-add')) { open(b.closest('.ppv-bar').dataset.draft); return; }
+    if (!confirm('PPV aus diesem Entwurf entfernen? Der Text bleibt stehen.')) return;
+    b.disabled = true;
+    fetch('/queue/' + b.closest('.ppv-bar').dataset.draft + '/ppv/remove', { method: 'POST' })
+      .then(function () { location.reload(); }).catch(function () { b.disabled = false; });
   });
   document.getElementById('pk-close').addEventListener('click', close);
   overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });

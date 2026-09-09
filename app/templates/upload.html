@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Upload</h1>
+<h1>Version &amp; GitHub</h1>
 <p class="muted">Aktuellen Stand nach GitHub veröffentlichen. Von hier aus laufen dieselben
 Schritte wie in <code>deploy/git-setup.sh</code> – inklusive der Prüfung, dass keine
 Zugangsdaten oder Datenbankdateien mitgehen.</p>
+{% if preview %}<div class="card ok">GitHub-Veröffentlichung ist im Mitlesemodus möglich. Nachrichtenversand, Posts und Token-Erneuerungen bleiben gesperrt. Der Server installiert die neue Version erst über seinen Update-Knopf.</div>{% endif %}
 
 {% if msg %}<div class="card ok">✓ {{ msg }}</div>{% endif %}
 {% if err %}<div class="card warn">⚠ {{ err }}</div>{% endif %}
@@ -59,6 +60,7 @@ Zugangsdaten oder Datenbankdateien mitgehen.</p>
   <h3>Veröffentlichen</h3>
   <form method="post" action="/upload/publish"
         onsubmit="return confirm('Aktuellen Stand committen und hochladen?');">
+    <input type="hidden" name="upload_csrf" value="{{ upload_csrf }}">
     <label>Commit-Nachricht
       <input name="message" value="" placeholder="{{ s['git_commit_default'] }}"></label>
 
@@ -85,6 +87,7 @@ Zugangsdaten oder Datenbankdateien mitgehen.</p>
 {% endif %}
 
 <form method="post" action="/upload/settings">
+  <input type="hidden" name="upload_csrf" value="{{ upload_csrf }}">
   <div class="card">
     <h3>Einstellungen</h3>
     <label>Repository-URL

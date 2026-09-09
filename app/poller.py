@@ -47,6 +47,9 @@ def _within_active_hours() -> bool:
 
 
 def _effective_mode(chat: Any) -> str:
+    from . import preview
+    if preview.enabled():
+        return "approval"
     if chat and chat["mode_override"] in ("approval", "auto"):
         return chat["mode_override"]
     return db.get_setting("mode", "approval")
@@ -71,7 +74,8 @@ def poll_cycle(custom_list_id=_UNSET) -> None:
     custom_list_id=_UNSET -> Prio-1-Liste aus den Einstellungen; sonst die uebergebene."""
     if not fanvue.is_connected():
         return
-    filter_ = db.get_setting("chat_filter", "unread")
+    from . import preview
+    filter_ = "" if preview.enabled() else db.get_setting("chat_filter", "unread")
     if custom_list_id is _UNSET:
         custom_list_id = db.get_setting("chat_custom_list_id", "")
     max_chats = int(db.get_setting("max_chats_per_cycle", 10))
@@ -107,6 +111,9 @@ def _check_alert_keywords(user_uuid: str, handle: str, display_name: str,
     wohin gemeldet wurde. Ein eigener Merker, weil last_inbound_uuid schon
     gesetzt sein kann, bevor wir hier ankommen.
     """
+    from . import preview
+    if preview.enabled():
+        return
     if not db.get_setting("alert_keywords_enabled", True):
         return
     msg_uuid = last_msg.get("uuid") or ""
@@ -190,7 +197,9 @@ def _process_chat(user_uuid: str, handle: str, display_name: str, me_uuid: str) 
     # schaut nur in ein Feld der ohnehin geladenen Chat-Zeile), das Einlesen
     # selbst laeuft im Hintergrund. Die Antwort auf DIESE Nachricht wartet also
     # nicht darauf; der Verlauf wirkt ab der uebernaechsten.
-    memory.maybe_auto_backfill(user_uuid, display_name or handle or "")
+    from . import preview
+    if not preview.enabled():
+        memory.maybe_auto_backfill(user_uuid, display_name or handle or "")
 
     # Neue Fan-Nachricht liegt vor -> eine noch eingeplante Reaktivierung verwerfen,
     # damit nicht kurz danach doch noch ein "wo bist du?" rausgeht.

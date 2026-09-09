@@ -3,24 +3,30 @@ from __future__ import annotations
 
 import os
 import re as _re
+import secrets
 import subprocess
 import threading
 import time
 from datetime import datetime
 from urllib.parse import quote as _q
 
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.concurrency import run_in_threadpool
 
-from . import csv_import, db, default_docs, fanvue, memory, openrouter, poller
+from .preview import enabled as preview_enabled, install_network_guard, PreviewMiddleware, PreviewNetworkBlocked, MESSAGE, status as preview_status
+install_network_guard()
+
+from . import csv_import, db, default_docs, deployment, fanvue, memory, openrouter, poller
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-app = FastAPI(title="Fanvue Chatbot")
+app = FastAPI(title="MP CreatorStudio")
+app.add_middleware(PreviewMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ.get("SECRET_KEY", "dev-secret-change-me"),
@@ -44,14 +50,33 @@ def _fmt_isodate(s):
         return str(s)[:10]
 
 
+def _fmt_message_time(value):
+    from datetime import timezone
+    from zoneinfo import ZoneInfo
+    if not value:
+        return "Zeitpunkt nicht verfügbar"
+    try:
+        stamp = (datetime.fromtimestamp(float(value), timezone.utc)
+                 if isinstance(value, (int, float)) else
+                 datetime.fromisoformat(str(value).replace("Z", "+00:00")))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return stamp.astimezone(ZoneInfo("Europe/Berlin")).strftime("%d.%m.%Y · %H:%M %Z")
+    except (ValueError, TypeError, OverflowError):
+        return "Zeitpunkt nicht verfügbar"
+
+
+templates.env.filters["message_time"] = _fmt_message_time
 templates.env.filters["ts"] = _fmt_ts
 templates.env.filters["fdate"] = _fmt_isodate
 
 
 @app.on_event("startup")
 def _startup() -> None:
+    from tools.backup import backup
+    backup(os.path.dirname(db.DATA_DIR))
     db.init_db()
-    poller.start()
+    # Worker starts after the AutoPost has initialized successfully.
 
 
 # --------------------------------------------------------------------- Kontext
@@ -75,16 +100,19 @@ def _static_version() -> str:
 def _base_ctx(request: Request) -> dict:
     return {
         "request": request,
+        "workspace_area": "settings" if request.url.path.startswith(("/settings/shared", "/upload")) else "autochat",
         "css_v": _static_version(),
         "connected": fanvue.is_connected(),
-        "running": db.get_setting("bot_running", False),
-        "mode": db.get_setting("mode", "approval"),
+        "running": db.get_setting("bot_running", False) and not preview_enabled() and not deployment.pending(),
+        "deployment_pending": deployment.pending(),
+        "preview": preview_enabled(),
+        "mode": "Mitlesen / Vorschläge" if preview_enabled() else db.get_setting("mode", "approval"),
         "pending_count": db.count_drafts("pending"),
         "tokens": db.get_tokens(),
         # Ohne eigene Konto-Kennung kann der Bot eigene Nachrichten nicht von
         # Fan-Nachrichten unterscheiden - das verfaelscht jeden Prompt.
         "account_missing": fanvue.is_connected() and not fanvue.account_uuid(),
-        "poller_status": poller.status(),
+        "poller_status": preview_status() if preview_enabled() else poller.status(),
     }
 
 
@@ -104,6 +132,8 @@ def upload_page(request: Request, msg: str = "", err: str = ""):
     ctx["problems"] = publisher.guard() if not ctx["st"].get("error") else []
     ctx["msg"] = msg
     ctx["err"] = err
+    request.session.setdefault('upload_csrf', secrets.token_urlsafe(32))
+    ctx['upload_csrf'] = request.session['upload_csrf']
     return templates.TemplateResponse("upload.html", ctx)
 
 
@@ -118,6 +148,7 @@ def api_upload_status():
 @app.post("/upload/settings")
 async def upload_settings(request: Request):
     form = await request.form()
+    _check_upload_csrf(request, form)
     for key in ("git_remote_url", "git_branch", "git_user_name", "git_user_email",
                 "git_commit_default"):
         if key in form:
@@ -137,16 +168,24 @@ async def upload_settings(request: Request):
 async def upload_publish(request: Request):
     from . import publisher
     form = await request.form()
+    _check_upload_csrf(request, form)
     message = str(form.get("message", "")).strip() or db.get_setting("git_commit_default", "Aktueller Stand")
     tag = str(form.get("tag", "")).strip()
     do_push = str(form.get("push", "1")) == "1"
-    res = publisher.publish(message, tag=tag, do_push=do_push)
+    res = await run_in_threadpool(publisher.publish, message, tag=tag, do_push=do_push)
     if res.get("ok"):
         return RedirectResponse(f"/upload?msg={_q(' · '.join(res['log']))}", status_code=303)
     detail = res.get("error", "Unbekannter Fehler")
     if res.get("problems"):
         detail += " — " + " ".join(res["problems"])
     return RedirectResponse(f"/upload?err={_q(detail[:400])}", status_code=303)
+
+
+def _check_upload_csrf(request, form):
+    expected = request.session.get('upload_csrf', '')
+    supplied = str(form.get('upload_csrf', ''))
+    if not expected or not secrets.compare_digest(expected, supplied):
+        raise HTTPException(403, 'Bitte die Upload-Seite neu öffnen und erneut versuchen.')
 
 
 @app.get("/api/update-check")
@@ -751,24 +790,32 @@ def system_reboot():
 
 
 # ------------------------------------------------------------- Freigabe-Queue
-def _draft_context(user_uuid: str, incoming_text: str, n: int, me_uuid: str) -> list[dict]:
-    """Die letzten n Nachrichten VOR der ausloesenden Fan-Nachricht (fuer die Queue-Anzeige)."""
-    if n <= 0:
-        return []
-    try:
-        res = fanvue.list_messages(user_uuid, size=n + 4)
-    except Exception:  # noqa: BLE001
-        return []
-    msgs = list(reversed(res.get("data", [])))  # chronologisch (aeltest -> neuest)
-    # Die letzte Nachricht ist i.d.R. die eingehende Fan-Nachricht (schon separat gezeigt)
-    if msgs and (msgs[-1].get("text") or "").strip() == (incoming_text or "").strip():
-        msgs = msgs[:-1]
-    out = []
-    for m in msgs[-n:]:
-        who = "Ich" if (m.get("sender") or {}).get("uuid", "") == me_uuid else "Fan"
-        out.append({"who": who, "text": (m.get("text") or "").strip(),
-                    "media": bool(m.get("hasMedia"))})
-    return out
+_draft_context_cache = {}
+
+
+def _draft_context(user_uuid: str, inbound_uuid: str, n: int, me_uuid: str,
+                   *, allow_remote: bool = True) -> tuple[list[dict], object]:
+    """Anchor by message UUID, never by repeated text or draft creation time."""
+    rows = [dict(r) for r in db.messages_tail_chronological(user_uuid, 500)]
+    if not any(r["msg_uuid"] == inbound_uuid for r in rows) and allow_remote:
+        try:
+            messages = list(reversed(fanvue.list_messages(user_uuid, size=50, mark_as_read=False).get("data", [])))
+            rows = [{"msg_uuid": m.get("uuid"), "direction": "out" if
+                     (m.get("sender") or {}).get("uuid") == me_uuid else "in",
+                     "text": m.get("text") or "", "has_media": m.get("hasMedia"),
+                     "sent_at": memory._msg_epoch(m)} for m in messages]
+        except Exception:
+            pass
+    anchor = next((i for i, r in enumerate(rows) if r["msg_uuid"] == inbound_uuid), None)
+    if anchor is None:
+        return _draft_context_cache.get((user_uuid, inbound_uuid, n, me_uuid), ([], None))
+    context = rows[max(0, anchor - max(0, n)):anchor]
+    result = [{"who": "Ich" if r["direction"] == "out" else "Fan", "text": r["text"],
+             "media": r["has_media"], "sent_at": r["sent_at"]} for r in context], rows[anchor]["sent_at"]
+    if len(_draft_context_cache) >= 512:
+        _draft_context_cache.pop(next(iter(_draft_context_cache)))
+    _draft_context_cache[(user_uuid, inbound_uuid, n, me_uuid)] = result
+    return result
 
 
 @app.get("/queue", response_class=HTMLResponse)
@@ -780,11 +827,12 @@ def queue(request: Request, msg: str = ""):
     ctx["max_regen"] = int(db.get_setting("draft_max_regen", 10))
     n = int(db.get_setting("queue_context_messages", 2))
     me_uuid = fanvue.account_uuid()
-    contexts: dict[int, list[dict]] = {}
-    if n > 0 and fanvue.is_connected():
-        for d in drafts:
-            contexts[d["id"]] = _draft_context(d["user_uuid"], d["incoming_text"], n, me_uuid)
-    ctx["contexts"] = contexts
+    contexts, incoming_times = {}, {}
+    for d in drafts:
+        contexts[d["id"]], incoming_times[d["id"]] = _draft_context(
+            d["user_uuid"], d["inbound_uuid"], n, me_uuid,
+            allow_remote=not request.headers.get("X-CreatorStudio-Refresh") and fanvue.is_connected())
+    ctx.update(contexts=contexts, incoming_times=incoming_times)
     return templates.TemplateResponse("queue.html", ctx)
 
 
@@ -1716,6 +1764,44 @@ def reactivate_now_route(user_uuid: str, handle: str = Form(""), display_name: s
 
 
 # ------------------------------------------------------------------ Settings
+_SHARED_FANVUE_KEYS = frozenset({"fanvue_client_id", "fanvue_client_secret", "fanvue_redirect_uri", "fanvue_api_version"})
+_SHARED_UPDATE_KEYS = frozenset({"update_check_enabled", "update_notify_telegram", "update_check_interval_hours"})
+_SHARED_SETTINGS_KEYS = _SHARED_FANVUE_KEYS | _SHARED_UPDATE_KEYS
+
+
+@app.get("/settings/shared", response_class=HTMLResponse)
+def shared_settings_page(request: Request, saved: str = ""):
+    ctx = _base_ctx(request)
+    ctx.update(s=db.all_settings(), saved=saved)
+    return templates.TemplateResponse("shared_settings.html", ctx)
+
+
+@app.post("/settings/shared/fanvue")
+async def save_shared_fanvue(request: Request):
+    form = await request.form()
+    for key in _SHARED_FANVUE_KEYS:
+        if key in form:
+            db.set_setting(key, str(form[key]).strip())
+    db.log("info", "system", "Gemeinsame Fanvue-Einstellungen gespeichert")
+    return RedirectResponse("/settings/shared?saved=fanvue#fanvue", status_code=303)
+
+
+@app.post("/settings/shared/updates")
+async def save_shared_updates(request: Request):
+    form = await request.form()
+    try:
+        interval = int(form.get("update_check_interval_hours", ""))
+        if not 1 <= interval <= 168:
+            raise ValueError
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Prüfabstand muss zwischen 1 und 168 Stunden liegen.")
+    for key in _SHARED_UPDATE_KEYS - {"update_check_interval_hours"}:
+        db.set_setting(key, key in form)
+    db.set_setting("update_check_interval_hours", interval)
+    db.log("info", "system", "Gemeinsame Update-Einstellungen gespeichert")
+    return RedirectResponse("/settings/shared?saved=updates#updates", status_code=303)
+
+
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
     ctx = _base_ctx(request)
@@ -1751,7 +1837,7 @@ async def settings_telegram_test(request: Request):
     try:
         bot = notify.get_me(token=token)
         notify.send_or_raise(
-            "✅ <b>Fanvue-Chatbot</b>\nDie Verbindung steht. Ab jetzt meldet sich der Bot hier, "
+            "✅ <b>AutoChat</b>\nDie Verbindung steht. Ab jetzt meldet sich der Bot hier, "
             "wenn ein Entwurf in der Freigabe-Queue endgültig hängen bleibt.",
             chat_id=chat_id, token=token)
         return {"ok": True,
@@ -1886,7 +1972,9 @@ _BOOL_KEYS = {"active_hours_enabled", "ppv_enabled", "ppv_use_llm_classifier",
 async def save_settings(request: Request):
     form = await request.form()
     for key in db.DEFAULT_SETTINGS:
-        if key in ("bot_running",):
+        # Shared controls have their own forms. Omitted checkboxes here must
+        # never disable the updater or overwrite the shared connection.
+        if key == "bot_running" or key in _SHARED_SETTINGS_KEYS:
             continue
         if key in _BOOL_KEYS:
             db.set_setting(key, key in form)
@@ -2205,7 +2293,7 @@ def oauth_start(request: Request):
     redirect_uri = db.get_setting("fanvue_redirect_uri")
     if not client_id or not redirect_uri:
         db.log("error", "oauth", "Client-ID/Redirect-URI fehlen")
-        return RedirectResponse("/settings", status_code=303)
+        return RedirectResponse("/settings/shared#fanvue", status_code=303)
     verifier, challenge = fanvue.make_pkce()
     state = fanvue.new_state()
     request.session["pkce_verifier"] = verifier
@@ -2244,10 +2332,21 @@ def oauth_callback(request: Request, code: str = "", state: str = "", error: str
 def oauth_disconnect():
     db.clear_tokens()
     db.log("info", "oauth", "Fanvue-Verbindung getrennt")
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse("/settings/shared#fanvue", status_code=303)
 
 
 @app.get("/health")
 def health():
-    return {"ok": True, "running": db.get_setting("bot_running", False),
+    return {"ok": True, "running": db.get_setting("bot_running", False) and not preview_enabled() and not deployment.pending(),
+        "preview": preview_enabled(),
             "connected": fanvue.is_connected(), "ts": time.time()}
+
+
+# AutoPost shares the process, port and release lifecycle of the AutoChat.
+from .creatorpilot import install_content_studio
+install_content_studio(app)
+
+@app.exception_handler(PreviewNetworkBlocked)
+async def preview_network_error(request, exc):
+    from fastapi.responses import JSONResponse
+    return JSONResponse({'detail': MESSAGE}, status_code=403)

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen · MP CreatorStudio{% endblock %}
+{% block content %}
+<h1>Gemeinsame Einstellungen</h1>
+<p class="muted">Verbindungen und Programm-Updates für deinen gesamten Creator Workspace.</p>
+<div class="card" id="deployment-status" data-live-preserve hidden>
+  <h3>Update-Fortschritt</h3><p class="muted" id="deployment-message"></p>
+</div>
+<script>
+(() => {
+  const card = document.getElementById('deployment-status');
+  async function refreshDeployment() {
+    try {
+      const response = await fetch('/api/deployment-status', {cache: 'no-store'});
+      if (!response.ok) return;
+      const state = await response.json();
+      card.hidden = !state.message;
+      document.getElementById('deployment-message').textContent = state.message || '';
+      card.className = 'card' + (['failed', 'rolled_back'].includes(state.phase) ? ' warn' : state.phase === 'complete' ? ' ok' : '');
+    } catch { /* Service may be restarting; retry automatically. */ }
+  }
+  refreshDeployment(); setInterval(refreshDeployment, 5000);
+})();
+</script>
+{% if saved in ['fanvue', 'updates'] %}<div class="card ok" role="status">Einstellungen gespeichert.</div>{% endif %}
+{% if preview %}<p class="muted">Im geschützten Mitlesemodus sind Änderungen an der Verbindung und den Updates gesperrt.</p>{% endif %}
+<div class="card" id="fanvue">
+  <h2>Gemeinsame Fanvue-Verbindung</h2>
+  <p class="muted">AutoChat und AutoPost verwenden dieselben Zugangsdaten und dieselbe Anmeldung.</p>
+  {% if connected %}
+    <p><span class="dot green"></span> Verbunden{% if tokens and tokens['account_handle'] %} als <strong>{{ tokens['account_handle'] }}</strong>{% endif %}.</p>
+    {% if tokens and tokens['scope'] %}
+    <p class="small muted">Gewährte Scopes: <code>{{ tokens['scope'] }}</code></p>
+    {% set granted = tokens['scope'] %}
+    {% set missing = [] %}
+    {% for need in ['read:fan','read:insights','read:media','read:chat','write:chat'] %}
+      {% if need not in granted %}{% set _ = missing.append(need) %}{% endif %}
+    {% endfor %}
+    {% if missing %}
+    <p class="small" style="color:#e0b050">⚠ Fehlende Scopes: <code>{{ missing | join(', ') }}</code>.
+    Hinweis: <code>read:fan</code> und <code>read:insights</code> gibt Fanvue nur für
+    <strong>Creator-/Agentur-Konten</strong> frei – bei anderen Kontotypen bleiben sie ungewährt
+    (Bot funktioniert trotzdem, nur ohne Fan-Insights und volle Mitgliederliste).</p>
+    {% endif %}
+    {% endif %}
+    <form method="post" action="/oauth/disconnect"><button class="btn-danger">Verbindung trennen</button></form>
+  {% else %}
+    <p><span class="dot red"></span> Nicht verbunden. Trage unten Client-ID, Secret und Redirect-URI ein, speichere, dann verbinde.</p>
+    {% if not preview %}<a class="btn-primary" href="/oauth/start">Mit Fanvue verbinden</a>{% endif %}
+  {% endif %}
+</div>
+
+<form method="post" action="/settings/shared/fanvue">
+  <details class="card sect"{% if not connected %} open{% endif %}>
+    <summary>Fanvue-Zugangsdaten</summary>
+    <label>Client-ID <input name="fanvue_client_id" value="{{ s['fanvue_client_id'] }}"></label>
+    <label>Client-Secret <input name="fanvue_client_secret" type="password" value="{{ s['fanvue_client_secret'] }}"></label>
+    <label>Redirect-URI (exakt in Fanvue-App hinterlegen)
+      <input name="fanvue_redirect_uri" value="{{ s['fanvue_redirect_uri'] }}"></label>
+    <label>API-Version <input name="fanvue_api_version" value="{{ s['fanvue_api_version'] }}"></label>
+    <p><button class="btn-primary">Fanvue-Einstellungen speichern</button></p>
+  </details>
+</form>
+<form method="post" action="/settings/shared/updates">
+  <div class="card" id="updates">
+    <h2>Programm-Updates</h2>
+    <p class="muted">Ein gemeinsamer Updateweg für MP CreatorStudio mit AutoChat und AutoPost.</p>
+    <p class="muted">Prüft regelmäßig, ob im Repository eine neue Version (Git-Tag <code>vX.Y.Z</code>)
+    veröffentlicht wurde. Installiert wird nur auf Knopfdruck über das Dashboard – nie von selbst.</p>
+    <div class="row">
+      <label class="chk"><input type="checkbox" name="update_check_enabled"
+        {% if s['update_check_enabled'] %}checked{% endif %}> Automatisch nach Updates sehen</label>
+      <label class="chk"><input type="checkbox" name="update_notify_telegram"
+        {% if s['update_notify_telegram'] %}checked{% endif %}> Neue Version per Telegram melden</label>
+      <label>Prüfabstand (Stunden)
+        <input name="update_check_interval_hours" type="number" min="1" max="168"
+          value="{{ s['update_check_interval_hours'] }}"></label>
+    </div>
+    <div class="draft-actions"><button class="btn-primary">Update-Einstellungen speichern</button><a class="btn" href="/upload">Version &amp; GitHub</a></div>
+    <p class="muted small">Telegram-Benachrichtigungen nutzen die in <a href="/settings#telegram">AutoChat</a> hinterlegte Telegram-Verbindung.</p>
+  </div>
+</form>
+{% endblock %}

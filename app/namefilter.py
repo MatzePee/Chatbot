@@ -2,7 +2,7 @@
 
 Verhindert, dass der Bot Kosenamen ("Schatz", "babe" ...) oder den Namen des Fans
 in aufeinanderfolgenden Nachrichten wiederholt – eine typische Verraeter-Signatur
-von Chatbots.
+von AutoChat.
 """
 from __future__ import annotations
 

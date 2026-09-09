@@ -119,6 +119,9 @@ def _store_token_response(payload: dict[str, Any]) -> None:
 
 def _refresh_token() -> None:
     """Erneuert den Access-Token via Refresh-Token (serialisiert)."""
+    from . import preview
+    if preview.enabled():
+        raise NotAuthenticated('Mitlesemodus: Nur der laufende Server-Bot darf Tokens erneuern.')
     with _refresh_lock:
         tokens = db.get_tokens()
         if not tokens or not tokens["refresh_token"]:
@@ -146,6 +149,12 @@ def _refresh_token() -> None:
 
 def get_access_token() -> str:
     tokens = db.get_tokens()
+    from . import preview
+    if preview.enabled():
+        try:
+            return preview.access_token(tokens)
+        except preview.PreviewNetworkBlocked as exc:
+            raise NotAuthenticated(str(exc)) from exc
     if not tokens or not tokens["access_token"]:
         raise NotAuthenticated()
     if not tokens["expires_at"] or tokens["expires_at"] <= time.time():
@@ -177,6 +186,9 @@ _TIMEOUT = httpx.Timeout(connect=10.0, read=45.0, write=30.0, pool=10.0)
 def _request(method: str, path: str, *, params: dict | None = None,
              json_body: dict | None = None, _retry: bool = True,
              _attempts: int = 3) -> httpx.Response:
+    from . import preview
+    if preview.enabled() and method.upper() not in ('GET', 'HEAD'):
+        raise preview.PreviewNetworkBlocked(preview.MESSAGE)
     url = f"{API_BASE}{path}"
     last_err = ""
     for attempt in range(_attempts):
@@ -462,6 +474,9 @@ def message_image_url(msg: dict[str, Any]) -> str:
 
 def list_messages(user_uuid: str, size: int = 15, mark_as_read: bool = False,
                   page: int = 1) -> dict[str, Any]:
+    from . import preview
+    if preview.enabled():
+        mark_as_read = False
     params = {"size": size, "page": page, "markAsRead": "true" if mark_as_read else "false"}
     return _request("GET", f"/chats/{user_uuid}/messages", params=params).json()
 

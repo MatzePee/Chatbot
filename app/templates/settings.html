@@ -1,31 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Einstellungen</h1>
+<h1>AutoChat-Einstellungen</h1>
 
-<div class="card">
-  <h3>Fanvue-Verbindung</h3>
-  {% if connected %}
-    <p><span class="dot green"></span> Verbunden{% if tokens and tokens['account_handle'] %} als <strong>{{ tokens['account_handle'] }}</strong>{% endif %}.</p>
-    {% if tokens and tokens['scope'] %}
-    <p class="small muted">Gewährte Scopes: <code>{{ tokens['scope'] }}</code></p>
-    {% set granted = tokens['scope'] %}
-    {% set missing = [] %}
-    {% for need in ['read:fan','read:insights','read:media','read:chat','write:chat'] %}
-      {% if need not in granted %}{% set _ = missing.append(need) %}{% endif %}
-    {% endfor %}
-    {% if missing %}
-    <p class="small" style="color:#e0b050">⚠ Fehlende Scopes: <code>{{ missing | join(', ') }}</code>.
-    Hinweis: <code>read:fan</code> und <code>read:insights</code> gibt Fanvue nur für
-    <strong>Creator-/Agentur-Konten</strong> frei – bei anderen Kontotypen bleiben sie ungewährt
-    (Bot funktioniert trotzdem, nur ohne Fan-Insights und volle Mitgliederliste).</p>
-    {% endif %}
-    {% endif %}
-    <form method="post" action="/oauth/disconnect"><button class="btn-danger">Verbindung trennen</button></form>
-  {% else %}
-    <p><span class="dot red"></span> Nicht verbunden. Trage unten Client-ID, Secret und Redirect-URI ein, speichere, dann verbinde.</p>
-    <a class="btn-primary" href="/oauth/start">🔗 Mit Fanvue verbinden</a>
-  {% endif %}
-</div>
+<p class="muted">Modelle, Antwortverhalten und Abläufe für AutoChat. Die gemeinsame <a href="/settings/shared#fanvue">Fanvue-Verbindung und Programm-Updates</a> findest du oben unter Einstellungen.</p>
 
 <div class="sect-tools">
   <a id="sect-all">alle aufklappen</a><span class="muted">·</span>
@@ -34,16 +11,8 @@
 
 <form method="post" action="/settings">
 
-  <h2 class="grp">Verbindung &amp; Schlüssel</h2>
-  <p class="muted grp-desc">Zugangsdaten für Fanvue, OpenRouter und die Bildanalyse.</p>
-  <details class="card sect">
-    <summary>Fanvue OAuth</summary>
-    <label>Client-ID <input name="fanvue_client_id" value="{{ s['fanvue_client_id'] }}"></label>
-    <label>Client-Secret <input name="fanvue_client_secret" type="password" value="{{ s['fanvue_client_secret'] }}"></label>
-    <label>Redirect-URI (exakt in Fanvue-App hinterlegen)
-      <input name="fanvue_redirect_uri" value="{{ s['fanvue_redirect_uri'] }}"></label>
-    <label>API-Version <input name="fanvue_api_version" value="{{ s['fanvue_api_version'] }}"></label>
-  </details>
+  <h2 class="grp">KI &amp; Bildanalyse</h2>
+  <p class="muted grp-desc">OpenRouter-Zugang und Modelle für AutoChat.</p>
   <details class="card sect">
     <summary>OpenRouter</summary>
     <label>API-Key <input name="openrouter_api_key" type="password" value="{{ s['openrouter_api_key'] }}"></label>
@@ -470,9 +439,9 @@
       <input name="escalation_keywords" value="{{ s['escalation_keywords'] }}"></label>
   </details>
 
-  <h2 class="grp">Benachrichtigungen &amp; Updates</h2>
-  <p class="muted grp-desc">Meldungen per Telegram und neue Programmversionen.</p>
-  <details class="card sect">
+  <h2 class="grp">Benachrichtigungen</h2>
+  <p class="muted grp-desc">Meldungen und Stichwort-Alarme per Telegram.</p>
+  <details class="card sect" id="telegram">
     <summary>Telegram-Benachrichtigung</summary>
     <p class="muted">Meldet sofort, wenn ein Entwurf endgültig hängt – also alle automatischen
     Neuversuche aufgebraucht sind und ohne dich nichts mehr passiert. Jeder Entwurf wird
@@ -521,20 +490,7 @@
     </div>
     <p id="kw-out" class="muted" style="margin-top:8px"></p>
   </details>
-  <details class="card sect">
-    <summary>Updates</summary>
-    <p class="muted">Prüft regelmäßig, ob im Repository eine neue Version (Git-Tag <code>vX.Y.Z</code>)
-    veröffentlicht wurde. Installiert wird nur auf Knopfdruck über das Dashboard – nie von selbst.</p>
-    <div class="row">
-      <label class="chk"><input type="checkbox" name="update_check_enabled"
-        {% if s['update_check_enabled'] %}checked{% endif %}> Automatisch nach Updates sehen</label>
-      <label class="chk"><input type="checkbox" name="update_notify_telegram"
-        {% if s['update_notify_telegram'] %}checked{% endif %}> Neue Version per Telegram melden</label>
-      <label>Prüfabstand (Stunden)
-        <input name="update_check_interval_hours" type="number" min="1" max="168"
-          value="{{ s['update_check_interval_hours'] }}"></label>
-    </div>
-  </details>
+
   <script>
   (function () {
     var out = document.getElementById('tg-out');

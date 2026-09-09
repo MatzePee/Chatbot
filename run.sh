@@ -1,41 +1,23 @@
 #!/usr/bin/env bash
-# Startskript fuer den Fanvue-Chatbot (macOS + Ubuntu).
-set -e
+set -euo pipefail
 cd "$(dirname "$0")"
-
-VENV=".venv"
-
-# Pruefen, ob ein vorhandener venv auf DIESER Plattform funktioniert.
-# (Falls z.B. ein venv einer anderen Plattform mitgeliefert wurde, neu bauen.)
-venv_ok() {
-  [ -x "$VENV/bin/python" ] && "$VENV/bin/python" -c "import ensurepip" >/dev/null 2>&1
-}
-
-if [ -d "$VENV" ] && ! venv_ok; then
-  echo "Vorhandene virtuelle Umgebung ist nicht nutzbar - baue sie neu..."
-  rm -rf "$VENV"
+if ! .venv/bin/python -c 'import sys; assert sys.version_info >= (3, 11)' >/dev/null 2>&1; then
+  PYTHON=""
+  for candidate in python3.12 python3.13 python3.11 python3 "$HOME/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"; do
+    if "$candidate" -c 'import sys; assert sys.version_info >= (3, 11)' >/dev/null 2>&1; then
+      PYTHON="$candidate"; break
+    fi
+  done
+  if [ -z "$PYTHON" ]; then
+    echo 'Bitte Python 3.11 oder neuer installieren und erneut starten.'; exit 1
+  fi
+  if [ -d .venv ]; then mv .venv ".venv-old-$(date +%Y%m%d%H%M%S)"; fi
+  "$PYTHON" -m venv .venv
 fi
-
-if [ ! -d "$VENV" ]; then
-  echo "Erstelle virtuelle Umgebung..."
-  python3 -m venv "$VENV"
+CURRENT="$(.venv/bin/python -c 'import hashlib; print(hashlib.sha256(open("requirements.txt","rb").read()).hexdigest())')"
+INSTALLED="$(cat .venv/requirements.sha256 2>/dev/null || true)"
+if [ "$CURRENT" != "$INSTALLED" ]; then
+  .venv/bin/python -m pip install -r requirements.txt
+  echo "$CURRENT" > .venv/requirements.sha256
 fi
-
-# shellcheck disable=SC1091
-source "$VENV/bin/activate"
-python -m pip install -q --upgrade pip
-python -m pip install -q -r requirements.txt
-
-# .env laden, falls vorhanden
-if [ -f ".env" ]; then
-  set -a
-  # shellcheck disable=SC1091
-  source .env
-  set +a
-fi
-
-HOST="${HOST:-127.0.0.1}"
-PORT="${PORT:-8000}"
-
-echo "Starte Fanvue-Chatbot auf http://${HOST}:${PORT}"
-exec python -m uvicorn app.main:app --host "$HOST" --port "$PORT"
+exec .venv/bin/python start.py "$@"
