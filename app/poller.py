@@ -532,7 +532,7 @@ def _fan_memory(user_uuid: str) -> str:
 
 def _generate(system_prompt: str, messages_chrono: list, me_uuid: str, fan_notes: str,
               banned: list[str], task: str = "chat", retry_delay: float | None = None,
-              fan_memory: str = "") -> str:
+              fan_memory: str = "", final_note: str = "") -> str:
     """Generiert eine Antwort inkl. Anti-AI-Regeln, Namens-Filter und Sprach-Anker.
     Bei einer Wiederholung verbotener Woerter wird EINMAL neu generiert.
     task steuert das genutzte Modell ('chat' oder 'caption').
