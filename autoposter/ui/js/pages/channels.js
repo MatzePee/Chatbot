@@ -53,7 +53,7 @@ export default async function renderChannels() {
   function draw() {
     clear(list)
     if (!channels.length) {
-      list.appendChild(empty('Noch keine Kanäle. Lege einen X- oder Fanvue-Kanal an.'))
+      list.appendChild(empty('Noch keine Kanäle. X kannst du hier anlegen. Die beiden Fanvue-Kanäle erscheinen automatisch nach Einrichtung der gemeinsamen Verbindung.'))
       return
     }
     for (const c of channels) {
@@ -64,6 +64,9 @@ export default async function renderChannels() {
           h('span', { class: 'hint', style: { textTransform: 'uppercase' } }, c.platform),
         ),
         h('div', { class: 'hint' }, c.handle),
+        c.fanvue_audience ? h('div', { class: 'hint' }, c.fanvue_audience === 'subscribers'
+          ? 'Subscriber-Posts · nur für zahlende Abonnenten'
+          : 'Follower-Posts · für Follower und Abonnenten') : null,
         h('div', { class: 'row', style: { fontSize: '12px' } },
           h('span', { style: { color: c.health === 'ok' ? 'var(--ok)' : c.health === 'paused' ? 'var(--dim)' : 'var(--err)' } },
             '● ' + c.health),
@@ -111,10 +114,10 @@ export default async function renderChannels() {
           h('button', { class: 'small', onClick: (e) => runTest(c, e.target) }, 'Testen'),
           h('button', { class: 'small', onClick: () => openPolicy(c) }, 'Einstellungen'),
           h('div', { class: 'spacer' }),
-          h('button', {
+          !c.fanvue_audience ? h('button', {
             class: 'small danger', title: 'Kanal endgültig löschen',
             onClick: () => openDelete(c),
-          }, 'Löschen'),
+          }, 'Löschen') : null,
         ),
       ))
     }
@@ -268,7 +271,7 @@ export default async function renderChannels() {
   // ------------------------------------------------------------ Anlegen
   function openCreate() {
     modal('Kanal anlegen', (close) => {
-      const platform = h('select', {}, h('option', { value: 'x' }, 'X (Twitter)'), h('option', { value: 'fanvue' }, 'Fanvue'))
+      const platform = h('select', {}, h('option', { value: 'x' }, 'X (Twitter)'))
       const name = h('input', {})
       const handle = h('input', { placeholder: '@sallylarsen' })
       const color = h('input', { type: 'color', value: '#1d9bf0' })
@@ -416,7 +419,7 @@ export default async function renderChannels() {
           numField('phash_lookback_posts', 'Ähnlichkeit prüfen gegen letzte N'),
           numField('stagger_minutes', 'Fester Versatz (Min.)',
             'Verschiebt alle Slots dieses Kanals, damit nicht mehrere Kanäle gleichzeitig posten'),
-          channel.platform === 'fanvue'
+          channel.platform === 'fanvue' && !channel.fanvue_audience
             ? numField('free_post_ratio', 'Anteil Free-Posts', '0 = nur Abonnenten, 1 = alles frei', '0.1')
             : null,
         ),
@@ -487,7 +490,8 @@ export default async function renderChannels() {
     h('div', { class: 'page-head' },
       h('h1', {}, 'Kanäle'),
       h('div', { class: 'spacer' }),
-      h('button', { class: 'primary', onClick: openCreate }, 'Kanal anlegen'),
+      h('button', { class: 'primary', onClick: openCreate }, 'X-Kanal anlegen'),
+      h('a', { class: 'btn', href: '/settings/shared#fanvue' }, 'Fanvue-Verbindung'),
     ),
     list,
   )

@@ -25,6 +25,10 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
         value: 'subscribers',
         selected: post.audience !== 'followers-and-subscribers',
       }, 'Sub-Post — nur für Abonnenten'))
+    if (channel?.fanvue_audience) {
+      audience.value = channel.fanvue_audience
+      audience.disabled = true
+    }
     const price = h('input', {
       type: 'number', min: '300', step: '50',
       value: post.price_cents || '', placeholder: 'kein Preis',
@@ -142,7 +146,8 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
         field('Hashtags (kommagetrennt)', hashtags),
         field('Geplant für', when),
         isFanvue ? field('Sichtbarkeit', audience,
-          'Free-Posts erreichen alle Follower, Sub-Posts nur zahlende Abonnenten.') : null,
+          channel.fanvue_audience ? 'Die Zielgruppe ist durch den gewählten Kanal festgelegt.'
+            : 'Free-Posts erreichen alle Follower, Sub-Posts nur zahlende Abonnenten.') : null,
         isFanvue ? field('Preis in Cent (optional)', price,
           'Mindestens 300 Cent, nur mit Bild möglich.') : null,
         isFanvue ? h('label', { class: 'inline', style: { marginBottom: '12px' } }, pin,

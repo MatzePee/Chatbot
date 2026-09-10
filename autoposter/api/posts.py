@@ -44,6 +44,16 @@ from autoposter.schemas import (
 )
 from autoposter.services import lifecycle, media as media_service, planner, publisher, runs
 from autoposter.services.llm import llm
+from autoposter.services.fanvue_channels import audience_for, fixed_audience
+
+
+def _audience(channel, requested):
+    if not fixed_audience(channel):
+        return requested or channel.default_audience
+    try:
+        return audience_for(channel, requested)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 def _local_time(post: Optional[Post], channel: Channel) -> Optional[datetime]:
     """Geplante Zeit in der Zeitzone des Kanals.
@@ -130,7 +140,7 @@ async def create_post(
         media_asset_ids=[str(a) for a in payload.media_asset_ids],
         media_set_id=payload.media_set_id,
         alt_texts=payload.alt_texts,
-        audience=payload.audience or channel.default_audience,
+        audience=_audience(channel, payload.audience),
         price_cents=payload.price_cents,
         media_preview_id=payload.media_preview_id,
         expires_at=payload.expires_at,
@@ -167,6 +177,10 @@ async def update_post(
         raise HTTPException(409, "Veröffentlichte Posts können nicht geändert werden")
 
     changes = payload.model_dump(exclude_unset=True)
+    if 'audience' in changes:
+        channel = await db.get(Channel, post.channel_id)
+        if fixed_audience(channel):
+            changes['audience'] = _audience(channel, changes['audience'])
     diff: Dict[str, Any] = {}
     old_assets = list(post.media_asset_ids or [])
 
@@ -296,7 +310,7 @@ async def duplicate_post(
             alt_texts=dict(source.alt_texts or {}),
             media_asset_ids=list(source.media_asset_ids or []),
             media_set_id=source.media_set_id,
-            audience=source.audience or channel.default_audience,
+            audience=fixed_audience(channel) or source.audience or channel.default_audience,
             price_cents=source.price_cents,
             media_preview_id=source.media_preview_id,
             pin_after_publish=source.pin_after_publish,

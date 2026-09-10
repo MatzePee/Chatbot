@@ -294,8 +294,13 @@ class FanvueAdapter:
     async def publish(
         self, cred: Credentials, channel: Channel, post: Post, media: List[MediaRef]
     ) -> PublishResult:
+        from autoposter.services.fanvue_channels import audience_for
+        try:
+            audience = audience_for(channel, post.audience)
+        except ValueError as exc:
+            raise AdapterError(str(exc)) from exc
         body: Dict[str, Any] = {
-            "audience": post.audience or channel.default_audience or "subscribers",
+            "audience": audience,
         }
         text = (post.body_text or "").strip()
         tags = " ".join(f"#{t.lstrip('#')}" for t in (post.hashtags or []))

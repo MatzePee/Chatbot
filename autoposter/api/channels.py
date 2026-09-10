@@ -58,6 +58,7 @@ from autoposter.services import media as media_service
 from autoposter.services import watermark
 from autoposter.services import rhythm
 from autoposter.services import oauthapp
+from autoposter.services import fanvue_channels
 
 router = APIRouter(tags=["channels"])
 
@@ -265,6 +266,7 @@ async def list_channels(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_user),
 ) -> List[ChannelOut]:
+    await fanvue_channels.ensure_channels(db)
     stmt = select(Channel).order_by(Channel.platform, Channel.display_name)
     if not include_inactive:
         stmt = stmt.where(Channel.is_active.is_(True))
@@ -340,6 +342,11 @@ async def update_channel(
         raise HTTPException(404, "Kanal nicht gefunden")
 
     data = payload.model_dump(exclude_unset=True)
+    fixed = fanvue_channels.fixed_audience(channel)
+    if fixed:
+        data['default_audience'] = fixed
+        if data.get('policy'):
+            data['policy']['free_post_ratio'] = 1.0 if fixed == 'followers-and-subscribers' else 0.0
     if "oauth_redirect_base" in data:
         try:
             data["oauth_redirect_base"] = oauthapp.normalize_redirect_base(data["oauth_redirect_base"], channel.platform)
@@ -456,6 +463,8 @@ async def delete_channel(
     ).scalar_one_or_none()
     if not channel:
         return  # Schon weg – für den Aufrufer dasselbe Ergebnis.
+    if fanvue_channels.fixed_audience(channel):
+        raise HTTPException(409, 'Dieser Kanal gehört zur gemeinsamen Fanvue-Verbindung. Bitte bei Bedarf pausieren.')
 
     credential_id = channel.credential_id
 

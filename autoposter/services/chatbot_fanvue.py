@@ -26,6 +26,9 @@ def oauth_app():
 
 def account_matches(channel):
     tokens = chatbot_db.get_tokens()
+    bound = getattr(channel, 'fanvue_account_uuid', '') or ''
+    if bound:
+        return bool(tokens and tokens['account_uuid'] == bound)
     expected = (channel.handle or '').strip().lstrip('@').casefold()
     actual = (tokens['account_handle'] or '').strip().lstrip('@').casefold() if tokens else ''
     return not expected or bool(actual and expected == actual)

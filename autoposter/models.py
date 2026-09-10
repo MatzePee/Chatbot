@@ -371,6 +371,10 @@ class Channel(Base, TimestampMixin):
     #: Fanvue: Planung an die Plattform übergeben (publishAt) statt lokal halten.
     platform_side_scheduling: Mapped[bool] = mapped_column(Boolean, default=False)
     default_audience: Mapped[str] = mapped_column(String(40), default="subscribers")
+    # Fixed audience for the two channels supplied by the shared connection.
+    # Empty on existing, manually configured channels.
+    fanvue_audience: Mapped[str] = mapped_column(String(40), default="")
+    fanvue_account_uuid: Mapped[str] = mapped_column(String(120), default="")
     last_published_at: Mapped[Optional[datetime]] = mapped_column(
         UTCDateTime, nullable=True
     )

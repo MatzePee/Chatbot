@@ -15,9 +15,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-def fingerprint(connection, table):
+def fingerprint(connection, table, columns=None):
     digest = hashlib.sha256()
-    for row in connection.execute('SELECT * FROM "' + table.replace('"', '""') + '" ORDER BY rowid'):
+    projection = ', '.join('"' + c.replace('"', '""') + '"' for c in columns) if columns else '*'
+    for row in connection.execute('SELECT ' + projection + ' FROM "' + table.replace('"', '""') + '" ORDER BY rowid'):
         digest.update(repr(tuple(row)).encode())
     return digest.hexdigest()
 
@@ -46,13 +47,15 @@ def run(source: Path):
             (root / 'studio/.creatorpilot-initialized').touch()
         # Read and decrypt existing private AutoPost data without contacting providers.
         studio_before = {}
+        studio_columns = {}
         credential_count = 0
         if (root / 'studio/autoposter.db').exists():
             from autoposter.crypto import decrypt
             from autoposter.services.appconfig import SECRET_FIELDS
             with sqlite3.connect(root / 'studio/autoposter.db') as conn:
                 names = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
-                studio_before = {name: fingerprint(conn, name) for name in names}
+                studio_columns = {name: [r[1] for r in conn.execute('PRAGMA table_info("' + name.replace('"', '""') + '")')] for name in names}
+                studio_before = {name: fingerprint(conn, name, studio_columns[name]) for name in names}
                 for access, refresh in conn.execute('SELECT access_token_enc,refresh_token_enc FROM channel_credential'):
                     for value in (access, refresh):
                         if value:
@@ -110,7 +113,9 @@ def run(source: Path):
                 assert runtime['global_pause'] and runtime['dry_run'], 'Fresh AutoPost must start paused.'
             elif studio_before:
                 with sqlite3.connect(root / 'studio/autoposter.db') as conn:
-                    assert all(fingerprint(conn, name) == digest for name, digest in studio_before.items()), 'Existing AutoPost data changed.'
+                    # Additive columns are allowed; every pre-existing cell and
+                    # row must still match, including row counts and ordering.
+                    assert all(fingerprint(conn, name, studio_columns[name]) == digest for name, digest in studio_before.items()), 'Existing AutoPost data changed.'
                     assert conn.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
             result = {'ok': True, 'python': sys.version.split()[0], 'existing_tables_preserved': len(before),
                       'autopost_tables_preserved': len(studio_before), 'autopost_secrets_verified': credential_count,

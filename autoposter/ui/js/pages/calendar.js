@@ -4,7 +4,7 @@ import {
   h, append, clear, empty, field, modal, toast, guard, spinner, confirmDialog,
   fmtTime, fmtDate, fmtDateTime, toLocalInput, attachPreview,
 } from '../ui.js?v=creatorstudio-mobile-system-20260909'
-import { openPostEditor } from '../posteditor.js?v=creatorstudio-mobile-system-20260909'
+import { openPostEditor } from '../posteditor.js?v=creatorstudio-fanvue-channels-20260910'
 import { runProgress } from '../progress.js?v=creatorstudio-mobile-system-20260909'
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -545,9 +545,11 @@ export default async function renderCalendar() {
           .filter((v) => typeof v === 'number')
         return gaps.length ? Math.max(...gaps) : 0
       }
-      const wantedPerDay = () => (isFanvue
-        ? (Number(subCount.value) || 0) + (Number(freeCount.value) || 0)
-        : (Number(imageCount.value) || 0) + (Number(textCount.value) || 0))
+      const wantedPerDay = () => isFanvue
+        ? Math.max(0, ...usable.filter(c => chosen.has(c.id)).map(c =>
+            (c.fanvue_audience === 'followers-and-subscribers' ? 0 : Number(subCount.value) || 0)
+            + (c.fanvue_audience === 'subscribers' ? 0 : Number(freeCount.value) || 0)))
+        : (Number(imageCount.value) || 0) + (Number(textCount.value) || 0)
       const checkFeasibility = () => {
         const want = wantedPerDay()
         let window = minutesOf(timeTo.value) - minutesOf(timeFrom.value)
@@ -698,8 +700,8 @@ export default async function renderCalendar() {
                   'Für alle Follower frei sichtbar'),
               ),
               h('div', { class: 'hint', style: { marginTop: '-4px' } },
-                'Fanvue kennt keine reinen Textposts — beide Arten brauchen ein Bild. '
-                + 'Die Reihenfolge über den Tag wird gemischt.'))
+                'Die Anzahl gilt je passendem Kanal: Subscriber-Posts im Subscriber-Kanal, '
+                + 'Follower-Posts im Follower-Kanal. Bestehende gemischte Kanäle verwenden beide Angaben.'))
           : h('div', { class: 'grid c2' },
               field('Bildposts pro Tag', imageCount),
               field('Textposts pro Tag', textCount),

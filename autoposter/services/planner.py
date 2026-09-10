@@ -29,6 +29,7 @@ from autoposter.models import (
 from autoposter.schemas import PlanFillResult, PlannedSlot
 from autoposter.services import appconfig, assignment, lifecycle, media as media_service, runs
 from autoposter.services.llm import BudgetExceeded, llm
+from autoposter.services.fanvue_channels import fixed_audience
 
 WEEKDAY_NAMES = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
@@ -535,8 +536,9 @@ async def fill_calendar(
             # Fanvue: Free-Post oder Sub-Post nach eingestelltem Anteil.
             # Deterministisch statt zufällig, damit das Verhältnis auch bei
             # wenigen Posts stimmt.
-            audience = channel.default_audience or Audience.subscribers.value
-            if channel.platform == "fanvue":
+            fixed = fixed_audience(channel)
+            audience = fixed or channel.default_audience or Audience.subscribers.value
+            if channel.platform == "fanvue" and not fixed:
                 planned_count += 1
                 target_free = policy.free_post_ratio * planned_count
                 if free_count < target_free:
@@ -758,6 +760,9 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
         issues.append(
             {"level": "error", "code": "no_audience", "message": "Zielgruppe (audience) fehlt"}
         )
+    if fixed_audience(channel) and post.audience and post.audience != fixed_audience(channel):
+        issues.append({'level': 'error', 'code': 'audience_mismatch',
+                       'message': 'Die Sichtbarkeit passt nicht zur festen Zielgruppe dieses Fanvue-Kanals.'})
 
     if post.scheduled_at:
         for start, end in await _blackouts(db, channel.id):
@@ -955,7 +960,10 @@ async def plan_range(
                 and (request.sub_posts_per_day or request.free_posts_per_day)
             )
             if by_audience:
-                want_total = request.sub_posts_per_day + request.free_posts_per_day
+                fixed = fixed_audience(channel)
+                sub_count = request.sub_posts_per_day if fixed != Audience.free.value else 0
+                follower_count = request.free_posts_per_day if fixed != Audience.subscribers.value else 0
+                want_total = sub_count + follower_count
             else:
                 want_total = request.image_posts_per_day + request.text_posts_per_day
 
@@ -969,8 +977,8 @@ async def plan_range(
             kinds: List[Tuple[str, Optional[str]]]
             if by_audience:
                 # Fanvue: keine reinen Textposts, dafür Abonnenten und Follower.
-                want_sub = min(request.sub_posts_per_day, open_count)
-                want_free = min(request.free_posts_per_day, open_count - want_sub)
+                want_sub = min(sub_count, open_count)
+                want_free = min(follower_count, open_count - want_sub)
                 want_images = want_sub + want_free
                 kinds = (
                     [("image", Audience.subscribers.value)] * want_sub
@@ -1093,11 +1101,12 @@ async def plan_range(
                     else PostType.image_single.value
                 )
 
-                audience = channel.default_audience or Audience.subscribers.value
-                if wanted_audience:
+                fixed = fixed_audience(channel)
+                audience = fixed or channel.default_audience or Audience.subscribers.value
+                if not fixed and wanted_audience:
                     # Im Dialog ausdrücklich angefordert – das schlägt jede Quote.
                     audience = wanted_audience
-                elif channel.platform == "fanvue":
+                elif channel.platform == "fanvue" and not fixed:
                     planned_for_channel += 1
                     if free_count < policy.free_post_ratio * planned_for_channel:
                         audience = Audience.free.value

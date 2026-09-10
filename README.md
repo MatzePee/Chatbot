@@ -155,6 +155,19 @@ Posts, Bezahlaktionen oder ein produktives GitHub-Update wurden nicht ausgelöst
 Der eingeschränkte SSH-Lesezugang wurde separat geprüft.
 
 
+## Fanvue-Kanäle aus der gemeinsamen Verbindung
+
+Ab v2.0.5 ergänzt AutoPost beim Laden der Kanalliste automatisch **Fanvue · Subscriber**
+und **Fanvue · Follower**, sobald Fanvue in den gemeinsamen Einstellungen eingerichtet
+ist. Ohne abgeschlossene Anmeldung sind sie bereits sichtbar, aber noch nicht verbunden.
+Beide nutzen ausschließlich die gemeinsame Verbindung; es werden keine zusätzlichen
+OAuth-Tokens angelegt. Bilder und Kalenderplanung sind je Kanal getrennt. Die feste
+Sichtbarkeit gilt auch beim automatischen Planen und beim Veröffentlichen.
+
+Bestehende manuelle Kanäle samt Bildzuordnungen und Posts bleiben unverändert.
+Die automatisch angelegten Kanäle können pausiert werden. Beim Wechsel des verbundenen
+Fanvue-Kontos bleiben die bisherigen Kanäle an ihr altes Konto gebunden.
+
 ## Live-Ansicht und X-Kommentare
 
 AutoChat und AutoPost aktualisieren sichtbare Seiten alle 15 Sekunden im Hintergrund.

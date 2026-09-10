@@ -246,6 +246,8 @@ class ChannelOut(ORMModel):
     has_client_secret: bool = False
     app_configured: bool = False
     redirect_uri: str = ""
+    fanvue_audience: str = ""
+    fanvue_account_uuid: str = ""
     #: Letzter Verbindungstest
     last_verified_at: Optional[datetime] = None
     verified_account: str = ""
