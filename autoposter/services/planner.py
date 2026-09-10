@@ -453,6 +453,7 @@ async def fill_calendar(
     now = datetime.now(timezone.utc)
 
     for channel in channels:
+        tz = ZoneInfo(channel.timezone or "UTC")
         policy = channel.policy or PostingPolicy()
         plan = (
             await db.execute(
@@ -497,7 +498,7 @@ async def fill_calendar(
         planned_count = 0
 
         for slot, kind in open_slots:
-            weekday = slot.astimezone(ZoneInfo(channel.timezone or "UTC")).weekday()
+            weekday = slot.astimezone(tz).weekday()
             theme = (plan.themes or {}).get(str(weekday), "") if plan else ""
 
             wants_text_only = kind == "text" and limits.supports_text_only
