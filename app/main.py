@@ -100,8 +100,8 @@ def _static_version() -> str:
 def _base_ctx(request: Request) -> dict:
     return {
         "request": request,
-        "workspace_area": ("system" if request.url.path == "/system" else
-                           "settings" if request.url.path.startswith(("/settings/shared", "/upload")) else "autochat"),
+        "workspace_area": ("settings" if request.url.path == "/system" or
+                           request.url.path.startswith(("/settings/shared", "/upload")) else "autochat"),
         "css_v": _static_version(),
         "connected": fanvue.is_connected(),
         "running": db.get_setting("bot_running", False) and not preview_enabled() and not deployment.pending(),

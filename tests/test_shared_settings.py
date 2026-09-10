@@ -118,8 +118,9 @@ def test_notification_options_and_publication_render_in_their_own_area(client):
         assert f'name="{name}"' not in shared
     assert 'id="tg-chatid"' in shared and 'id="tg-chatid"' not in chat
     assert 'id="kw-test"' in chat and 'id="kw-test"' not in shared
-    assert shared.count('>Veröffentlichen</h2>') == 1 and '>Veröffentlichen</h2>' not in chat
-    assert 'Zur Upload-Seite' in shared and 'Zur Upload-Seite' not in chat
+    assert '>Veröffentlichen</h2>' not in shared and '>Veröffentlichen</h2>' not in chat
+    assert 'Zur Upload-Seite' not in shared and 'Zur Upload-Seite' not in chat
+    assert 'href="/upload"' in shared and 'GitHub-Veröffentlichung' in shared
 
 
 @pytest.mark.parametrize('prefix', ['/settings', '/settings/shared'])
@@ -136,3 +137,16 @@ def test_connection_tools_use_entered_values_without_saving_or_real_messages(cli
     assert 'MP CreatorStudio' in sent[0][0]
     assert client.post(prefix + '/telegram-chatid', data={'token': 'entered-token'}).json()['chat_id'] == '-10042'
     assert db.all_settings() == before
+
+
+def test_update_controls_are_visible_in_shared_settings_and_system(client):
+    for path in ['/settings/shared', '/system']:
+        page = client.get(path).text
+        assert page.count('id="upd-card"') == 1
+        assert 'id="upd-now">Nach Updates suchen</button>' in page
+        assert 'action="/system/update" id="upd-install-form"' in page
+        assert 'id="upd-install" disabled>Update installieren</button>' in page
+        assert '/static/program-updates.js' in page
+    # Installation must not be nested in the settings-save form.
+    shared = client.get('/settings/shared').text
+    assert shared.index('id="upd-install-form"') < shared.index('action="/settings/shared/updates"')

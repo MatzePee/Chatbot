@@ -53,6 +53,8 @@
 .workspace-sidebar .workspace-nav a:hover { color: #1d1d1f; background: #eef0f4; }
 .workspace-sidebar .workspace-nav a.active { color: #0066cc; background: #e8f1fe; }
 .workspace-icon { width: 18px; flex: none; text-align: center; font-size: 16px; opacity: .85; }
+.workspace-nav-heading { padding: 18px 12px 4px; color: #858991; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.workspace-nav-heading:first-child { padding-top: 4px; }
 .workspace-nav .badge { margin-left: auto; }
 .workspace-sidefoot { padding: 18px 24px; border-top: 1px solid #e5e7eb; font-size: 11px; line-height: 1.7; color: #858991; }
 .workspace-sidefoot .status { font-size: 11px; width: auto; margin: 0; line-height: 1.8; color: #747b87; }

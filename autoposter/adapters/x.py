@@ -1,9 +1,8 @@
 """Adapter für X (Twitter) API v2.
 
 - OAuth 2.0 Authorization Code mit PKCE, Refresh-Token-Rotation.
-- Medien-Upload über den v2-Endpunkt POST /2/media/upload im chunked Flow
-  (INIT -> APPEND -> FINALIZE -> STATUS-Polling). Die v1.1-Upload-Endpunkte sind
-  für Self-Serve-Tarife abgekündigt und werden bewusst nicht verwendet.
+- Medien-Upload über die v2-Endpunkte initialize, {id}/append und {id}/finalize
+  mit anschließendem STATUS-Polling.
 - Bildersets mit mehr als 4 Bildern werden vom Publisher als Self-Thread zerlegt.
 """
 from __future__ import annotations
@@ -194,13 +193,12 @@ class XAdapter:
         async with http_client(timeout=180.0) as client:
             # INIT
             init = await client.post(
-                url,
+                f"{url}/initialize",
                 headers=headers,
-                data={
-                    "command": "INIT",
-                    "total_bytes": str(len(data)),
+                json={
+                    "total_bytes": len(data),
                     "media_type": asset.mime,
-                    "media_category": "tweet_image",
+                    "media_category": "tweet_gif" if asset.mime == "image/gif" else "tweet_image",
                 },
             )
             raise_for_response(init, "X Media INIT")
@@ -212,16 +210,16 @@ class XAdapter:
             for index, offset in enumerate(range(0, len(data), CHUNK_SIZE)):
                 chunk = data[offset : offset + CHUNK_SIZE]
                 append = await client.post(
-                    url,
+                    f"{url}/{media_id}/append",
                     headers=headers,
-                    data={"command": "APPEND", "media_id": media_id, "segment_index": str(index)},
+                    data={"segment_index": str(index)},
                     files={"media": ("chunk", chunk, "application/octet-stream")},
                 )
                 raise_for_response(append, f"X Media APPEND #{index}")
 
             # FINALIZE
             finalize = await client.post(
-                url, headers=headers, data={"command": "FINALIZE", "media_id": media_id}
+                f"{url}/{media_id}/finalize", headers=headers
             )
             raise_for_response(finalize, "X Media FINALIZE")
             info = finalize.json().get("data", finalize.json())
@@ -230,7 +228,7 @@ class XAdapter:
             processing = info.get("processing_info")
             waited = 0
             while processing and processing.get("state") in ("pending", "in_progress"):
-                wait = int(processing.get("check_after_secs", 3))
+                wait = max(1, int(processing.get("check_after_secs", 3)))
                 waited += wait
                 if waited > 300:
                     raise AdapterError("X Media-Verarbeitung dauert zu lange", retryable=True)
@@ -250,7 +248,7 @@ class XAdapter:
                 meta = await client.post(
                     f"{self.base}/2/media/metadata",
                     headers={**headers, "Content-Type": "application/json"},
-                    content=json.dumps({"id": media_id, "alt_text": {"text": alt}}),
+                    json={"id": media_id, "metadata": {"alt_text": {"text": alt}}},
                 )
                 if meta.status_code >= 400 and meta.status_code not in (403, 404):
                     raise_for_response(meta, "X Alt-Text")

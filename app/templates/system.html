@@ -14,10 +14,7 @@
 {% endif %}
 
 {% include "_deployment_status.html" %}
-<div class="card" id="upd-card">
-  <h3>Version <span class="muted small" id="upd-current"></span></h3>
-  <div id="upd-body"><p class="muted">Wird geprüft…</p></div>
-</div>
+{% include "_program_updates.html" %}
 
 <div class="card" id="server-load">
   <h3>Server-Auslastung <span class="muted small" id="si-age"></span></h3>
@@ -41,6 +38,5 @@
   <p class="muted small">Erfordert die einmalige Server-Einrichtung aus <code>DEPLOY.md</code> (Helferskript + sudo-Regel).</p>
 </div>
 
-<link rel="stylesheet" href="/static/system.css?v={{ css_v }}">
 <script src="/static/system.js?v={{ css_v }}" defer></script>
 {% endblock %}

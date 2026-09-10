@@ -1,4 +1,5 @@
 """System navigation must keep live controls separate and preserve preview safety."""
+import re
 import subprocess
 from urllib.parse import parse_qs, urlsplit
 
@@ -76,3 +77,17 @@ def test_system_remains_readable_but_actions_blocked_in_preview(client, monkeypa
     for action in ['update', 'restart-service', 'reboot']:
         assert client.post('/system/' + action).status_code == 403
     assert actions == []
+
+
+@pytest.mark.parametrize('path', ['/settings/shared', '/system', '/upload'])
+def test_settings_and_system_share_navigation(client, path):
+    response = client.get(path)
+    assert response.status_code == 200
+    top = re.search(r'<nav class="workspace-switcher".*?</nav>', response.text, re.S).group()
+    assert re.findall(r'href="([^"]+)"', top) == ['/', '/autoposter/', '/settings/shared']
+    assert 'href="/settings/shared" class="active"' in top
+    sidebar = re.search(r'<nav class="workspace-nav".*?</nav>', response.text, re.S).group()
+    assert re.findall(r'href="([^"]+)"', sidebar) == [
+        '/settings/shared#fanvue', '/settings/shared#telegram', '/system',
+        '/settings/shared#updates', '/upload']
+    assert 'Verbindungen' in sidebar and 'Verwaltung' in sidebar

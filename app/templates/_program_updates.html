@@ -1,0 +1,13 @@
+<div class="card" id="upd-card" data-live-preserve data-preview="{{ 'true' if preview else 'false' }}">
+  <h2>Programm-Updates <span class="muted small" id="upd-current"></span></h2>
+  <div id="upd-body" role="status"><p class="muted">Update-Status wird geladen…</p></div>
+  <div class="draft-actions">
+    <button type="button" class="btn" id="upd-now">Nach Updates suchen</button>
+    <form method="post" action="/system/update" id="upd-install-form">
+      <button type="submit" class="btn-primary" id="upd-install" disabled>Update installieren</button>
+    </form>
+  </div>
+  {% if preview %}<p class="muted small">Die Installation ist im geschützten Mitlesemodus gesperrt. Updates installierst du auf dem Produktivserver.</p>{% endif %}
+</div>
+<link rel="stylesheet" href="/static/system.css?v={{ css_v }}">
+<script src="/static/program-updates.js?v={{ css_v }}" defer></script>

@@ -18,29 +18,29 @@
    dem Klick und verschwindet mit der neuen Seite von selbst. #}
 <div id="pageload" class="pageload" role="progressbar" aria-hidden="true"><span></span></div>
 {% set shared = workspace_area == 'settings' %}
-{% set system = workspace_area == 'system' %}
 <header class="workspace-topbar">
   <a class="workspace-brand" href="/" aria-label="MP CreatorStudio – Startseite">
     <img src="/static/creatorpilot.svg?v={{ css_v }}" alt="" width="32" height="32">
     <span>MP CreatorStudio</span>
   </a>
   <nav class="workspace-switcher" aria-label="Programmbereiche">
-    <a href="/"{% if not shared and not system %} class="active" aria-current="true"{% endif %}>AutoChat</a>
+    <a href="/"{% if not shared %} class="active" aria-current="true"{% endif %}>AutoChat</a>
     <a href="/autoposter/">AutoPost</a>
     <a href="/settings/shared"{% if shared %} class="active" aria-current="true"{% endif %}>Einstellungen</a>
-    <a href="/system"{% if system %} class="active" aria-current="true"{% endif %}>System</a>
   </nav>
   <button class="workspace-menu-button" type="button" aria-expanded="false" aria-controls="workspace-sidebar">☰ Menü</button>
 </header>
 <div class="workspace-body">
   <button class="workspace-backdrop" type="button" aria-label="Menü schließen" tabindex="-1"></button>
-  <aside class="workspace-sidebar" id="workspace-sidebar" aria-label="{% if system %}System{% elif shared %}Gemeinsame Einstellungen{% else %}AutoChat{% endif %}">
-    <div class="workspace-section"><strong>{% if system %}System{% elif shared %}Einstellungen{% else %}AutoChat{% endif %}</strong></div>
-    <nav class="workspace-nav" aria-label="{% if system %}Systembereiche{% elif shared %}Einstellungsseiten{% else %}AutoChat-Seiten{% endif %}">
-      {% if system %}
-        {% set links = [('/system', '◫', 'Übersicht'), ('/system#server-load', '▤', 'Server-Auslastung'), ('/system#server-controls', '⏻', 'Server'), ('/system#upd-card', '↻', 'Version')] %}
-      {% elif shared %}
-        {% set links = [('/settings/shared', '⚙', 'Allgemein'), ('/upload', '↥', 'Version & GitHub')] %}
+  <aside class="workspace-sidebar" id="workspace-sidebar" aria-label="{% if shared %}Gemeinsame Einstellungen{% else %}AutoChat{% endif %}">
+    <div class="workspace-section"><strong>{% if shared %}Einstellungen{% else %}AutoChat{% endif %}</strong></div>
+    <nav class="workspace-nav"{% if shared %} data-settings-nav{% endif %} aria-label="{% if shared %}Einstellungsseiten{% else %}AutoChat-Seiten{% endif %}">
+      {% if shared %}
+        <span class="workspace-nav-heading">Verbindungen</span>
+        <a href="/settings/shared#fanvue"{% if request.url.path == '/settings/shared' %} class="active" aria-current="location"{% endif %}><span class="workspace-icon" aria-hidden="true">◉</span><span>Fanvue</span></a>
+        <a href="/settings/shared#telegram"><span class="workspace-icon" aria-hidden="true">✉</span><span>Telegram</span></a>
+        <span class="workspace-nav-heading">Verwaltung</span>
+        {% set links = [('/system', '◫', 'Systemübersicht'), ('/settings/shared#updates', '↻', 'Programm-Updates'), ('/upload', '↥', 'GitHub-Veröffentlichung')] %}
       {% else %}
         {% set links = [('/', '◫', 'Dashboard'), ('/queue', '☷', 'Vorschläge' if preview else 'Freigabe'), ('/chats', '◉', 'Subs'), ('/ppv', '▦', 'PPV'), ('/reports', '▤', 'Reports'), ('/test', '▷', 'Test'), ('/logs', '≡', 'Logs'), ('/settings', '⚙', 'AutoChat-Einstellungen')] %}
       {% endif %}

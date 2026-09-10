@@ -1,5 +1,19 @@
 // Delegated because AutoPost creates the shared shell after checking its session.
 (() => {
+  function updateSettingsNavigation() {
+    const links = [...document.querySelectorAll('[data-settings-nav] a')];
+    const samePage = links.filter(link => link.pathname === location.pathname);
+    const selected = samePage.find(link => link.hash === location.hash) || samePage[0];
+    links.forEach(link => {
+      link.classList.toggle('active', link === selected);
+      if (link === selected) link.setAttribute('aria-current', link.hash ? 'location' : 'page');
+      else link.removeAttribute('aria-current');
+    });
+  }
+  updateSettingsNavigation();
+  window.addEventListener('hashchange', updateSettingsNavigation);
+  document.addEventListener('creatorpilot:refresh', updateSettingsNavigation);
+
   function setMenu(frame, open) {
     if (!frame) return;
     frame.classList.toggle('workspace-menu-open', open);

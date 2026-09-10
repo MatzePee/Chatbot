@@ -80,12 +80,14 @@
 </form>
 <script src="/static/telegram-settings.js?v={{ css_v }}" defer></script>
 
+<section id="updates">
+{% include "_program_updates.html" %}
 <form method="post" action="/settings/shared/updates">
-  <div class="card" id="updates">
-    <h2>Programm-Updates</h2>
+  <div class="card">
+    <h2>Update-Einstellungen</h2>
     <p class="muted">Ein gemeinsamer Updateweg für MP CreatorStudio mit AutoChat und AutoPost.</p>
     <p class="muted">Prüft regelmäßig, ob im Repository eine neue Version (Git-Tag <code>vX.Y.Z</code>)
-    veröffentlicht wurde. Installiert wird nur auf Knopfdruck über <a href="/system">System</a> – nie von selbst.</p>
+    veröffentlicht wurde. Die Installation startest du oben über „Update installieren“.</p>
     <div class="row">
       <label class="chk"><input type="checkbox" name="update_check_enabled"
         {% if s['update_check_enabled'] %}checked{% endif %}> Automatisch nach Updates sehen</label>
@@ -95,17 +97,10 @@
         <input name="update_check_interval_hours" type="number" min="1" max="168"
           value="{{ s['update_check_interval_hours'] }}"></label>
     </div>
-    <div class="draft-actions"><button class="btn-primary">Update-Einstellungen speichern</button><a class="btn" href="/upload">Version &amp; GitHub</a></div>
+    <div class="draft-actions"><button class="btn-primary">Update-Einstellungen speichern</button><a class="btn" href="/upload">GitHub-Veröffentlichung</a></div>
     <p class="muted small">Update-Meldungen nutzen die <a href="#telegram">gemeinsame Telegram-Verbindung</a>.</p>
   </div>
 </form>
-<h2 class="grp" id="publish">Veröffentlichen</h2>
-<p class="muted grp-desc">Den aktuellen Programmstand nach GitHub hochladen.</p>
-<div class="card">
-  <p class="muted" style="margin-top:0">Zeigt die geänderten Dateien, lässt die Versionsnummer
-  festlegen und lädt auf Knopfdruck hoch. Prüft vorher, dass keine Zugangsdaten und keine
-  Datenbank mitgehen.</p>
-  <a class="btn-primary" href="/upload">⬆ Zur Upload-Seite</a>
-</div>
+</section>
 
 {% endblock %}
