@@ -164,7 +164,7 @@ class PreviewMiddleware:
                 return
         if scope['type'] == 'http' and enabled():
             path = scope['path']
-            safe_post = (path in ('/test', '/upload/publish', '/upload/settings', '/api/v1/media/search', '/autoposter/api/v1/media/search', '/api/v1/settings/image-comment', '/autoposter/api/v1/settings/image-comment')
+            safe_post = (path in ('/api/v1/posts/translate', '/autoposter/api/v1/posts/translate', '/test', '/upload/publish', '/upload/settings', '/api/v1/media/search', '/autoposter/api/v1/media/search', '/api/v1/settings/image-comment', '/autoposter/api/v1/settings/image-comment')
                          or re.fullmatch(r'/queue/\d+/(regenerate|save|reject)', path)
                          or re.fullmatch(r'/(?:autoposter/)?api/v1/channels/[0-9a-f-]+/test', path))
             writes = scope['method'] not in ('GET', 'HEAD', 'OPTIONS') and not (scope['method'] == 'POST' and safe_post)

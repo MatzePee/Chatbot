@@ -1,6 +1,6 @@
 import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
 import { h, clear, empty, fmtDateTime, guard } from './ui.js?v=creatorstudio-mobile-system-20260909'
-import { openPostEditor } from './posteditor.js?v=creatorstudio-fanvue-channels-20260910'
+import { openPostEditor } from './posteditor.js?v=creatorstudio-translation-20260910'
 
 let preview, owner, timer
 const observer = new MutationObserver(() => { if (owner && !owner.isConnected) hide() })

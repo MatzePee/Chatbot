@@ -1,4 +1,4 @@
-import { renderUpcoming } from '../upcoming-posts.js?v=creatorstudio-upcoming-20260910'
+import { renderUpcoming } from '../upcoming-posts.js?v=creatorstudio-translation-20260910'
 import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
 import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard, append, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 

@@ -4,7 +4,7 @@ import {
   h, append, clear, empty, field, modal, toast, guard, spinner, confirmDialog,
   fmtTime, fmtDate, fmtDateTime, toLocalInput, attachPreview,
 } from '../ui.js?v=creatorstudio-mobile-system-20260909'
-import { openPostEditor } from '../posteditor.js?v=creatorstudio-fanvue-channels-20260910'
+import { openPostEditor } from '../posteditor.js?v=creatorstudio-translation-20260910'
 import { runProgress } from '../progress.js?v=creatorstudio-mobile-system-20260909'
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']

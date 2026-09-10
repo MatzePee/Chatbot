@@ -26,6 +26,8 @@ from autoposter.models import (
     User,
 )
 from autoposter.schemas import (
+    TranslateTextRequest,
+    TranslateTextResult,
     GenerateRequest,
     GenerateResult,
     PlanFillRequest,
@@ -384,6 +386,25 @@ async def preflight(
         ok=not any(i["level"] == "error" for i in issues),
         issues=[PreflightIssue(**i) for i in issues],
     )
+
+
+@router.post("/translate", response_model=TranslateTextResult)
+async def translate_text(
+    payload: TranslateTextRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_editor),
+) -> TranslateTextResult:
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(422, "Bitte zuerst einen Text eingeben.")
+    from autoposter.services.llm import BudgetExceeded
+    try:
+        translation = await llm.translate_german(db, text)
+    except BudgetExceeded as exc:
+        raise HTTPException(429, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    return TranslateTextResult(translation=translation)
 
 
 @router.post("/generate", response_model=GenerateResult)

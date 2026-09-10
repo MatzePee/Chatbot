@@ -697,3 +697,11 @@ class SavedViewIn(BaseModel):
 class SavedViewOut(ORMModel, SavedViewIn):
     id: uuid.UUID
     is_system: bool
+
+
+class TranslateTextRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=5000)
+
+
+class TranslateTextResult(BaseModel):
+    translation: str

@@ -176,6 +176,7 @@ export const api = {
   applyRules: (channelId) => post('/assignments/rules/apply' + qs({ channel_id: channelId })),
 
   // --- Posts / Kalender ---
+  translateText: (text) => post('/posts/translate', { text }),
   posts: (params) => get('/posts' + qs(params)),
   post: (id) => get('/posts/' + id),
   createPost: (d) => post('/posts', d),

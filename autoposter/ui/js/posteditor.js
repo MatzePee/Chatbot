@@ -1,3 +1,4 @@
+import { translationField } from './translation-preview.js?v=creatorstudio-translation-20260910'
 // Post-Editor als eigenes Modul – wird vom Kalender und vom Tagesdetail genutzt.
 import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
 import {
@@ -13,6 +14,7 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
   modal(`Post — ${channel ? channel.display_name : ''}`, (close) => {
     const text = h('textarea', { style: { height: '130px' } })
     text.value = post.body_text || ''
+    const translatedText = translationField(text, post.body_text_variants)
     const hashtags = h('input', { value: (post.hashtags || []).join(', ') })
     const when = h('input', { type: 'datetime-local', value: toLocalInput(post.scheduled_at) })
 
@@ -55,6 +57,7 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
     }
 
     const updateCounter = () => {
+      translatedText.invalidate()
       const len = text.value.length + hashtags.value.split(',').filter(Boolean).join(' ').length
       counter.textContent = `${len} / ${maxChars} Zeichen`
       counter.style.color = len > maxChars ? 'var(--err)' : 'var(--dim)'
@@ -109,6 +112,7 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
         const fresh = (result.variants || [])[0]
         if (!fresh || !fresh.text) { toast.error('Das Modell lieferte keinen Text'); return }
 
+        translatedText.seed(result.variants)
         text.value = fresh.text
         hashtags.value = (fresh.hashtags || []).join(', ')
         updateCounter()
@@ -141,7 +145,7 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
           post.generation_meta.x_image_comment.error ? '\n' + post.generation_meta.x_image_comment.error : '',
         ) : null,
         h('div', { style: { height: '10px' } }),
-        field('Text', text),
+        translatedText.node,
         counter,
         field('Hashtags (kommagetrennt)', hashtags),
         field('Geplant für', when),
