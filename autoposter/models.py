@@ -367,6 +367,8 @@ class Channel(Base, TimestampMixin):
     timezone: Mapped[str] = mapped_column(String(60), default="Europe/Berlin")
     nsfw_level: Mapped[str] = mapped_column(String(20), default=NsfwLevel.suggestive.value)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    #: Nur automatisches Nachplanen; manuelle Planung und Versand bleiben unabhängig.
+    auto_plan_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     health: Mapped[str] = mapped_column(String(20), default=ChannelHealth.ok.value)
     health_note: Mapped[str] = mapped_column(Text, default="")
     #: Fanvue: Planung an die Plattform übergeben (publishAt) statt lokal halten.

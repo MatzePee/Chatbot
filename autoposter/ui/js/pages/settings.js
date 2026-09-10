@@ -9,8 +9,8 @@ const MODEL_TASKS = [
 ]
 
 export default async function renderSettings({ user }) {
-  const [settings, integrations, report, usage] = await Promise.all([
-    api.settings(), api.integrations(), api.maintenanceReport(), api.llmUsage(),
+  const [settings, integrations, report, usage, channels] = await Promise.all([
+    api.settings(), api.integrations(), api.maintenanceReport(), api.llmUsage(), api.channels(),
   ])
 
   const page = h('div', { class: 'page stack' },
@@ -55,10 +55,10 @@ export default async function renderSettings({ user }) {
   page.appendChild(platformDefaultsCard(integrations))
 
   // ------------------------------------------------------------ Verbindungen prüfen
-  page.appendChild(await connectionCard())
+  page.appendChild(await connectionCard(channels))
 
   // ------------------------------------------------------------ Planung
-  page.appendChild(planningCard(integrations))
+  page.appendChild(planningCard(integrations, channels))
 
   // ------------------------------------------------------------ Kosten
   const pct = usage.budget_usd ? Math.min(100, (usage.total_usd / usage.budget_usd) * 100) : 0
@@ -222,8 +222,7 @@ async function openrouterCard(integrations) {
 }
 
 // --------------------------------------------------------------------------- //
-async function connectionCard() {
-  const channels = await api.channels()
+async function connectionCard(channels) {
   const results = h('div', { class: 'col' })
 
   /** Eine Zeile je Kanal. Jede Zeile hält ihren eigenen Container, damit ein
@@ -389,6 +388,7 @@ function plannedPostsCard() {
 }
 
 function platformDefaultsCard(integrations) {
+  const baseUrl = h('input', { type: 'url', value: integrations.public_base_url || '' })
   const fanvueVersion = h('code', {}, integrations.fanvue_api_version || '—')
   const xTier = h('select', {}, ...['free', 'basic', 'pro'].map((t) =>
     h('option', { value: t, selected: t === integrations.x_api_tier }, t)))
@@ -396,6 +396,7 @@ function platformDefaultsCard(integrations) {
   const save = guard(async () => {
     const updated = await api.saveIntegrations({
       x_api_tier: xTier.value,
+      public_base_url: baseUrl.value.trim(),
     })
     Object.assign(integrations, updated)
     toast.ok('Gespeichert')
@@ -409,6 +410,13 @@ function platformDefaultsCard(integrations) {
       h('div', {}, h('div', { class: 'hint' }, 'Fanvue · gemeinsame Verbindung'), fanvueVersion, h('p', {}, h('a', { href: '/settings/shared#fanvue' }, 'Gemeinsame Fanvue-Verbindung →'))),
       field('X API-Tarif', xTier, 'Steuert das voreingestellte Tageskontingent neuer Kanäle.'),
     ),
+    h('details', { style: { marginBottom: '12px' } },
+      h('summary', {}, 'Erweitert: Standardadresse für Verbindungen'),
+      field('Öffentliche Basis-URL', baseUrl,
+        'Rückfalladresse für Kanäle ohne eigene Callback-Adresse. Eine unter Kanäle eingetragene ' +
+        'Callback-Adresse hat Vorrang. Fanvue verwendet die gemeinsame Verbindung. ' +
+        'Diese Adresse beeinflusst die Planung nicht.'),
+    ),
     h('div', { class: 'row' },
       h('button', { class: 'primary', onClick: save }, 'Speichern'),
       h('a', { class: 'btn', href: '#/channels' }, 'Zugangsdaten pflegen → Kanäle'),
@@ -418,10 +426,9 @@ function platformDefaultsCard(integrations) {
 
 
 // --------------------------------------------------------------------------- //
-function planningCard(integrations) {
+function planningCard(integrations, channels) {
   const gap = h('input', { type: 'number', min: '0', value: integrations.cross_channel_min_gap_minutes ?? 0 })
   const warn = h('input', { type: 'number', min: '1', value: integrations.inventory_warn_days ?? 14 })
-  const baseUrl = h('input', { value: integrations.public_base_url || '' })
 
   const autoPlan = h('input', { type: 'checkbox', checked: !!integrations.auto_plan_enabled })
   const autoDays = h('input', {
@@ -439,11 +446,33 @@ function planningCard(integrations) {
     autoEvery.disabled = !autoPlan.checked
   })
 
+  const channelToggles = channels.map((channel) => {
+    const toggle = h('input', {
+      type: 'checkbox', checked: channel.auto_plan_enabled !== false,
+      'aria-label': `Autobefüllen für ${channel.display_name}`,
+    })
+    toggle.addEventListener('change', guard(async () => {
+      toggle.disabled = true
+      try {
+        const updated = await api.updateChannel(channel.id, { auto_plan_enabled: toggle.checked })
+        Object.assign(channel, updated)
+        toast.ok(`Autobefüllen für ${channel.display_name} ${channel.auto_plan_enabled ? 'eingeschaltet' : 'ausgeschaltet'}`)
+      } finally {
+        toggle.checked = channel.auto_plan_enabled !== false
+        toggle.disabled = false
+      }
+    }))
+    return h('label', { class: 'inline', style: { padding: '10px 0', alignItems: 'center' } }, toggle,
+      h('span', {}, h('b', {}, channel.display_name),
+        h('span', { class: 'hint', style: { display: 'block' } },
+          `${channel.platform === 'x' ? 'X' : 'Fanvue'}${channel.handle ? ' · ' + channel.handle : ''}`,
+          !channel.is_active ? ' · Kanal pausiert – wird nicht befüllt' : '')))
+  })
+
   const save = guard(async () => {
     const updated = await api.saveIntegrations({
       cross_channel_min_gap_minutes: Number(gap.value),
       inventory_warn_days: Number(warn.value),
-      public_base_url: baseUrl.value.trim(),
       auto_plan_enabled: autoPlan.checked,
       auto_plan_days: Number(autoDays.value) || 14,
       auto_plan_interval_hours: Number(autoEvery.value) || 24,
@@ -453,7 +482,7 @@ function planningCard(integrations) {
   })
 
   return card('Planung',
-    h('div', { class: 'warnbox', style: { marginBottom: '12px' } },
+    h('div', { class: 'warnbox', style: { marginBottom: '12px', display: 'block' } },
       h('label', { class: 'inline' }, autoPlan,
         h('b', {}, 'Automatisch nachplanen')),
       h('div', { class: 'hint', style: { marginTop: '4px' } },
@@ -467,6 +496,15 @@ function planningCard(integrations) {
         h('div', { style: { width: '80px' } }, autoDays),
         h('span', { class: 'hint' }, 'Tage')),
     ),
+    h('div', { style: { marginBottom: '20px' } },
+      h('h3', {}, 'Autobefüllen je Kanal'),
+      h('p', { class: 'hint' },
+        'Die Kanalschalter werden sofort gespeichert. Automatisch befüllt werden nur eingeschaltete, aktive Kanäle, ' +
+        'wenn der Hauptschalter „Automatisch nachplanen“ gespeichert und aktiv ist. ' +
+        'Bestehende Posts und manuelles Befüllen bleiben unverändert.'),
+      h('div', { class: 'grid c2' }, ...channelToggles),
+      channels.length ? null : empty('Noch keine Kanäle vorhanden. Lege zuerst unter Kanäle eine Verbindung an.'),
+    ),
     h('div', { class: 'grid c2' },
       field('Mindestabstand ZWISCHEN Kanälen (Minuten)', gap,
         '0 = Kanäle dürfen gleichzeitig posten (Standard). Ein Wert größer 0 '
@@ -475,8 +513,6 @@ function planningCard(integrations) {
         + 'unter Kanäle → Einstellungen.'),
       field('Warnung bei Bildvorrat unter (Tagen)', warn),
     ),
-    field('Öffentliche Basis-URL', baseUrl,
-      'Grundlage für die Redirect-URIs oben. Muss von außen erreichbar sein, damit OAuth funktioniert.'),
     h('button', { class: 'primary', onClick: save }, 'Speichern'),
   )
 }

@@ -127,11 +127,20 @@ async def generate_plan(days: int = 14) -> Dict[str, Any]:
             except (ValueError, TypeError):
                 pass  # unlesbarer Zeitstempel -> jetzt laufen und neu setzen
 
+        channel_ids = list((await db.execute(
+            select(Channel.id).where(
+                Channel.is_active.is_(True), Channel.auto_plan_enabled.is_(True)
+            )
+        )).scalars().all())
+        # Eine leere Auswahl darf nicht als „alle Kanäle“ beim Planer ankommen.
+        if not channel_ids:
+            return {"skipped": "kein Kanal für automatisches Nachplanen eingeschaltet"}
+
         await appconfig.set_many(
             db, {"auto_plan_last_run": datetime.now(timezone.utc).isoformat()}
         )
         days = int(await appconfig.get(db, "auto_plan_days", days) or days)
-        result = await planner.fill_calendar(db, days=days, dry_run=False)
+        result = await planner.fill_calendar(db, channel_ids=channel_ids, days=days, dry_run=False)
         for gap in result.gaps[:10]:
             await notify.push(
                 db,

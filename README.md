@@ -97,6 +97,20 @@ bei noch fehlender Bildbeschreibung bleibt ein Medienpost ein Medienpost und
 verwendet das Modell für Bildunterschriften. Änderungen gelten für künftig
 neu generierte Texte; bestehende geplante Posts werden nicht automatisch umgeschrieben.
 
+## Automatisches Befüllen je Kanal
+
+Unter **AutoPost-Einstellungen → Planung** lassen sich einzelne Kanäle für das
+Autobefüllen ein- und ausschalten. Diese Kanalschalter werden sofort gespeichert.
+Zusätzlich muss der globale Hauptschalter **Automatisch nachplanen** aktiviert und
+gespeichert sein. Pausierte Kanäle werden immer übersprungen. Sind alle Kanalschalter
+aus, werden keine neuen Posts automatisch angelegt. Bestehende Posts und manuelles
+Befüllen bleiben unverändert. Beim Update bleiben bestehende Kanäle für das
+Autobefüllen ausgewählt; der bisherige Zustand des Hauptschalters bleibt erhalten.
+
+Die öffentliche Basis-URL steht unter **Plattform-Vorgaben → Erweitert**. Sie bleibt
+die Rückfalladresse für Verbindungen ohne eigene Callback-Adresse im Kanal und hat
+keinen Einfluss auf die Planung.
+
 ## Update der produktiven Installation
 
 Die Vorbereitung für den bestehenden Server ist abgeschlossen. Die Bedienung steht

@@ -203,6 +203,7 @@ class ChannelUpdate(BaseModel):
     timezone: Optional[str] = None
     nsfw_level: Optional[str] = None
     is_active: Optional[bool] = None
+    auto_plan_enabled: bool = True
     platform_side_scheduling: Optional[bool] = None
     default_audience: Optional[str] = None
     oauth_client_id: Optional[str] = None
@@ -230,6 +231,7 @@ class ChannelOut(ORMModel):
     timezone: str
     nsfw_level: str
     is_active: bool
+    auto_plan_enabled: bool = True
     health: str
     health_note: str
     platform_side_scheduling: bool
