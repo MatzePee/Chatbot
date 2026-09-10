@@ -83,7 +83,10 @@ async def _upload_all(
         # Wasserzeichen erst hier: Das Original bleibt unangetastet, und
         # dasselbe Bild kann auf zwei Kanälen mit verschiedenen Zeichen laufen.
         data = await asyncio.to_thread(watermark.apply_bytes, data, channel, mime=asset.mime)
-        ref = await adapter.upload_media(cred, asset, data)
+        if channel.platform == 'x':
+            ref = await adapter.upload_media(cred, asset, data, include_alt_text=channel.x_send_alt_text)
+        else:
+            ref = await adapter.upload_media(cred, asset, data)
         if cached:
             cached.external_id = ref.external_id
             cached.expires_at = ref.expires_at

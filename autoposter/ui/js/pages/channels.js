@@ -379,6 +379,8 @@ export default async function renderChannels() {
         ...personas.map((x) => h('option', { value: x.id, selected: x.id === channel.persona_id }, x.name)))
       const poolGroup = h('input', { value: p.exclusive_pool_group || '', placeholder: 'leer = eigener Pool' })
       const watermark = watermarkEditor(channel)
+      const sendAltText = h('input', { type: 'checkbox', checked: channel.x_send_alt_text !== false })
+      const madeWithAi = h('input', { type: 'checkbox', checked: !!channel.x_made_with_ai })
 
       // Sets: auf Fanvue gehört eine Bildstrecke in EINEN Post, auf X wirken
       // einzelne Bilder besser. Leer heißt "nach Plattform".
@@ -442,6 +444,18 @@ export default async function renderChannels() {
           'Größe und Abstände sind relativ zum Bild – dasselbe Zeichen sitzt auf Hoch- '
           + 'und Querformat gleich. Standard ist unten links mit kleinem Abstand.'),
         watermark.node,
+        channel.platform === 'x' ? h('div', { class: 'col', style: { margin: '16px 0' } },
+          h('h3', {}, 'X-Medienkennzeichnung'),
+          h('label', { class: 'inline' }, sendAltText, 'Bildbeschreibung an X senden (ALT)'),
+          h('p', { class: 'hint' },
+            'X zeigt bei Bildern mit Beschreibung das ALT-Abzeichen an. Es ist kein Wasserzeichen. ' +
+            'Ausschalten verhindert die Übermittlung bei neuen Uploads; dabei entfällt die Bildbeschreibung für Screenreader. ' +
+            'Bereits veröffentlichte Bilder bleiben unverändert.'),
+          h('label', { class: 'inline' }, madeWithAi, 'Medien als KI-generiert kennzeichnen'),
+          h('p', { class: 'hint' },
+            'Kennzeichnet künftig veröffentlichte Medienposts dieses X-Kanals mit dem offiziellen KI-Label. ' +
+            'Gilt auch für bereits geplante Posts. Reine Textposts und Auto-Kommentare bleiben unverändert.'),
+        ) : null,
         field('Zeitfenster allgemein (JSON)', windows,
           'dow: 0 = Montag … 6 = Sonntag. Gilt, wenn unten kein eigenes Fenster gesetzt ist.'),
         h('div', { class: 'grid c2' },
@@ -475,6 +489,10 @@ export default async function renderChannels() {
               color: color.value,
               ...(callback ? callback.values() : {}),
               ...watermark.values(),
+              ...(channel.platform === 'x' ? {
+                x_send_alt_text: sendAltText.checked,
+                x_made_with_ai: madeWithAi.checked,
+              } : {}),
             })
             toast.ok('Einstellungen gespeichert')
             close(); reload()

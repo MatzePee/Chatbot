@@ -186,7 +186,9 @@ class XAdapter:
     # ------------------------------------------------------------------ #
     # Medien
     # ------------------------------------------------------------------ #
-    async def upload_media(self, cred: Credentials, asset: MediaAsset, data: bytes) -> MediaRef:
+    async def upload_media(
+        self, cred: Credentials, asset: MediaAsset, data: bytes, *, include_alt_text: bool = True
+    ) -> MediaRef:
         url = f"{self.base}/2/media/upload"
         headers = self._auth(cred)
 
@@ -242,9 +244,9 @@ class XAdapter:
             if processing and processing.get("state") == "failed":
                 raise AdapterError(f"X Media-Verarbeitung fehlgeschlagen: {processing}")
 
-            # Alt-Text setzen (Pflicht in dieser App)
+            # X zeigt bei hinterlegter Bildbeschreibung sein eigenes ALT-Abzeichen.
             alt = (asset.caption_hint or asset.ai_description or "")[:1000]
-            if alt:
+            if include_alt_text and alt:
                 meta = await client.post(
                     f"{self.base}/2/media/metadata",
                     headers={**headers, "Content-Type": "application/json"},
@@ -279,6 +281,8 @@ class XAdapter:
         body: Dict[str, Any] = {"text": self._compose_text(post)}
         if media:
             body["media"] = {"media_ids": [m.external_id for m in media[:4]]}
+            if channel.x_made_with_ai:
+                body["made_with_ai"] = True
         if post.reply_settings and post.reply_settings != "everyone":
             body["reply_settings"] = post.reply_settings
         if (post.generation_meta or {}).get("in_reply_to_tweet_id"):

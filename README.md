@@ -111,6 +111,22 @@ Die öffentliche Basis-URL steht unter **Plattform-Vorgaben → Erweitert**. Sie
 die Rückfalladresse für Verbindungen ohne eigene Callback-Adresse im Kanal und hat
 keinen Einfluss auf die Planung.
 
+## X: ALT-Anzeige und KI-Label
+
+Unter **AutoPost → Kanäle → Einstellungen → X-Medienkennzeichnung** gibt es zwei
+unabhängige Optionen. **Bildbeschreibung an X senden (ALT)** steuert die Übermittlung
+von Alternativtext. Das ALT-Abzeichen wird von X angezeigt und ist kein Wasserzeichen.
+Nach dem Ausschalten erhalten neue Uploads keine Bildbeschreibung; vorhandene Posts
+bleiben unverändert. Die intern für die Texterzeugung verwendete Bildbeschreibung
+bleibt erhalten. Beim Wechsel der Option wird nur der lokale Upload-Cache dieses
+Kanals verworfen, damit keine alten Medien-Metadaten wiederverwendet werden.
+
+**Medien als KI-generiert kennzeichnen** übermittelt bei Medienposts `made_with_ai`
+an die X-API. Das gilt auch für bereits geplante, noch nicht veröffentlichte Posts.
+Reine Textposts, Auto-Kommentare und Fanvue werden davon nicht verändert. Beim Update
+bleibt ALT zunächst eingeschaltet und das KI-Label ausgeschaltet; beide Werte werden
+pro X-Kanal gespeichert. API-Referenz: https://docs.x.com/x-api/posts/create-post
+
 ## Update der produktiven Installation
 
 Die Vorbereitung für den bestehenden Server ist abgeschlossen. Die Bedienung steht

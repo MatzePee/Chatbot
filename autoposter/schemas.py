@@ -204,6 +204,8 @@ class ChannelUpdate(BaseModel):
     nsfw_level: Optional[str] = None
     is_active: Optional[bool] = None
     auto_plan_enabled: bool = True
+    x_send_alt_text: bool = True
+    x_made_with_ai: bool = False
     platform_side_scheduling: Optional[bool] = None
     default_audience: Optional[str] = None
     oauth_client_id: Optional[str] = None
@@ -232,6 +234,8 @@ class ChannelOut(ORMModel):
     nsfw_level: str
     is_active: bool
     auto_plan_enabled: bool = True
+    x_send_alt_text: bool = True
+    x_made_with_ai: bool = False
     health: str
     health_note: str
     platform_side_scheduling: bool

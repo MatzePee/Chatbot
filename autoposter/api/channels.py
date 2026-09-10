@@ -344,6 +344,10 @@ async def update_channel(
 
     data = payload.model_dump(exclude_unset=True)
     fixed = fanvue_channels.fixed_audience(channel)
+    alt_changed = (
+        channel.platform == 'x' and 'x_send_alt_text' in data
+        and data['x_send_alt_text'] != channel.x_send_alt_text
+    )
     if fixed:
         data['default_audience'] = fixed
         if data.get('policy'):
@@ -390,6 +394,10 @@ async def update_channel(
 
     db.add(channel)
     await db.flush()
+    if alt_changed:
+        # Bereits hochgeladene Medien haben den alten Alt-Text. Nur den lokalen
+        # Upload-Cache verwerfen; veröffentlichte Posts und Originale bleiben erhalten.
+        await db.execute(delete(ExternalMediaRef).where(ExternalMediaRef.channel_id == channel.id))
     await db.refresh(channel)
     return await _to_out(db, channel)
 

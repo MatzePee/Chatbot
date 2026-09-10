@@ -700,7 +700,8 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
                         ),
                     }
                 )
-            if limits.supports_alt_text and not (post.alt_texts or {}).get(str(asset.id)):
+            send_alt = channel.platform != 'x' or channel.x_send_alt_text
+            if limits.supports_alt_text and send_alt and not (post.alt_texts or {}).get(str(asset.id)):
                 issues.append(
                     {
                         "level": "warning",
