@@ -82,6 +82,21 @@ OpenRouter-Zugänge, Modelle, Prompts und Abläufe bleiben bereichsspezifisch:
 `/autoposter/#/settings`. Die getrennten Formulare erhalten beim Speichern die
 Werte der anderen Bereiche. Datenbank, Token-Verwaltung und Updateweg bleiben erhalten.
 
+## Personas für Text- und Medienposts
+
+Unter AutoPost → Personas gibt es getrennte Bereiche **Text-Post** und
+**Medien-Post**, jeweils mit eigenem Systemprompt und eigenen Beispielposts für
+X und Fanvue. Der vorhandene Systemprompt bleibt als Text-Post-Prompt erhalten;
+das neue Medien-Promptfeld ergänzt die Datenbank ohne Änderung vorhandener Werte.
+Bestehende Beispiele behalten ihre Zuordnung mit bzw. ohne Bild.
+
+Nur Textposts erhalten den Tagesrhythmus und das Tagesthema. Medienposts nutzen
+die Bildbeschreibung und die Medien-Vorgaben ohne Tageszeitbezug. Ohne passende
+Beispiele wird nicht mehr auf Beispiele der anderen Postart ausgewichen. Auch
+bei noch fehlender Bildbeschreibung bleibt ein Medienpost ein Medienpost und
+verwendet das Modell für Bildunterschriften. Änderungen gelten für künftig
+neu generierte Texte; bestehende geplante Posts werden nicht automatisch umgeschrieben.
+
 ## Update der produktiven Installation
 
 Die Vorbereitung für den bestehenden Server ist abgeschlossen. Die Bedienung steht
@@ -125,6 +140,30 @@ installiert den Update-Helfer samt eng begrenzter sudo-Regel. Es ändert weder d
 Programmdaten noch den laufenden Programmstand und startet den Bot nicht neu.
 Anschließend wird das eigentliche Programmupdate in der Oberfläche gestartet.
 Die kurze Anleitung steht in [ANLEITUNG_SABRINA.md](ANLEITUNG_SABRINA.md).
+
+## Speicherbereinigung nach Updates
+
+Nach einem erfolgreich abgeschlossenen Update bereinigt MP CreatorStudio die
+älteren Update-Dateien automatisch, normalerweise innerhalb einer Minute.
+Unter `data/releases/` bleiben die aktive Python-Umgebung und die unmittelbar
+vorherige Umgebung für eine Rückkehr erhalten. Unter `data/backups/` werden die
+letzten drei automatisch erzeugten `before-update-*`-Sicherungen behalten.
+Ältere Vorbereitungsordner gescheiterter Updateversuche werden ebenfalls erst
+nach einem erfolgreichen Update entfernt. Manuelle Sicherungen, aktuelle
+Datenbanken, Medien, Zugangsdaten und unbekannte Ordner bleiben erhalten.
+
+Die Bereinigung läuft als Dienstbenutzer und verwendet dieselbe Sperre wie der
+Update-Helfer. Während eines Updates, nach einem Fehlschlag, bei unklaren
+Versionsdaten und im lokalen Mitlesemodus wird nichts entfernt. Die tatsächlich
+laufende Umgebung und das Rückfallziel werden vor jeder Bereinigung geprüft.
+Ein Aufräumfehler stoppt den Bot nicht und löst kein Rollback aus.
+
+Das funktioniert auch mit dem bereits installierten Update-Helfer: Nach der
+Installation der neuen Programmversion ist kein erneutes Reparaturscript nötig.
+Das Ergebnis steht in `data/update-cleanup.json` und im Dienstprotokoll. Der für
+die Updatevorbereitung benötigte freie Platz (mindestens 1,5 GB) muss weiterhin
+vor dem Update verfügbar sein; es wird nicht vor der erfolgreichen Prüfung
+vorsorglich gelöscht.
 
 ## Sicherungen und Prüfung
 

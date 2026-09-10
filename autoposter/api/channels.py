@@ -151,6 +151,7 @@ async def add_examples(
                 )
             )
         ).scalars().all()
+        if bool((row.image_description or "").strip()) == bool(payload.image_description.strip())
     }
 
     created: List[PersonaExample] = []

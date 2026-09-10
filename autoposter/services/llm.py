@@ -50,6 +50,14 @@ OPENING_ANGLES = [
 ]
 
 
+MEDIA_OPENING_ANGLES = [
+    "ein sichtbares Detail des Bildes",
+    "eine Frage zum gezeigten Motiv",
+    "eine kurze Bemerkung zu Farben oder Formen im Bild",
+    "eine kleine Selbstironie zur gezeigten Pose",
+]
+
+
 class BudgetExceeded(RuntimeError):
     pass
 
@@ -281,8 +289,7 @@ async def _few_shots(
 
     Beispiele mit hinterlegter Bildbeschreibung gehören zu Bildposts, solche
     ohne zu reinen Textposts – eine Frage an die Community sieht anders aus als
-    eine Bildunterschrift. Passen keine, werden alle genommen; eine Stilvorlage
-    ist immer noch besser als keine.
+    eine Bildunterschrift. Die Postarten werden niemals vermischt.
     """
     stmt = select(PersonaExample).where(
         PersonaExample.persona_id == persona_id,
@@ -297,8 +304,7 @@ async def _few_shots(
 
     if with_image is not None:
         fitting = [r for r in rows if bool((r.image_description or "").strip()) == with_image]
-        if fitting:
-            rows = fitting
+        rows = fitting
 
     # Aus dem passenden Vorrat zufällig ziehen: sonst bekommt jeder Post
     # dieselben fünf Beispiele und damit dieselbe Schablone.
@@ -308,11 +314,18 @@ async def _few_shots(
     return [r.text for r in pool]
 
 
-def build_system_prompt(persona: Optional[Persona], platform: str) -> str:
+def build_system_prompt(persona: Optional[Persona], platform: str, *, with_image: bool = False) -> str:
+    media_rule = (
+        "MEDIEN-POST: Beziehe den Text ausschließlich auf den sichtbaren Bildinhalt. "
+        "Verwende keine Bezüge zur Tageszeit, Uhrzeit, zum Datum oder Wochentag und "
+        "keine geplanten Aktivitäten aus einem Tagesrhythmus. Auch die geplante "
+        "Veröffentlichungszeit ist keine Information über das Bild. "
+        "Erfinde keine Umstände außerhalb des Bildes. Diese Regel gilt auch dann, "
+        "wenn Stilvorgaben oder Beispielposts zeitliche Bezüge enthalten."
+    ) if with_image else ""
     if not persona:
-        return (
-            "Du schreibst Social-Media-Texte. " + PLATFORM_RULES.get(platform, "")
-        )
+        return "\n\n".join(filter(None, [
+            "Du schreibst Social-Media-Texte. " + PLATFORM_RULES.get(platform, ""), media_rule]))
     emoji = {
         "none": "Verwende keine Emojis.",
         "sparse": "Höchstens ein Emoji, oft gar keins.",
@@ -332,7 +345,8 @@ def build_system_prompt(persona: Optional[Persona], platform: str) -> str:
             if persona.forbidden_topics
             else ""
         ),
-        persona.system_prompt.strip(),
+        ((persona.media_system_prompt if with_image else persona.system_prompt) or "").strip(),
+        media_rule,
         "Schreibe niemals über dich als KI. Keine Anführungszeichen um den Text. "
         "Keine Erklärungen, nur der fertige Post-Text.",
     ]
@@ -626,11 +640,12 @@ class LlmClient:
         when_local: Optional[datetime] = None,
         has_image: Optional[bool] = None,
     ) -> LlmResult:
+        has_image = bool(image_descriptions) if has_image is None else has_image
         recent = await _recent_texts(db, channel_id)
         # Beispielposts passend zur Postart: Fragen an die Community sehen anders
         # aus als Bildunterschriften.
         shots = (
-            await _few_shots(db, persona.id, platform, with_image=bool(image_descriptions))
+            await _few_shots(db, persona.id, platform, with_image=has_image)
             if persona
             else []
         )
@@ -638,19 +653,17 @@ class LlmClient:
         user_parts = [f"Erzeuge {variants} unterschiedliche Varianten für einen Post."]
         # Der Tagesrhythmus steht bewusst weit oben: Er ist die härteste
         # Randbedingung. Ein Post um 03:00 aus dem Gym ist sofort unglaubwürdig.
-        if persona and persona.daily_rhythm and when_local:
+        if not has_image and persona and persona.daily_rhythm and when_local:
             fragment = rhythm.prompt_fragment(persona.daily_rhythm, when_local)
             if fragment:
                 user_parts.append(fragment)
-        if has_image is None:
-            has_image = bool(image_descriptions)
 
         if image_descriptions:
             user_parts.append(
                 "Zu diesem Post gehört ein Bild. Das ist darauf zu sehen:\n"
                 + "\n".join(f"- {d}" for d in image_descriptions if d)
                 + "\n\nDer Text muss erkennbar zu diesem Bild gehören: gleicher Ort, gleiche "
-                "Situation, gleiche Tageszeit. Erfinde keine andere Umgebung und keine andere "
+                "Situation. Stelle keinen Bezug zur Tageszeit her. Erfinde keine andere Umgebung und keine andere "
                 "Tätigkeit. Beschreibe das Bild aber nicht Wort für Wort – kommentiere den "
                 "Moment, als hättest du ihn gerade selbst erlebt."
             )
@@ -664,7 +677,7 @@ class LlmClient:
             )
         else:
             user_parts.append("Es gibt kein Bild. Schreibe einen reinen Textpost.")
-        if theme:
+        if theme and not has_image:
             user_parts.append(f"Thema des Tages: {theme}")
         if instruction:
             user_parts.append(f"Zusätzliche Anweisung: {instruction}")
@@ -695,7 +708,7 @@ class LlmClient:
         # Ein zufälliger Einstiegswinkel bricht das auf.
         user_parts.append(
             "Wähle für jede Variante einen anderen Einstieg. Möglicher Blickwinkel für "
-            f"diesen Post: {random.choice(OPENING_ANGLES)}"
+            f"diesen Post: {random.choice(MEDIA_OPENING_ANGLES if has_image else OPENING_ANGLES)}"
         )
         # Das Beispiel enthielt früher wörtlich "..." und "tag" als Werte. Manche
         # Modelle geben genau das zurück – und ein Post mit dem Text "..." und
@@ -717,7 +730,7 @@ class LlmClient:
         # wurde also mit dem Bildunterschriften-Modell erzeugt, und die
         # Einstellung „Reine Textposts" blieb wirkungslos. Zwei Ausdrücke, die
         # dasselbe entscheiden sollen, laufen früher oder später auseinander.
-        with_image = bool(image_descriptions)
+        with_image = has_image
         task = "caption" if with_image else "text_post"
         chosen_model = cfg(
             "openrouter_model_caption" if with_image else "openrouter_model_text"
@@ -737,7 +750,7 @@ class LlmClient:
             no_reasoning=True,
             max_tokens=min(12000, max(3200, max_chars * variants)),
             messages=[
-                {"role": "system", "content": build_system_prompt(persona, platform)},
+                {"role": "system", "content": build_system_prompt(persona, platform, with_image=has_image)},
                 {"role": "user", "content": "\n\n".join(user_parts)},
             ],
         )

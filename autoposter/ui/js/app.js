@@ -9,7 +9,7 @@ import renderAssign from './pages/assign.js?v=creatorstudio-mobile-system-202609
 import renderMatrix from './pages/matrix.js?v=creatorstudio-mobile-system-20260909'
 import renderCalendar from './pages/calendar.js?v=creatorstudio-translation-20260910'
 import renderChannels from './pages/channels.js?v=creatorstudio-fanvue-channels-20260910'
-import renderPersonas from './pages/personas.js?v=creatorstudio-mobile-system-20260909'
+import renderPersonas from './pages/personas.js?v=creatorstudio-persona-types-20260910'
 import renderSettings from './pages/settings.js?v=creatorstudio-mobile-system-20260909'
 
 

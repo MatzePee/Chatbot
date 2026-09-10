@@ -71,9 +71,14 @@ def install_content_studio(app):
         else:
             from . import poller
             poller.start()
+            from . import update_cleanup
+            app.state.update_cleanup_stop = update_cleanup.start(deployment.ROOT, revision)
 
     @app.on_event('shutdown')
     async def stop_studio():
+        cleanup_stop = getattr(app.state, "update_cleanup_stop", None)
+        if cleanup_stop is not None:
+            cleanup_stop.set()
         from .preview import stop_shadow_worker
         stop_shadow_worker()
         await app.state.studio_lifespan.__aexit__(None, None, None)

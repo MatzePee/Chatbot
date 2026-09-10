@@ -9,8 +9,8 @@ const PLATFORMS = [['x', 'X'], ['fanvue', 'Fanvue']]
  * Getrennt nach Plattform und danach, ob ein Bild dabei ist – eine Frage an
  * die Community klingt anders als eine Bildunterschrift.
  */
-export function examplesEditor(persona) {
-  const state = { platform: 'x', kind: 'text', items: [] }
+export function examplesEditor(persona, { kind = null } = {}) {
+  const state = { platform: 'x', kind: kind || 'text', items: [] }
 
   const listBox = h('div', { class: 'col', style: { gap: '4px' } })
   const countLine = h('div', { class: 'hint' })
@@ -18,7 +18,8 @@ export function examplesEditor(persona) {
     style: { height: '150px', fontSize: '12px' },
     placeholder:
       'Ein Beispiel pro Zeile. Nummerierungen wie "1." werden automatisch entfernt.\n'
-      + 'Coffee or tea? And no, \'both\' is not an answer. ☕🍵',
+      + (kind === 'image' ? 'Beispieltexte passend zu deinen Bildern – ohne Tageszeitbezug.'
+        : 'Coffee or tea? And no, \'both\' is not an answer. ☕🍵'),
   })
 
   const kindTabs = h('div', { class: 'row' })
@@ -40,6 +41,7 @@ export function examplesEditor(persona) {
     }
 
     clear(kindTabs)
+    if (kind) return
     kindTabs.appendChild(h('span', { class: 'hint' }, 'Gilt für:'))
     for (const [value, label] of [['text', '¶ Posts ohne Bild'], ['image', '▣ Posts mit Bild']]) {
       kindTabs.appendChild(h('button', {

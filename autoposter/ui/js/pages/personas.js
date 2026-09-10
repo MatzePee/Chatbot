@@ -1,7 +1,7 @@
 import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
 import { h, clear, empty, field, card, toast, guard, spinner } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 import { rhythmEditor } from '../rhythm.js?v=creatorstudio-mobile-system-20260909'
-import { examplesEditor } from '../examples.js?v=creatorstudio-mobile-system-20260909'
+import { examplesEditor } from '../examples.js?v=creatorstudio-persona-types-20260910'
 
 export default async function renderPersonas() {
   let [personas, channels] = await Promise.all([api.personas(), api.channels()])
@@ -45,6 +45,8 @@ export default async function renderPersonas() {
     const tone = h('textarea', {}); tone.value = p.tone_guidelines || ''
     const sys = h('textarea', { style: { height: '190px', fontFamily: 'ui-monospace, monospace', fontSize: '12px' } })
     sys.value = p.system_prompt || ''
+    const mediaSys = h('textarea', { style: { height: '190px' }, placeholder: 'Beschreibe den gewünschten Stil deiner Bildposts.' })
+    mediaSys.value = p.media_system_prompt || ''
     const lang = h('input', { value: p.language })
     const emoji = h('select', {}, ...[['none', 'keine'], ['sparse', 'sparsam'], ['liberal', 'großzügig']]
       .map(([v, l]) => h('option', { value: v, selected: v === p.emoji_policy }, l)))
@@ -54,7 +56,8 @@ export default async function renderPersonas() {
     const hashtags = h('input', { value: (p.hashtag_pool || []).join(', ') })
     const ctas = h('input', { value: (p.cta_pool || []).join(' | ') })
     const rhythm = rhythmEditor({ value: p.daily_rhythm || '' })
-    const examples = examplesEditor(p)
+    const textExamples = examplesEditor(p, { kind: 'text' })
+    const mediaExamples = examplesEditor(p, { kind: 'image' })
 
     const save = guard(async () => {
       const updated = await api.updatePersona(p.id, {
@@ -62,6 +65,7 @@ export default async function renderPersonas() {
         bio: bio.value,
         tone_guidelines: tone.value,
         system_prompt: sys.value,
+        media_system_prompt: mediaSys.value,
         language: lang.value,
         emoji_policy: emoji.value,
         temperature: Number(temp.value),
@@ -102,6 +106,37 @@ export default async function renderPersonas() {
       }
     }))
 
+    const textPanel = h('div', { class: 'stack persona-post-panel', role: 'tabpanel', id: 'persona-text-panel' },
+      card('Text-Post', field('Systemprompt für Textposts', sys)),
+      card('Tagesrhythmus', h('p', { class: 'hint' },
+        'Gilt ausschließlich für Textposts und berücksichtigt deren geplante Uhrzeit in der Zeitzone des Kanals.'), rhythm.node),
+      card('Beispielposts für Textposts', textExamples.node))
+    const mediaPanel = h('div', { class: 'stack persona-post-panel', role: 'tabpanel', id: 'persona-media-panel', hidden: true },
+      card('Medien-Post', field('Systemprompt für Medienposts', mediaSys),
+        h('p', { class: 'hint' }, 'Medienposts beziehen sich nur auf den Bildinhalt. Tageszeit, Tagesrhythmus und Tagesthema werden nicht verwendet.')),
+      card('Beispielposts für Medienposts', mediaExamples.node))
+    const postTypeTabs = h('div', { class: 'row persona-post-tabs', role: 'tablist', 'aria-label': 'Postart' })
+    for (const [label, panel] of [['Text-Post', textPanel], ['Medien-Post', mediaPanel]]) {
+      const button = h('button', { type: 'button', role: 'tab', class: 'chip' + (panel === textPanel ? ' on' : ''),
+        'aria-selected': String(panel === textPanel), 'aria-controls': panel.id, id: panel.id + '-tab',
+        onClick: () => {
+          textPanel.hidden = panel !== textPanel
+          mediaPanel.hidden = panel !== mediaPanel
+          for (const tab of postTypeTabs.children) {
+            const active = tab === button
+            tab.classList.toggle('on', active)
+            tab.setAttribute('aria-selected', String(active))
+          }
+        },
+      }, label)
+      panel.setAttribute('aria-labelledby', button.id)
+      postTypeTabs.appendChild(button)
+    }
+
+    textPanel.appendChild(card('Text-Post testen',
+      h('p', { class: 'hint' }, 'Verwendet die gespeicherten Einstellungen der Persona des gewählten Kanals.'),
+      h('div', { class: 'row', style: { marginBottom: '10px' } }, chanSel, testBtn), out))
+
     detailBox.appendChild(h('div', { class: 'stack' },
       h('h1', { style: { margin: 0, fontSize: '20px' } }, p.name),
       h('div', { class: 'grid c2' },
@@ -117,32 +152,15 @@ export default async function renderPersonas() {
           field('Modell (leer = Standard)', model),
         ),
         h('div', {},
-          field('System-Prompt', sys),
           field('Verbotene Themen (kommagetrennt)', forbidden),
           field('Hashtag-Pool', hashtags),
           field('CTA-Pool (mit | trennen)', ctas),
         ),
       ),
-      h('button', { class: 'primary', onClick: save }, 'Speichern'),
-      card('Tagesrhythmus',
-        h('p', { class: 'hint', style: { marginTop: '-4px' } },
-          'Jeder erzeugte Text bekommt die Aktivität mit, die zur geplanten Uhrzeit gehört – ',
-          'in der Zeitzone des jeweiligen Kanals. So behauptet kein Post um 03:00, ',
-          'die Persona sei gerade im Gym.'),
-        rhythm.node,
-      ),
-      card('Beispielposts',
-        h('p', { class: 'hint', style: { marginTop: '-4px' } },
-          'Der zuverlässigste Hebel für den Stil. Bis zu 8 Beispiele gehen bei jeder ',
-          'Generierung als Vorlage mit – das Modell übernimmt Aufbau, Länge und Tonfall, ',
-          'nicht den Inhalt. Getrennt nach Posts mit und ohne Bild, weil eine Frage an die ',
-          'Community anders klingt als eine Bildunterschrift.'),
-        examples.node,
-      ),
-      card('Prompt-Playground',
-        h('div', { class: 'row', style: { marginBottom: '10px' } }, chanSel, testBtn),
-        out,
-      ),
+      postTypeTabs,
+      textPanel,
+      mediaPanel,
+      h('button', { class: 'primary', onClick: save }, 'Persona speichern'),
     ))
   }
 

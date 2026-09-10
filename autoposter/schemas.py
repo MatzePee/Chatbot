@@ -44,6 +44,7 @@ class PersonaBase(BaseModel):
     bio: str = ""
     tone_guidelines: str = ""
     system_prompt: str = ""
+    media_system_prompt: str = ""
     #: Wochenplan in Textform, siehe app/services/rhythm.py
     daily_rhythm: str = ""
     forbidden_topics: List[str] = []
@@ -64,6 +65,7 @@ class PersonaUpdate(BaseModel):
     bio: Optional[str] = None
     tone_guidelines: Optional[str] = None
     system_prompt: Optional[str] = None
+    media_system_prompt: Optional[str] = None
     daily_rhythm: Optional[str] = None
     forbidden_topics: Optional[List[str]] = None
     emoji_policy: Optional[str] = None

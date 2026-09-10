@@ -215,6 +215,7 @@ class Persona(Base, TimestampMixin):
     bio: Mapped[str] = mapped_column(Text, default="")
     tone_guidelines: Mapped[str] = mapped_column(Text, default="")
     system_prompt: Mapped[str] = mapped_column(Text, default="")
+    media_system_prompt: Mapped[str] = mapped_column(Text, default="")
     #: Wochenplan in Textform – siehe app/services/rhythm.py. Sorgt dafür, dass
     #: ein Post um 03:00 nicht behauptet, die Persona sei im Gym.
     daily_rhythm: Mapped[str] = mapped_column(Text, default="")
