@@ -3,7 +3,7 @@ import '/static/live-refresh.js?v=creatorstudio-mobile-system-20260909'
 import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
 import { h, clear, append, toast } from './ui.js?v=creatorstudio-mobile-system-20260909'
 
-import renderDashboard from './pages/dashboard.js?v=creatorstudio-mobile-system-20260909'
+import renderDashboard from './pages/dashboard.js?v=creatorstudio-upcoming-20260910'
 import renderLibrary from './pages/library.js?v=creatorstudio-mobile-system-20260909'
 import renderAssign from './pages/assign.js?v=creatorstudio-mobile-system-20260909'
 import renderMatrix from './pages/matrix.js?v=creatorstudio-mobile-system-20260909'

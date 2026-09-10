@@ -1,3 +1,4 @@
+import { renderUpcoming } from '../upcoming-posts.js?v=creatorstudio-upcoming-20260910'
 import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
 import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard, append, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
@@ -111,17 +112,7 @@ export default async function renderDashboard() {
 
   // ------------------------------------------------------------ Nächste Posts / Probleme
   const upcoming = h('div', { class: 'col' })
-  if (!data.upcoming_posts.length) upcoming.appendChild(empty('Nichts eingeplant.'))
-  for (const p of data.upcoming_posts) {
-    const ch = data.channel_health.find((c) => c.id === p.channel_id)
-    upcoming.appendChild(h('div', { class: 'row', style: { fontSize: '12px', border: '1px solid var(--line)', borderRadius: '8px', padding: '5px 8px' } },
-      h('i', { class: 'dot', style: { background: ch ? ch.color : '#666' } }),
-      h('span', { class: 'hint num' }, fmtDateTime(p.scheduled_at)),
-      h('span', { style: { flex: '1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
-        p.body_text || '(kein Text)'),
-      h('span', { class: 'hint' }, p.status),
-    ))
-  }
+  renderUpcoming(upcoming, data.upcoming_posts, data.channel_health)
 
   const problems = h('div', { class: 'col' })
   if (!data.notifications.length && !data.recent_failures.length) problems.appendChild(empty('Alles ruhig.'))
