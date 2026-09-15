@@ -685,7 +685,12 @@ def _validate_plan(payload: PlanRangeRequest) -> None:
         raise HTTPException(400, "Das Enddatum liegt vor dem Startdatum")
     if (payload.date_to - payload.date_from).days > 180:
         raise HTTPException(400, "Der Zeitraum darf höchstens 180 Tage umfassen")
-    if payload.image_posts_per_day + payload.text_posts_per_day <= 0:
+    if (
+        payload.image_posts_per_day
+        + payload.text_posts_per_day
+        + payload.sub_posts_per_day
+        + payload.free_posts_per_day
+    ) <= 0:
         raise HTTPException(400, "Mindestens ein Post pro Tag muss eingestellt sein")
 
 

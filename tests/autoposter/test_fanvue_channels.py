@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
@@ -8,6 +9,7 @@ from app import db as chat_db
 from autoposter.models import Channel, ContentPlan, ChannelCredential, Post, PostingPolicy
 from autoposter.services import fanvue_channels as pairs, chatbot_fanvue as shared
 from autoposter.api.channels import list_channels, update_channel, delete_channel
+from autoposter.api.posts import plan_range
 from autoposter.schemas import ChannelUpdate, AssignmentBatch, PlanRangeRequest
 from autoposter.services import assignment, media, planner
 from tests.autoposter.test_duplicates import make_channel, make_image
@@ -109,8 +111,9 @@ async def test_both_planners_keep_images_and_audiences_separate(db, connection):
     normal = await planner.fill_calendar(db, channel_ids=list(by_id), days=2, dry_run=True, generate_text=False)
     assert {s.channel_id for s in normal.slots} == set(by_id)
     requested = PlanRangeRequest(channel_ids=list(by_id), date_from=start.date(), date_to=start.date(),
+                                 image_posts_per_day=0, text_posts_per_day=0,
                                  sub_posts_per_day=2, free_posts_per_day=1, generate_text=False, dry_run=True)
-    ranged = await planner.plan_range(db, requested)
+    ranged = await plan_range(requested, db=db, user=SimpleNamespace(id=None))
     for result in (normal, ranged):
         for slot in result.slots:
             assert slot.audience == by_id[slot.channel_id].fanvue_audience

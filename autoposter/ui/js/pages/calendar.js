@@ -665,22 +665,25 @@ export default async function renderCalendar() {
 
         // Der Lauf kann Minuten dauern – deshalb im Hintergrund starten und
         // den Fortschritt anzeigen, statt die Anfrage offen zu halten.
-        const { run_id, label } = await api.planRangeStart({ ...payload(), dry_run: false })
-        attached = run_id
-        const progress = runProgress(run_id, { label })
-        clear(preview).appendChild(progress.node)
+        try {
+          const { run_id, label } = await api.planRangeStart({ ...payload(), dry_run: false })
+          attached = run_id
+          const progress = runProgress(run_id, { label })
+          clear(preview).appendChild(progress.node)
 
-        const state = await progress.finished
-        attached = null
-        runBtn.disabled = false; previewBtn.disabled = false
-        await load()
-        if (state.status === 'done') {
-          const r = state.result || {}
-          toast.ok(`${r.created || 0} Posts angelegt`
-            + (r.gaps ? `, ${r.gaps} Lücken offen` : ''))
-          close()
-        } else if (state.status === 'cancelled') {
-          toast.info('Abgebrochen – bereits angelegte Posts bleiben erhalten')
+          const state = await progress.finished
+          await load()
+          if (state.status === 'done') {
+            const r = state.result || {}
+            toast.ok(`${r.created || 0} Posts angelegt`
+              + (r.gaps ? `, ${r.gaps} Lücken offen` : ''))
+            close()
+          } else if (state.status === 'cancelled') {
+            toast.info('Abgebrochen – bereits angelegte Posts bleiben erhalten')
+          }
+        } finally {
+          attached = null
+          runBtn.disabled = false; previewBtn.disabled = false
         }
       }))
 
