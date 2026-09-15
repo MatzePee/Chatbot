@@ -345,6 +345,9 @@ def build_system_prompt(persona: Optional[Persona], platform: str, *, with_image
             if persona.forbidden_topics
             else ""
         ),
+        "Ausdrückliche Sprach-, Emoji- und Formatvorgaben im folgenden individuellen Prompt "
+        "haben Vorrang vor den allgemeinen Persona-Vorgaben. "
+        "Das Ausgabeformat gilt für den vollständigen Inhalt des JSON-Feldes text.",
         ((persona.media_system_prompt if with_image else persona.system_prompt) or "").strip(),
         media_rule,
         "Schreibe niemals über dich als KI. Keine Anführungszeichen um den Text. "
@@ -641,6 +644,10 @@ class LlmClient:
         has_image: Optional[bool] = None,
     ) -> LlmResult:
         has_image = bool(image_descriptions) if has_image is None else has_image
+        custom_prompt = ((persona.media_system_prompt if has_image else persona.system_prompt) or "") if persona else ""
+        # Recognize the explicitly requested flag format, never impose it on
+        # Fanvue personas that ask for a single language.
+        bilingual = platform == "fanvue" and all(flag in custom_prompt for flag in ("🇺🇸", "🇩🇪"))
         recent = await _recent_texts(db, channel_id)
         # Beispielposts passend zur Postart: Fragen an die Community sehen anders
         # aus als Bildunterschriften.
@@ -683,13 +690,13 @@ class LlmClient:
             user_parts.append(f"Zusätzliche Anweisung: {instruction}")
         if persona and persona.hashtag_pool:
             user_parts.append(
-                "Mögliche Hashtags (maximal 3 auswählen, passend): "
+                "Nur wenn der individuelle Prompt Hashtags erlaubt: maximal 3 passende auswählen aus: "
                 + ", ".join(persona.hashtag_pool)
             )
         if shots:
             user_parts.append(
-                "So klingen Posts dieser Person. Übernimm Aufbau, Länge, Satzmelodie und "
-                "die Art des Schlusses – aber niemals den Inhalt:\n"
+                "So klingen Posts dieser Person. Übernimm den Stil, soweit er den "
+                "individuellen Sprach- und Formatvorgaben entspricht – niemals den Inhalt:\n"
                 + "\n".join(f"- {s}" for s in shots)
             )
         if recent:
@@ -716,8 +723,12 @@ class LlmClient:
         # Deshalb benannte Platzhalter plus ausdrückliches Verbot.
         user_parts.append(
             f"Jede Variante darf höchstens {max_chars} Zeichen lang sein (inkl. Hashtags).\n"
+            "Das Feld text enthält den VOLLSTÄNDIGEN Post mit ALLEN im individuellen Prompt "
+            "verlangten Sprachen und Absätzen. Leerzeilen innerhalb des JSON-Strings als \\n\\n kodieren. "
+            "Keine verlangte Sprachversion in ein anderes Feld auslagern.\n"
             "Erzeuge zu jeder Variante zusätzlich die vollständige deutsche Übersetzung im Feld translation_de. "
-            "Sie dient nur als Lesehilfe und zählt nicht zum Zeichenlimit des Posts.\n"
+            "Dieses zusätzliche Feld ist eine Lesehilfe und ersetzt NIEMALS einen im Post verlangten deutschen Absatz. "
+            "Nur die separate Lesehilfe zählt nicht zum Zeichenlimit.\n"
             "Antworte mit NICHTS außer diesem JSON:\n"
             '{"variants":[{"text":"HIER_DER_FERTIGE_POST","hashtags":["HIER_EIN_SCHLAGWORT"],"translation_de":"HIER_DIE_DEUTSCHE_UEBERSETZUNG"}]}\n'
             "Die Großbuchstaben-Wörter sind Platzhalter. Ersetze sie durch echten "
@@ -756,6 +767,8 @@ class LlmClient:
         )
 
         content = content_of(payload)
+        if (payload.get("choices") or [{}])[0].get("finish_reason") == "length":
+            raise RuntimeError("Das Modell hat den Post wegen des Token-Limits abgeschnitten. Bitte neu erzeugen.")
         if not content:
             # Klar scheitern statt einen leeren Post anzulegen: Der Planer fängt
             # das ab, schreibt die Begründung an den Post und lässt ihn zur
@@ -788,6 +801,24 @@ class LlmClient:
             # als Post im Kalender zu landen.
             if not text or is_placeholder(text) or looks_like_reasoning(text, max_chars):
                 continue
+            if bilingual:
+                # Some models still put the requested German paragraph only
+                # in the reading-aid field. Recover it before storing the post.
+                if "🇩🇪" not in text and text.startswith("🇺🇸"):
+                    german = strip_reasoning(str(item.get("translation_de") or "")).strip()
+                    if not german or german.startswith("HIER_"):
+                        german = await self.translate_german(db, text)
+                    german = re.sub(r"^(?:🇺🇸|🇩🇪)\s*", "", german).strip()
+                    item["translation_de"] = german
+                    text += "\n\n🇩🇪 " + german
+                match = re.fullmatch(r"🇺🇸\s*(.+?)\s*🇩🇪\s*(.+)", text, re.S)
+                if (
+                    not match
+                    or any(is_placeholder(part) for part in match.groups())
+                    or any(flag in part for part in match.groups() for flag in ("🇺🇸", "🇩🇪"))
+                ):
+                    raise RuntimeError("Der Fanvue-Text enthält nicht beide verlangten Sprachversionen. Bitte neu erzeugen.")
+                text = "🇺🇸 " + " ".join(match[1].split()) + "\n\n🇩🇪 " + " ".join(match[2].split())
             tags = [
                 str(t).lstrip("#")
                 for t in (item.get("hashtags") or [])
