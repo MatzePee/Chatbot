@@ -2,9 +2,20 @@ from unittest.mock import Mock
 
 import pytest
 
+from app import fanvue
+from autoposter.adapters.base import AdapterError
 from autoposter.models import Channel
 from autoposter.services import chatbot_fanvue as shared, credentials, oauthapp, appconfig
-from autoposter.adapters.base import AdapterError
+
+
+def test_shared_fanvue_oauth_requests_autopost_write_scopes():
+    url = fanvue.build_authorize_url(
+        "client", "https://example.test/oauth/callback", "state", "challenge"
+    )
+    assert "write%3Amedia" in url
+    assert "read%3Apost" in url
+    assert "write%3Apost" in url
+    assert "prompt=consent" in url
 
 
 @pytest.fixture

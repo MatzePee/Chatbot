@@ -15,7 +15,7 @@
     <p class="small muted">Gewährte Scopes: <code>{{ tokens['scope'] }}</code></p>
     {% set granted = tokens['scope'] %}
     {% set missing = [] %}
-    {% for need in ['read:fan','read:insights','read:media','read:chat','write:chat'] %}
+    {% for need in ['read:fan','read:insights','read:media','write:media','read:post','write:post','read:chat','write:chat'] %}
       {% if need not in granted %}{% set _ = missing.append(need) %}{% endif %}
     {% endfor %}
     {% if missing %}
@@ -23,6 +23,10 @@
     Hinweis: <code>read:fan</code> und <code>read:insights</code> gibt Fanvue nur für
     <strong>Creator-/Agentur-Konten</strong> frei – bei anderen Kontotypen bleiben sie ungewährt
     (Bot funktioniert trotzdem, nur ohne Fan-Insights und volle Mitgliederliste).</p>
+    {% if 'write:media' in missing or 'write:post' in missing %}
+    <p class="small" style="color:#e0b050"><strong>AutoPost ist ohne diese Schreibrechte gesperrt.</strong>
+    Trenne die Fanvue-Verbindung und verbinde sie anschließend erneut, um die neuen Rechte freizugeben.</p>
+    {% endif %}
     {% endif %}
     {% endif %}
     <form method="post" action="/oauth/disconnect"><button class="btn-danger">Verbindung trennen</button></form>
@@ -102,5 +106,14 @@
   </div>
 </form>
 </section>
+
+<div class="card" id="service-controls">
+  <h2>Dienststeuerung</h2>
+  <p class="muted">Startet MP CreatorStudio neu, damit Änderungen am Programmcode aktiv werden. Die Oberfläche ist dabei kurz nicht erreichbar.</p>
+  <form method="post" action="/system/restart-service"
+        onsubmit="return confirm('MP CreatorStudio wirklich neu starten? Die App ist kurz nicht erreichbar.');">
+    <button class="btn"{% if preview %} disabled title="Im Mitlesemodus gesperrt"{% endif %}>🔄 Dienst neu starten</button>
+  </form>
+</div>
 
 {% endblock %}

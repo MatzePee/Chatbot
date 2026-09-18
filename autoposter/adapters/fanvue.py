@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
@@ -57,6 +58,7 @@ SCOPES = [
 MIN_PRICE_CENTS = 300
 MAX_TEXT = 5000
 PART_SIZE = 8 * 1024 * 1024
+logger = logging.getLogger(__name__)
 
 
 
@@ -233,10 +235,26 @@ class FanvueAdapter:
                     }
                 ),
             )
+            logger.info(
+                "Fanvue upload create: endpoint=%s status=%s",
+                create.request.url.path,
+                create.status_code,
+            )
+            if create.status_code >= 400:
+                logger.warning(
+                    "Fanvue upload create failed: request_id=%s response=%s",
+                    create.headers.get("x-request-id", ""),
+                    create.text[:500],
+                )
             raise_for_response(create, "Fanvue Upload-Session anlegen")
             session = create.json()
 
             upload_id = str(session.get("uploadId") or session.get("id") or "")
+            logger.info(
+                "Fanvue upload session created: upload_id=%s parts=%s",
+                upload_id,
+                parts_count,
+            )
             if not upload_id:
                 raise AdapterError(f"Fanvue lieferte keine uploadId: {create.text[:300]}")
 
@@ -250,12 +268,30 @@ class FanvueAdapter:
                         f"{self.base}/v0/media/uploads/{upload_id}/parts/{index + 1}/url",
                         headers=headers,
                     )
+                    logger.info(
+                        "Fanvue upload part URL: upload_id=%s part=%s status=%s",
+                        upload_id,
+                        index + 1,
+                        part.status_code,
+                    )
+                    if part.status_code >= 400:
+                        logger.warning(
+                            "Fanvue upload part URL failed: request_id=%s response=%s",
+                            part.headers.get("x-request-id", ""),
+                            part.text[:500],
+                        )
                     raise_for_response(part, f"Fanvue Upload-URL für Teil {index + 1}")
                     url = part.text.strip().strip('"')
                     if not url:
                         raise AdapterError(f"Fanvue lieferte keine Upload-URL für Teil {index + 1}")
                     put = await s3.put(url, content=chunk,
                                        headers={"Content-Type": asset.mime})
+                    logger.info(
+                        "Fanvue S3 part upload: upload_id=%s part=%s status=%s",
+                        upload_id,
+                        index + 1,
+                        put.status_code,
+                    )
                     if put.status_code >= 400:
                         raise AdapterError(
                             f"S3-Teil-Upload #{index} fehlgeschlagen ({put.status_code})",
@@ -271,6 +307,17 @@ class FanvueAdapter:
                 headers={**headers, "Content-Type": "application/json"},
                 content=json.dumps({"parts": etags}),
             )
+            logger.info(
+                "Fanvue upload complete: endpoint=%s status=%s",
+                complete.request.url.path,
+                complete.status_code,
+            )
+            if complete.status_code >= 400:
+                logger.warning(
+                    "Fanvue upload complete failed: request_id=%s response=%s",
+                    complete.headers.get("x-request-id", ""),
+                    complete.text[:500],
+                )
             raise_for_response(complete, "Fanvue Upload-Session abschließen")
             completed = complete.json()
             media_uuid = str(
@@ -284,6 +331,11 @@ class FanvueAdapter:
             for _ in range(60):
                 status = await client.get(
                     f"{self.base}/v0/media/{media_uuid}", headers=headers
+                )
+                logger.info(
+                    "Fanvue media status: media_uuid=%s http_status=%s",
+                    media_uuid,
+                    status.status_code,
                 )
                 if status.status_code >= 400:
                     await asyncio.sleep(3)

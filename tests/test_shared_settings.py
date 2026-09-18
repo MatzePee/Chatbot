@@ -150,3 +150,10 @@ def test_update_controls_are_visible_in_shared_settings_and_system(client):
     # Installation must not be nested in the settings-save form.
     shared = client.get('/settings/shared').text
     assert shared.index('id="upd-install-form"') < shared.index('action="/settings/shared/updates"')
+
+
+def test_service_restart_is_visible_in_shared_settings(client):
+    shared = client.get('/settings/shared').text
+    assert 'id="service-controls"' in shared
+    assert 'action="/system/restart-service"' in shared
+    assert 'Dienst neu starten' in shared

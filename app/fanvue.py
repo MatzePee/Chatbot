@@ -30,8 +30,10 @@ TOKEN_URL = f"{AUTH_BASE}/oauth2/token"
 # Scopes, die der Bot braucht.
 # Fanvue-Pflicht-Scopes: openid, offline_access, offline (Refresh-Token / Langzeitzugriff).
 # read:media -> Vault-Ordner/Medien fuer PPV lesen.
+# write:media + write:post -> Medien hochladen und AutoPost veroeffentlichen.
 SCOPES = ["openid", "offline_access", "offline",
-          "read:self", "read:chat", "write:chat", "read:fan", "read:media", "read:insights"]
+          "read:self", "read:chat", "write:chat", "read:fan",
+          "read:media", "write:media", "read:post", "write:post", "read:insights"]
 
 _refresh_lock = threading.Lock()
 
