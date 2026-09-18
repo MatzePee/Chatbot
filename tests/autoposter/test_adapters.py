@@ -133,6 +133,39 @@ async def test_fanvue_bulk_meldet_teilfehler_pro_item():
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_fanvue_upload_verwendet_v0_multipart_endpunkte():
+    """Der alte /media/upload-sessions-Pfad liefert bei Fanvue 404."""
+    from autoposter.adapters.base import Credentials
+    from autoposter.models import MediaAsset
+
+    adapter = FanvueAdapter()
+    base = settings.fanvue_api_base
+    respx.post(f"{base}/v0/media/uploads").mock(
+        return_value=httpx.Response(201, json={"id": "upload-1"})
+    )
+    respx.get(f"{base}/v0/media/uploads/upload-1/parts/1/url").mock(
+        return_value=httpx.Response(200, text="https://s3.example/part-1")
+    )
+    respx.patch(f"{base}/v0/media/uploads/upload-1").mock(
+        return_value=httpx.Response(200, json={"mediaUuid": "media-1"})
+    )
+    respx.get(f"{base}/v0/media/media-1").mock(
+        return_value=httpx.Response(200, json={"status": "ready"})
+    )
+    s3 = respx.put("https://s3.example/part-1").mock(
+        return_value=httpx.Response(200, headers={"ETag": '"etag-1"'})
+    )
+    asset = MediaAsset(filename="photo.jpg", storage_path="/tmp/photo.jpg", sha256="a" * 64, mime="image/jpeg")
+
+    result = await adapter.upload_media(Credentials(access_token="token"), asset, b"image")
+
+    assert result.external_id == "media-1"
+    assert s3.called
+    assert respx.calls[0].request.url.path.endswith("/v0/media/uploads")
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_x_tweet_erstellen():
     adapter = XAdapter()
     respx.post(f"{settings.x_api_base}/2/tweets").mock(

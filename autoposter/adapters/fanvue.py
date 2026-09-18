@@ -213,43 +213,47 @@ class FanvueAdapter:
     async def upload_media(self, cred: Credentials, asset: MediaAsset, data: bytes) -> MediaRef:
         headers = self._headers(cred)
         parts_count = max(1, -(-len(data) // PART_SIZE))
+        media_type = asset.mime.split("/", 1)[0].lower()
+        if media_type not in {"image", "video", "audio"}:
+            raise AdapterError(f"Nicht unterstützter Fanvue-Medientyp: {asset.mime}")
 
         async with http_client(timeout=300.0) as client:
-            # 1) Upload-Session anlegen (Media-Record + S3-Multipart)
+            # 1) Upload-Session anlegen (Media-Record + S3-Multipart).
+            # Fanvue's current vault API lives below /v0/media/uploads.  The
+            # former /media/upload-sessions route now responds with 404.
             create = await client.post(
-                f"{self.base}/media/upload-sessions",
+                f"{self.base}/v0/media/uploads",
                 headers={**headers, "Content-Type": "application/json"},
                 content=json.dumps(
                     {
+                        "name": asset.filename,
                         "filename": asset.filename,
-                        "mimeType": asset.mime,
-                        "sizeInBytes": len(data),
-                        "partsCount": parts_count,
+                        "mediaType": media_type,
+                        "sizeBytes": len(data),
                     }
                 ),
             )
             raise_for_response(create, "Fanvue Upload-Session anlegen")
             session = create.json()
 
-            media_uuid = str(
-                session.get("mediaUuid") or session.get("uuid") or session.get("media", {}).get("uuid", "")
-            )
-            upload_id = session.get("uploadId") or session.get("sessionUuid")
-            urls = session.get("partUrls") or session.get("urls") or []
-            if not media_uuid:
-                raise AdapterError(f"Fanvue lieferte keine mediaUuid: {create.text[:300]}")
+            upload_id = str(session.get("uploadId") or session.get("id") or "")
+            if not upload_id:
+                raise AdapterError(f"Fanvue lieferte keine uploadId: {create.text[:300]}")
 
-            # 2) Teile direkt nach S3 laden (presigned URLs, ohne Auth-Header!)
+            # 2) Für jedes Teil eine kurzlebige URL abfragen und direkt nach
+            # S3 laden (presigned URLs, ohne Fanvue-Auth-Header).
             etags: List[Dict[str, Any]] = []
             async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as s3:
                 for index in range(parts_count):
                     chunk = data[index * PART_SIZE : (index + 1) * PART_SIZE]
-                    if index >= len(urls):
-                        raise AdapterError(
-                            "Fanvue lieferte zu wenige presigned URLs für den Upload"
-                        )
-                    entry = urls[index]
-                    url = entry if isinstance(entry, str) else entry.get("url")
+                    part = await client.get(
+                        f"{self.base}/v0/media/uploads/{upload_id}/parts/{index + 1}/url",
+                        headers=headers,
+                    )
+                    raise_for_response(part, f"Fanvue Upload-URL für Teil {index + 1}")
+                    url = part.text.strip().strip('"')
+                    if not url:
+                        raise AdapterError(f"Fanvue lieferte keine Upload-URL für Teil {index + 1}")
                     put = await s3.put(url, content=chunk,
                                        headers={"Content-Type": asset.mime})
                     if put.status_code >= 400:
@@ -258,21 +262,28 @@ class FanvueAdapter:
                             retryable=True,
                         )
                     etags.append(
-                        {"partNumber": index + 1, "eTag": put.headers.get("ETag", "").strip('"')}
+                        {"ETag": put.headers.get("ETag", "").strip('"'), "PartNumber": index + 1}
                     )
 
             # 3) Session abschließen
-            complete = await client.post(
-                f"{self.base}/media/upload-sessions/{upload_id or media_uuid}/complete",
+            complete = await client.patch(
+                f"{self.base}/v0/media/uploads/{upload_id}",
                 headers={**headers, "Content-Type": "application/json"},
-                content=json.dumps({"mediaUuid": media_uuid, "parts": etags}),
+                content=json.dumps({"parts": etags}),
             )
             raise_for_response(complete, "Fanvue Upload-Session abschließen")
+            completed = complete.json()
+            media_uuid = str(
+                completed.get("mediaUuid") or completed.get("uuid")
+                or session.get("mediaUuid") or session.get("media", {}).get("uuid", "")
+            )
+            if not media_uuid:
+                raise AdapterError(f"Fanvue lieferte keine mediaUuid: {complete.text[:300]}")
 
             # 4) Auf 'ready' warten — vorher darf nicht gepostet werden
             for _ in range(60):
                 status = await client.get(
-                    f"{self.base}/media/{media_uuid}", headers=headers
+                    f"{self.base}/v0/media/{media_uuid}", headers=headers
                 )
                 if status.status_code >= 400:
                     await asyncio.sleep(3)
