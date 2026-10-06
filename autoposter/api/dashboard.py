@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from autoposter.config import settings
 from autoposter.db import get_db
-from autoposter.deps import current_user, require_admin
+from autoposter.deps import current_user, require_admin, require_editor
 from autoposter.models import (
     AppSetting,
     Channel,
@@ -31,7 +31,7 @@ from autoposter.schemas import (
 )
 from autoposter.services import appconfig
 from autoposter.services import credentials as cred_service
-from autoposter.services import inventory, library, llm as llm_service
+from autoposter.services import inventory, library, problems, llm as llm_service
 
 router = APIRouter(tags=["dashboard"])
 
@@ -40,6 +40,7 @@ router = APIRouter(tags=["dashboard"])
 async def dashboard(
     db: AsyncSession = Depends(get_db), _: User = Depends(current_user)
 ) -> DashboardOut:
+    await problems.check_if_due(db)
     now = datetime.now(timezone.utc)
 
     upcoming = (
@@ -65,6 +66,21 @@ async def dashboard(
             .limit(10)
         )
     ).scalars().all()
+
+    failure_out = []
+    assessments = {}
+    superseded = set()
+    for post in failures:
+        out = PostOut.model_validate(post)
+        try:
+            if await problems.failure_superseded(db, post):
+                superseded.add(str(post.id))
+                continue
+            out.error_message, out.retry_ready = await problems.current_failure(db, post)
+        except Exception:
+            pass  # Keep the previous error if the current check cannot complete.
+        assessments[str(post.id)] = out
+        failure_out.append(out)
 
     channels = (await db.execute(select(Channel).order_by(Channel.display_name))).scalars().all()
     channel_out: List[ChannelOut] = []
@@ -92,21 +108,32 @@ async def dashboard(
         inventory=await inventory.overview(db),
         lifecycle_counts=await library.lifecycle_counts(db),
         upcoming_posts=[PostOut.model_validate(p) for p in upcoming],
-        recent_failures=[PostOut.model_validate(p) for p in failures],
+        recent_failures=failure_out,
         channel_health=channel_out,
         notifications=[
             {
                 "id": str(n.id),
                 "level": n.level,
                 "title": n.title,
-                "body": n.body,
+                "body": assessments[n.entity_id].error_message if n.entity == "post" and n.entity_id in assessments and problems.kind(n) == "post" else n.body,
+                "entity": n.entity,
+                "entity_id": n.entity_id,
                 "created_at": n.created_at.isoformat(),
             }
             for n in notes
+            if not (n.entity == "post" and problems.kind(n) == "post" and n.entity_id in superseded)
+            and not (n.entity == "post" and n.entity_id in assessments and assessments[n.entity_id].retry_ready and problems.kind(n) == "post")
         ],
         dry_run=settings.dry_run,
         global_pause=settings.global_pause,
     )
+
+
+@router.post("/problems/check")
+async def check_problems(
+    db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)
+) -> Dict[str, Any]:
+    return await problems.check(db)
 
 
 @router.get("/inventory", response_model=InventoryOverview)

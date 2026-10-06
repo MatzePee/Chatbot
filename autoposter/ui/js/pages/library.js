@@ -4,7 +4,7 @@ import { openCreateSetDialog, openSetDialog } from '../sets.js?v=creatorstudio-m
 import {
   h, append, clear, card, empty, field, modal, toast, guard, spinner,
   mediaTile, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, fmtDateTime, fmtBytes, debounce, attachPreview,
-} from '../ui.js?v=creatorstudio-mobile-system-20260909'
+} from '../ui.js?v=creatorstudio-preview-bounds-20261006'
 
 export default async function renderLibrary({ query }) {
   const [channels, views, tagList] = await Promise.all([api.channels(), api.views(), api.tags()])
@@ -357,6 +357,31 @@ export default async function renderLibrary({ query }) {
               await api.archiveMedia(d.id, d.lifecycle !== 'archived')
               toast.ok('Status geändert'); close(); await load(); await refreshCounts()
             }) }, d.lifecycle === 'archived' ? 'Reaktivieren' : 'Archivieren'),
+            h('button', { class: 'danger', onClick: () => {
+              modal('Bild löschen', (closeConfirm) => {
+                const deleteBtn = h('button', { class: 'danger' }, 'Bild löschen')
+                deleteBtn.addEventListener('click', guard(async () => {
+                  if (deleteBtn.disabled) return
+                  deleteBtn.disabled = true
+                  deleteBtn.textContent = 'Lösche …'
+                  try {
+                    await api.deleteMedia(d.id)
+                    state.selected.delete(d.id)
+                    closeConfirm(); close()
+                    toast.ok('Bild gelöscht')
+                    await load()
+                    await Promise.all([refreshCounts(), refreshSets()])
+                  } finally {
+                    deleteBtn.disabled = false
+                    deleteBtn.textContent = 'Bild löschen'
+                  }
+                }))
+                return h('div', { class: 'col' },
+                  h('p', {}, `„${d.filename}“ endgültig aus der Bibliothek löschen? Zugehörige Zuordnungen und Set-Mitgliedschaften werden entfernt. Bereits veröffentlichte Beiträge auf X oder Fanvue bleiben bestehen.`),
+                  h('div', { class: 'row' }, deleteBtn, h('button', { onClick: closeConfirm }, 'Abbrechen')),
+                )
+              })
+            } }, 'Löschen'),
           ),
         ),
         h('div', { class: 'stack' },

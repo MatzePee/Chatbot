@@ -245,6 +245,14 @@ async def unassign(db: AsyncSession, payload: AssignmentRemove) -> AssignmentRes
 
     await db.flush()
     await lifecycle.refresh_assets(db, touched)
+    from autoposter.services import reuse
+    for channel_id in payload.channel_ids:
+        revoked = []
+        for asset_id in touched:
+            asset = await db.get(MediaAsset, asset_id)
+            if asset and str(channel_id) not in (asset.assigned_channel_ids or []) and str(channel_id) not in (asset.scheduled_channel_ids or []):
+                revoked.append(asset_id)
+        await reuse.consume(db, revoked, channel_id)
     return result
 
 
@@ -337,7 +345,9 @@ async def channel_pool(
     )
     assets = list((await db.execute(stmt)).scalars().all())
     if not include_used:
-        assets = [a for a in assets if str(channel_id) not in (a.used_channel_ids or [])]
+        from autoposter.services import reuse
+        released = await reuse.allowed(db, channel_id)
+        assets = [a for a in assets if str(channel_id) not in (a.used_channel_ids or []) or str(a.id) in released]
     assets.sort(key=lambda a: (priorities.get(a.id, 9999), a.created_at))
     return assets
 

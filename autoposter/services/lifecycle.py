@@ -186,4 +186,6 @@ async def record_usage(
             entry.used_at = used_at
         db.add(entry)
     await db.flush()
+    from autoposter.services import reuse
+    await reuse.consume(db, asset_ids, channel_id)
     await refresh_assets(db, asset_ids)

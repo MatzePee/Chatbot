@@ -39,10 +39,10 @@ celery_app.conf.beat_schedule = {
         "task": "autoposter.refresh_metrics",
         "schedule": crontab(minute="*/30"),
     },
-    # Täglich 07:30 UTC: Bestandswarnung und Zusammenfassung.
+    # Stündlich: bestehende Probleme prüfen und Bestandswarnungen aktualisieren.
     "inventory-check": {
         "task": "autoposter.inventory_check",
-        "schedule": crontab(hour=7, minute=30),
+        "schedule": crontab(minute=30),
     },
     # Täglich 03:15 UTC: verbrauchte Bilder archivieren, Zähler auffrischen.
     "nightly-maintenance": {

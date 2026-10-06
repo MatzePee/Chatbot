@@ -21,14 +21,15 @@ from autoposter.schemas import (
     MediaOut,
 )
 from autoposter.services import assignment as service
-from autoposter.services import inventory, library, media as media_service
+from autoposter.services import inventory, library, lifecycle, reuse, media as media_service
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
 
 
-def _to_out(asset: MediaAsset) -> MediaOut:
+def _to_out(asset: MediaAsset, releases=None) -> MediaOut:
     out = MediaOut.model_validate(asset)
     out.thumb_url, out.url = media_service.public_urls(asset)
+    out.reusable_channel_ids = (releases or {}).get(str(asset.id), [])
     return out
 
 
@@ -45,6 +46,37 @@ async def assign_batch(
     result = await service.assign(db, payload, actor_id=user.id)
     library.invalidate_counts()
     return result
+
+
+@router.post("/channel/{channel_id}/assets/{asset_id}/reuse", response_model=MediaOut)
+async def reuse_asset(
+    channel_id: uuid.UUID, asset_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db), user: User = Depends(require_editor),
+) -> MediaOut:
+    channel = await db.get(Channel, channel_id)
+    asset = await db.get(MediaAsset, asset_id)
+    if not channel or not asset:
+        raise HTTPException(404, "Bild oder Kanal nicht gefunden")
+    await lifecycle.refresh_asset(db, asset)
+    if not channel.is_active or asset.status != "ready":
+        raise HTTPException(400, "Bild und Kanal müssen aktiv verfügbar sein")
+    if str(channel_id) not in (asset.used_channel_ids or []):
+        raise HTTPException(400, "Dieses Bild wurde auf dem Kanal noch nicht veröffentlicht")
+    if str(channel_id) in (asset.scheduled_channel_ids or []):
+        raise HTTPException(409, "Dieses Bild ist auf dem Kanal bereits erneut eingeplant")
+    reason = service.check_compatibility(asset, channel)
+    if reason:
+        raise HTTPException(400, reason)
+    result = await service.assign(db, AssignmentBatch(asset_ids=[asset_id], channel_ids=[channel_id]), actor_id=user.id)
+    if result.rejected:
+        raise HTTPException(400, result.rejected[0]["reason"])
+    await reuse.release(db, asset_id, channel_id)
+    from autoposter.services import problems
+    await problems.recheck_channel_failures(db, channel_id)
+    library.invalidate_counts()
+    out = _to_out(asset)
+    out.reusable_channel_ids = (await reuse.all_channels(db)).get(str(asset_id), [])
+    return out
 
 
 @router.post("/remove", response_model=AssignmentResult)
@@ -100,16 +132,17 @@ async def channel_pool(
     _: User = Depends(current_user),
 ) -> List[MediaOut]:
     assets = await service.channel_pool(db, channel_id, include_used=include_used)
-    return [_to_out(a) for a in assets[:limit]]
+    releases = await reuse.all_channels(db)
+    return [_to_out(a, releases) for a in assets[:limit]]
 
 
 @router.get("/board")
 async def board(
-    limit_per_channel: int = Query(default=60, le=500),
+    limit_per_channel: int | None = Query(default=None, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_user),
 ) -> Dict[str, Any]:
-    """Alles, was die Zuordnungsseite für den ersten Aufbau braucht."""
+    """Vollständige Kanalbestände; nur auf ausdrücklichen Wunsch begrenzen."""
     channels = (
         await db.execute(
             select(Channel).where(Channel.is_active.is_(True)).order_by(Channel.display_name)
@@ -118,6 +151,7 @@ async def board(
     overview = await inventory.overview(db)
     inv = {str(c.channel_id): c for c in overview.channels}
 
+    releases = await reuse.all_channels(db)
     columns = []
     for channel in channels:
         assets = await service.channel_pool(db, channel.id, include_used=True)
@@ -138,7 +172,7 @@ async def board(
                 "days_left": entry.days_left if entry else None,
                 "traffic_light": entry.traffic_light if entry else "grey",
                 "empty_on": entry.empty_on.isoformat() if entry and entry.empty_on else None,
-                "assets": [_to_out(a).model_dump(mode="json") for a in assets[:limit_per_channel]],
+                "assets": [_to_out(a, releases).model_dump(mode="json") for a in assets[:limit_per_channel]],
             }
         )
     return {"columns": columns, "unassigned": overview.unassigned_assets}

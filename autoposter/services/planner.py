@@ -273,6 +273,8 @@ async def pick_assets(
         if policy.reuse_cooldown_days
         else None
     )
+    from autoposter.services import reuse
+    released = await reuse.allowed(db, channel.id)
     recent_hashes = await _recent_phashes(db, channel.id, policy.phash_lookback_posts)
 
     # Bei Kanälen, die Sets auflösen: je Set nur das vorderste offene Bild.
@@ -304,12 +306,12 @@ async def pick_assets(
             continue
         if assignment.nsfw_rank(asset.nsfw_level) > assignment.nsfw_rank(channel.nsfw_level):
             continue
-        if str(channel.id) in (asset.used_channel_ids or []):
+        if str(channel.id) in (asset.used_channel_ids or []) and str(asset.id) not in released:
             if not cutoff or not asset.last_used_at or asset.last_used_at > cutoff:
                 continue
         if str(channel.id) in (asset.scheduled_channel_ids or []):
             continue
-        if asset.phash and any(
+        if str(asset.id) not in released and asset.phash and any(
             media_service.hamming(asset.phash, other) < policy.phash_min_distance
             for other in recent_hashes
         ):
@@ -651,6 +653,8 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
     adapter = get_adapter(channel.platform)
     limits = adapter.limits()
     policy = channel.policy or PostingPolicy()
+    from autoposter.services import reuse
+    released = await reuse.allowed(db, channel.id)
 
     text_length = len(post.body_text or "") + sum(len(h) + 2 for h in (post.hashtags or []))
     if not post.body_text:
@@ -718,7 +722,7 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
                     }
                 )
             # Duplikat-Prüfung ausschließlich innerhalb dieses Kanals.
-            if str(channel.id) in (asset.used_channel_ids or []):
+            if str(channel.id) in (asset.used_channel_ids or []) and str(asset.id) not in released:
                 cooldown_ok = (
                     policy.reuse_cooldown_days > 0
                     and asset.last_used_at

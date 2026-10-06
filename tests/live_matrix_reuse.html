@@ -1,0 +1,44 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><title>Matrix erneute Bereitstellung Test</title>
+<link rel="stylesheet" href="/autoposter/app.css"><link rel="stylesheet" href="/static/workspace.css">
+<div id="root"></div><div id="modals"></div><div id="toasts"></div><pre id="result" hidden></pre>
+<script type="module">
+import renderMatrix from '/autoposter/js/pages/matrix.js'
+window.CreatorStudioLive={begin(){},end(){},busy:()=>false}
+const channels=['A','B'].map(id=>({id,name:id,platform:'x',color:'#0071e3'}))
+let released=false, fail=false, requests=0
+const asset={id:'photo',filename:'photo.jpg',width:600,height:800,usage_count:4,used_channel_ids:['A','B'],scheduled_channel_ids:[],reusable_channel_ids:[],thumb_url:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',url:''}
+window.fetch=async(url,options={})=>{
+  const path=new URL(url,location.href).pathname
+  if(path==='/api/v1/media/matrix')return Response.json({channels,rows:[{asset:{...asset,reusable_channel_ids:released?['A']:[]},cells:{A:released?'assigned':'published',B:'published'}}],next_cursor:null})
+  if(path==='/api/v1/assignments/channel/A/assets/photo/reuse'){
+    requests++;if(options.method!=='POST')throw Error('Expected POST')
+    if(fail)return Response.json({detail:'Testfehler'},{status:409})
+    released=true;return Response.json({...asset,reusable_channel_ids:['A']})
+  }
+  throw Error('Unexpected API: '+path)
+}
+const results=[],check=(value,label)=>{if(!value)throw Error(label);results.push(label)}
+const settle=()=>new Promise(resolve=>setTimeout(resolve,100))
+const action=page=>[...page.querySelectorAll('tbody td')][1].querySelector('button.small')
+try{
+  let page=await renderMatrix();document.querySelector('#root').appendChild(page)
+  check(action(page).textContent==='Erneut bereitstellen','Veröffentlichte Zelle bietet erneute Bereitstellung an')
+  action(page).click();await settle()
+  check(requests===1 && page.querySelector('tbody td:nth-child(2)').textContent.includes('erneut bereitgestellt'),'Klick stellt Bild für diesen Kanal erneut bereit')
+  check(page.querySelector('tbody td:nth-child(3)').textContent.includes('veröffentlicht'),'Anderer Kanal behält seinen veröffentlichten Status')
+  check(page.querySelector('.mcol-img').textContent.includes('4× genutzt'),'Nutzungshistorie bleibt sichtbar')
+  await page.refresh()
+  check(page.querySelector('tbody td:nth-child(2)').textContent.includes('erneut bereitgestellt'),'Freigabe bleibt nach automatischer Aktualisierung erhalten')
+  released=false;const replacement=await renderMatrix();page.replaceWith(replacement);page=replacement
+  page.querySelector('input[type=checkbox]').click()
+  action(page).click();await settle()
+  check(!page.querySelector('tbody'),'Neu bereitgestelltes Bild beachtet Zugeordnete ausblenden')
+  released=false;fail=true;const failed=await renderMatrix();page.replaceWith(failed);page=failed
+  action(page).click();await settle()
+  check(page.querySelector('tbody td:nth-child(2)').textContent.includes('veröffentlicht') && !action(page).disabled,'Fehler lässt bisherigen Status bestehen und erlaubt erneuten Versuch')
+  asset.scheduled_channel_ids=['A'];const planned=await renderMatrix();page.replaceWith(planned)
+  check(action(planned).disabled,'Bereits erneut geplante Bilder können nicht nochmals bereitgestellt werden')
+  window.matrixReuseTestResult={ok:true,results}
+}catch(error){window.matrixReuseTestResult={ok:false,results,error:error.stack}}
+document.querySelector('#result').textContent=JSON.stringify(window.matrixReuseTestResult,null,2)
+</script></html>

@@ -69,13 +69,15 @@ async def channel_inventory(db: AsyncSession, channel: Channel) -> ChannelInvent
         datetime.now(timezone.utc) - timedelta(days=cooldown_days) if cooldown_days else None
     )
 
+    from autoposter.services import reuse
+    released = await reuse.allowed(db, channel.id)
     available = 0
     for asset in pool:
         if asset.status != MediaStatus.ready.value:
             continue
         if assignment.nsfw_rank(asset.nsfw_level) > assignment.nsfw_rank(channel.nsfw_level):
             continue
-        if asset.id in used_ids:
+        if asset.id in used_ids and str(asset.id) not in released:
             if not cutoff or not asset.last_used_at or asset.last_used_at > cutoff:
                 continue
         available += 1

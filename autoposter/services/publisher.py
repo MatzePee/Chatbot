@@ -174,6 +174,7 @@ async def publish_post(
     if blocking and not force:
         post.status = PostStatus.failed.value
         post.error_message = "; ".join(i["message"] for i in blocking)[:900]
+        post.generation_meta = {**(post.generation_meta or {}), "preflight_failure": True}
         db.add(post)
         await notify.push(
             db,
@@ -185,6 +186,8 @@ async def publish_post(
         )
         return False, post.error_message
 
+    if (post.generation_meta or {}).get("preflight_failure"):
+        post.generation_meta = {key: value for key, value in post.generation_meta.items() if key != "preflight_failure"}
     await _reset_quota_if_needed(db, channel)
     policy: PostingPolicy = channel.policy or PostingPolicy()
     if channel.quota_used_today >= policy.daily_api_quota and not force:

@@ -1,0 +1,54 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><title>Matrixfilter Regressionstest</title>
+<link rel="stylesheet" href="/autoposter/app.css"><link rel="stylesheet" href="/static/workspace.css">
+<div id="root" class="workspace-frame"><header class="workspace-topbar">Matrixfilter Test</header><div class="workspace-body"><main class="workspace-scroll"><div id="view"></div></main></div></div><div id="toasts"></div><div id="modals"></div><pre id="result" hidden></pre>
+<script type="module">
+import renderMatrix from '/autoposter/js/pages/matrix.js'
+const channels = ['A','B'].map(id => ({id, name: id, platform: 'x', color: '#0071e3'}))
+const row = (id, a, b) => ({asset: {id, filename: id + '.jpg', width: 600, height: 800, thumb_url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52"/>', url: ''}, cells: {A: a, B: b}})
+let rows = [row('free','none','none'), row('assigned','assigned','none'), row('scheduled','none','scheduled'), row('published','published','none'), row('mixed','assigned','scheduled'), row('full','assigned','published')]
+let nextCursor = 'page2', assignedRequests = []
+window.fetch = async (url, options = {}) => {
+  const parsed = new URL(url, location.href)
+  if (parsed.pathname === '/api/v1/media/matrix') {
+    return Response.json({channels, rows: parsed.searchParams.has('cursor') ? [row('extra','none','none')] : rows, next_cursor: parsed.searchParams.has('cursor') ? null : nextCursor})
+  }
+  if (parsed.pathname === '/api/v1/assignments/batch') {
+    const payload = JSON.parse(options.body); assignedRequests.push(payload)
+    for (const r of rows) if (payload.asset_ids.includes(r.asset.id)) for (const c of payload.channel_ids) r.cells[c] = 'assigned'
+    return Response.json({created: payload.asset_ids.length, rejected: []})
+  }
+  throw Error('Unexpected request: ' + url)
+}
+window.CreatorStudioLive = {busy: () => false, begin() {}, end() {}}
+const results = [], check = (value, label) => {if (!value) throw Error(label); results.push(label)}
+const settle = () => new Promise(resolve => setTimeout(resolve, 100))
+try {
+  const page = await renderMatrix(); document.querySelector('#view').appendChild(page)
+  const filters = [...page.querySelectorAll('input[type=checkbox]')]
+  const visible = () => [...page.querySelectorAll('tbody .mname')].map(n => n.textContent)
+  check(visible().length === 6, 'Alle Bilder sind zunächst sichtbar')
+  filters[0].click()
+  check(visible().join(',') === 'free.jpg,scheduled.jpg,published.jpg', 'Zugeordnete auf einem beliebigen Kanal ausblenden')
+  filters[1].click()
+  check(visible().join(',') === 'free.jpg,published.jpg', 'Eingeplante zusätzlich ausblenden')
+  filters[2].click()
+  check(visible().join(',') === 'free.jpg', 'Veröffentlichte zusätzlich ausblenden')
+  const previousTable = page.querySelector('table')
+  await page.refresh()
+  check(filters.every(f => f.checked) && page.querySelector('table') === previousTable, 'Filter und unveränderte Tabelle bleiben bei Aktualisierung erhalten')
+  const select = page.querySelector('select'); select.value = 'B'; select.dispatchEvent(new Event('change')); await settle()
+  check(assignedRequests.length === 1 && assignedRequests[0].asset_ids.join(',') === 'free', 'Sammelzuordnung betrifft ausschließlich sichtbare Bilder')
+  check(!visible().length, 'Ein neu zugeordnetes Bild verschwindet bei aktivem Filter')
+  check(page.querySelector('button').textContent === 'Nur mit offenen Kanälen', 'Bestehender Filter bleibt verfügbar')
+  const more = [...page.querySelectorAll('button')].find(b => b.textContent === 'Mehr laden')
+  check(more.style.display !== 'none', 'Mehr laden bleibt bei vollständig ausgeblendeter Seite erreichbar')
+  more.click(); await settle()
+  check(visible().join(',') === 'extra.jpg', 'Nachgeladene Bilder beachten dieselben Filter')
+  filters.forEach(f => f.click())
+  check(visible().length === 7, 'Ausgeblendete Bilder lassen sich wieder einblenden')
+  page.querySelector('button').click()
+  check(!visible().includes('full.jpg'), 'Statusfilter sind mit Nur mit offenen Kanälen kombinierbar')
+  window.matrixTestResult = {ok: true, results}
+} catch(error) {window.matrixTestResult = {ok: false, results, error: error.stack}}
+document.querySelector('#result').textContent = JSON.stringify(window.matrixTestResult, null, 2)
+</script></html>

@@ -1,0 +1,27 @@
+<!doctype html><html><meta charset="utf-8"><link rel="stylesheet" href="/autoposter/app.css"><div id="root"></div><pre id="result" hidden></pre>
+<script type="module">
+import {attachPreview,mediaTile} from '/autoposter/js/ui.js'
+const results=[],check=(x,label)=>{if(!x)throw Error(label);results.push(label)},wait=ms=>new Promise(r=>setTimeout(r,ms))
+const src=(w,h)=>'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="lightblue"/></svg>`)
+const pointer=(el,type,x,y)=>el.dispatchEvent(new MouseEvent(type,{clientX:x,clientY:y}))
+const inside=()=>{const el=document.querySelector('.hoverpreview'),r=el.getBoundingClientRect();return el.classList.contains('on')&&r.left>=7&&r.top>=7&&r.right<=innerWidth-7&&r.bottom<=innerHeight-7}
+try{
+ const host=document.createElement('div');host.style.cssText='height:80px;width:100px;overflow:hidden';document.body.appendChild(host)
+ for(const [w,h,name]of [[300,1400,'Portrait'],[1400,300,'Landscape'],[600,600,'Square']])for(const size of [380,320]){
+  const url=src(w,h),el=size===380?document.createElement('img'):mediaTile({id:name,filename:name,thumb_url:url,url,lifecycle:'assigned',assigned_channel_ids:[],used_channel_ids:[],scheduled_channel_ids:[],usage_count:0},[],{preview:true})
+  if(size===380)attachPreview(el,url,{delay:5,size});host.appendChild(el)
+  for(const [x,y,label]of [[innerWidth-12,innerHeight-12,'bottom right'],[12,innerHeight-12,'bottom left'],[innerWidth-12,12,'top right']]){
+   pointer(el,'mouseenter',x,y);await wait(size===320?550:180)
+   check(inside(),`${name}, ${size}, ${label} stays within viewport`)
+   check(document.querySelector('.hoverpreview').parentElement===document.body,'Preview escapes clipping container')
+   pointer(el,'mouseleave',x,y)
+  }el.remove()
+ }
+ const el=document.createElement('img');host.appendChild(el);attachPreview(el,'/slow-preview.svg',{delay:5,size:380})
+ pointer(el,'mouseenter',innerWidth-12,innerHeight-100);await wait(20);pointer(el,'mousemove',innerWidth-12,innerHeight-12);await wait(350)
+ check(document.querySelector('.hoverpreview img').naturalHeight===1400&&inside(),'Delayed portrait uses actual height and latest pointer')
+ host.dispatchEvent(new Event('scroll'));check(!document.querySelector('.hoverpreview').classList.contains('on'),'Nested scroll hides preview')
+ window.previewBoundsTestResult={ok:true,checks:results.length}
+}catch(e){window.previewBoundsTestResult={ok:false,results,error:e.stack}}
+document.querySelector('#result').textContent=JSON.stringify(window.previewBoundsTestResult)
+</script></html>

@@ -1,0 +1,47 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><title>Bibliothek löschen Test</title>
+<link rel="stylesheet" href="/autoposter/app.css"><link rel="stylesheet" href="/static/workspace.css">
+<div id="root"></div><div id="modals"></div><div id="toasts"></div><pre id="result" hidden></pre>
+<script type="module">
+import renderLibrary from '/autoposter/js/pages/library.js'
+window.CreatorStudioLive={begin(){},end(){},busy:()=>false}
+let deleted=false, fail=true, requests=0, counts=0, sets=0
+const asset={id:'photo',filename:'photo.jpg',width:600,height:800,bytes:1000,mime:'image/jpeg',lifecycle:'new',nsfw_level:'sfw',tags:[],set_ids:[],assigned_channel_ids:[],used_channel_ids:[],scheduled_channel_ids:[],usage_count:0,history:[],open_channels:[],thumb_url:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',url:''}
+window.fetch=async(url,options={})=>{
+  const path=new URL(url,location.href).pathname
+  if(['/api/v1/channels','/api/v1/views','/api/v1/media/tags'].includes(path))return Response.json([])
+  if(path==='/api/v1/sets'){sets++;return Response.json([])}
+  if(path==='/api/v1/media/counts'){counts++;return Response.json({total:deleted?0:1,new:deleted?0:1})}
+  if(path==='/api/v1/media/search')return Response.json({items:deleted?[]:[asset],next_cursor:null})
+  if(path==='/api/v1/media/photo'){
+    if(options.method==='DELETE'){
+      requests++
+      if(fail)return Response.json({detail:'Dieses Bild wird noch in offenen Posts verwendet.'},{status:409})
+      deleted=true;return new Response(null,{status:204})
+    }
+    return Response.json(asset)
+  }
+  throw Error('Unexpected API: '+path)
+}
+const results=[],check=(value,label)=>{if(!value)throw Error(label);results.push(label)}
+const settle=()=>new Promise(resolve=>setTimeout(resolve,120))
+const button=(label)=>[...document.querySelectorAll('#modals button')].find(b=>b.textContent===label)
+try{
+  const page=await renderLibrary({query:new URLSearchParams()});document.querySelector('#root').appendChild(page)
+  page.querySelector('.tile').click();await settle()
+  check(!!button('Löschen'),'Detailansicht bietet Löschen neben Speichern und Archivieren an')
+  button('Löschen').click()
+  check(document.querySelectorAll('.modal-bg').length===2 && requests===0,'Löschen erfordert Bestätigung')
+  button('Abbrechen').click()
+  check(document.querySelectorAll('.modal-bg').length===1 && requests===0,'Abbrechen behält Bild und Detailansicht')
+  button('Löschen').click();button('Bild löschen').click();await settle()
+  check(requests===1 && !deleted && !button('Bild löschen').disabled,'Fehler verhindert Löschen und erlaubt erneuten Versuch')
+  check(document.querySelectorAll('.modal-bg').length===2 && page.querySelector('.tile'),'Fehler behält Dialoge und Bild')
+  const beforeCounts=counts,beforeSets=sets
+  fail=false;button('Bild löschen').click();await settle()
+  check(requests===2 && deleted && !page.querySelector('.tile'),'Bestätigung entfernt Bild aus Bibliothek')
+  check(document.querySelectorAll('.modal-bg').length===0,'Erfolgreiches Löschen schließt beide Dialoge')
+  check(counts>beforeCounts && sets>beforeSets,'Zähler und Sets werden nach Löschen aktualisiert')
+  window.libraryDeleteTestResult={ok:true,results}
+}catch(error){window.libraryDeleteTestResult={ok:false,results,error:error.stack}}
+document.querySelector('#result').textContent=JSON.stringify(window.libraryDeleteTestResult,null,2)
+</script></html>

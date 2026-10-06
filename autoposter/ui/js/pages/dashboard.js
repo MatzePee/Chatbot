@@ -1,5 +1,5 @@
 import { renderUpcoming } from '../upcoming-posts.js?v=creatorstudio-translation-20260910'
-import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
+import { api } from '../api.js?v=creatorstudio-problem-check-20261006'
 import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard, append, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 export default async function renderDashboard() {
@@ -115,22 +115,44 @@ export default async function renderDashboard() {
   renderUpcoming(upcoming, data.upcoming_posts, data.channel_health)
 
   const problems = h('div', { class: 'col' })
-  if (!data.notifications.length && !data.recent_failures.length) problems.appendChild(empty('Alles ruhig.'))
-  for (const n of data.notifications) {
-    problems.appendChild(h('div', { class: n.level === 'error' ? 'errbox' : 'warnbox' },
-      h('div', {}, h('b', {}, n.title), h('div', { class: 'hint' }, n.body)),
-    ))
+  function drawProblems(current) {
+    clear(problems)
+    if (!current.notifications.length && !current.recent_failures.length) problems.appendChild(empty('Alles ruhig.'))
+    for (const n of current.notifications) {
+      problems.appendChild(h('div', { class: n.level === 'error' ? 'errbox' : 'warnbox' },
+        h('div', {}, h('b', {}, n.title), h('div', { class: 'hint' }, n.body)),
+      ))
+    }
+    for (const p of current.recent_failures) {
+      if (current.notifications.some(n => n.entity === 'post' && n.entity_id === p.id && /^(Preflight fehlgeschlagen:|Veröffentlichung fehlgeschlagen:)/.test(n.title))) continue
+      problems.appendChild(h('div', { class: p.retry_ready ? 'warnbox' : 'errbox' },
+        h('b', {}, p.retry_ready ? 'Post wartet auf erneute Freigabe' : 'Veröffentlichung fehlgeschlagen'),
+        h('div', { class: 'hint' }, p.error_message),
+      ))
+    }
   }
-  for (const p of data.recent_failures) {
-    problems.appendChild(h('div', { class: 'errbox' },
-      h('b', {}, 'Veröffentlichung fehlgeschlagen'),
-      h('div', { class: 'hint' }, p.error_message),
-    ))
-  }
-
+  drawProblems(data)
+  const checkBtn = h('button', { class: 'small', title: 'Probleme werden zusätzlich alle 60 Minuten geprüft' }, 'Jetzt prüfen')
+  checkBtn.addEventListener('click', guard(async () => {
+    if (checkBtn.disabled) return
+    checkBtn.disabled = true
+    checkBtn.textContent = 'Prüfe …'
+    try {
+      const result = await api.checkProblems()
+      drawProblems(await api.dashboard())
+      if (result.errors?.length) toast.error(`${result.errors.length} Meldungen konnten noch nicht geprüft werden`)
+      else toast.ok('Probleme geprüft')
+    } finally {
+      checkBtn.disabled = false
+      checkBtn.textContent = 'Jetzt prüfen'
+    }
+  }))
+  const problemsCard = card('Probleme', problems)
+  const heading = problemsCard.querySelector('h2')
+  heading.classList.add('row')
+  heading.appendChild(checkBtn)
   page.appendChild(h('div', { class: 'grid c2' },
-    card('Als Nächstes geplant', upcoming),
-    card('Probleme', problems),
+    card('Als Nächstes geplant', upcoming), problemsCard,
   ))
 
   // ------------------------------------------------------------ Kanal-Status

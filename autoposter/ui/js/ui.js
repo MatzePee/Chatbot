@@ -164,16 +164,21 @@ export function confirmDialog(title, message, { okLabel = 'OK', danger = false }
 
 // ---------------------------------------------------------------- Vorschau
 let previewEl = null
+let previewOwner = null
 
 function previewNode() {
   if (!previewEl) {
     previewEl = h('div', { class: 'hoverpreview' }, h('img', { alt: '' }))
     document.body.appendChild(previewEl)
+    // Capture also catches scrolling inside the pool, channel columns and matrix.
+    window.addEventListener('scroll', hidePreview, { passive: true, capture: true })
+    window.addEventListener('resize', hidePreview, { passive: true })
   }
   return previewEl
 }
 
 function hidePreview() {
+  previewOwner = null
   if (previewEl) previewEl.classList.remove('on')
 }
 
@@ -186,30 +191,37 @@ export function attachPreview(el, src, { delay = 260, size = 340 } = {}) {
   if (!src) return el
   let timer = null
 
-  const place = (event) => {
+  let pointer = null
+  const place = () => {
+    if (!pointer || previewOwner !== el) return
     const node = previewNode()
-    const margin = 14
-    // Standard: rechts unterhalb des Zeigers. Passt es dort nicht, wird
-    // gespiegelt bzw. an den Rand geklemmt, damit nichts abgeschnitten wird.
-    let x = event.clientX + margin
-    let y = event.clientY + margin
-    if (x + size > window.innerWidth - 8) x = event.clientX - size - margin
-    if (y + size > window.innerHeight - 8) y = Math.max(8, window.innerHeight - size - 8)
-    node.style.left = Math.max(8, x) + 'px'
-    node.style.top = Math.max(8, y) + 'px'
+    const margin = 14, edge = 8
+    node.style.width = Math.max(1, Math.min(size, window.innerWidth - edge * 2)) + 'px'
+    // offset dimensions include the border and ignore the entrance animation.
+    const width = node.offsetWidth, height = node.offsetHeight
+    let x = pointer.clientX + margin, y = pointer.clientY + margin
+    if (x + width > window.innerWidth - edge) x = pointer.clientX - width - margin
+    if (y + height > window.innerHeight - edge) y = pointer.clientY - height - margin
+    node.style.left = Math.max(edge, Math.min(x, window.innerWidth - width - edge)) + 'px'
+    node.style.top = Math.max(edge, Math.min(y, window.innerHeight - height - edge)) + 'px'
   }
 
   el.addEventListener('mouseenter', (event) => {
+    pointer = { clientX: event.clientX, clientY: event.clientY }
     timer = setTimeout(() => {
+      if (!el.isConnected) return
       const node = previewNode()
+      previewOwner = el
+      // The actual height may only be known after an uncached image loads.
+      node.firstChild.onload = place
       node.firstChild.src = src
-      node.style.width = size + 'px'
-      place(event)
+      place()
       node.classList.add('on')
     }, delay)
   })
   el.addEventListener('mousemove', (event) => {
-    if (previewEl && previewEl.classList.contains('on')) place(event)
+    pointer = { clientX: event.clientX, clientY: event.clientY }
+    if (previewOwner === el && previewEl?.classList.contains('on')) place()
   })
   el.addEventListener('mouseleave', () => {
     clearTimeout(timer)
@@ -224,7 +236,6 @@ export function attachPreview(el, src, { delay = 260, size = 340 } = {}) {
     clearTimeout(timer)
     hidePreview()
   })
-  window.addEventListener('scroll', hidePreview, { passive: true })
   return el
 }
 

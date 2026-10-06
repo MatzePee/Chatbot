@@ -6,7 +6,7 @@ import { openUploadDialog } from '../upload.js?v=creatorstudio-mobile-system-202
 import {
   h, append, clear, empty, modal, toast, guard, spinner,
   mediaTile, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, NSFW_RANK, debounce,
-} from '../ui.js?v=creatorstudio-mobile-system-20260909'
+} from '../ui.js?v=creatorstudio-preview-bounds-20261006'
 
 const POOL_FILTERS = [
   { key: 'all', label: 'Alle' },
@@ -15,15 +15,27 @@ const POOL_FILTERS = [
   { key: 'partially_used', label: 'Teilweise verbraucht' },
 ]
 
+const CHANNEL_GROUPS = [
+  { key: 'scheduled', label: 'Bereits verplant' },
+  { key: 'published', label: 'Bereits gepostet' },
+  { key: 'unplanned', label: 'Noch nicht verplant' },
+]
+
+function channelGroup(asset, channelId) {
+  // Veröffentlichungen und Planungen gelten jeweils nur für diesen Kanal.
+  // Bereits veröffentlichte Bilder bleiben auch bei Wiederverplanung in ihrer Gruppe.
+  if ((asset.used_channel_ids || []).includes(channelId) && !(asset.reusable_channel_ids || []).includes(channelId)) return 'published'
+  if ((asset.scheduled_channel_ids || []).includes(channelId)) return 'scheduled'
+  return 'unplanned'
+}
+
 export default async function renderAssign() {
   const state = {
     columns: [], channels: [], pool: [], cursor: null,
     selected: new Set(), lastClicked: null,
     filter: 'all', search: '', tag: '',
     undo: [], hidden: new Set(), altDown: false,
-    // Auf einem Kanal bereits veröffentlichte Bilder sind für die Zuordnung
-    // erledigt – sie stehen standardmäßig nicht mehr im Weg.
-    showUsed: false,
+    hiddenGroups: new Map(),
   }
 
   const tagList = await api.tags()
@@ -197,6 +209,9 @@ export default async function renderAssign() {
 
   // ------------------------------------------------------------ Zeichnen
   function drawPool() {
+    const scrollTop = poolBody.scrollTop
+    const workspace = poolBody.closest('.workspace-scroll')
+    const workspaceTop = workspace?.scrollTop
     clear(poolBody)
     if (!state.pool.length) {
       poolBody.appendChild(empty('Keine Bilder für diesen Filter.'))
@@ -244,29 +259,43 @@ export default async function renderAssign() {
     }
     undoBtn.textContent = `Rückgängig (${state.undo.length})`
     undoBtn.disabled = !state.undo.length
+    poolBody.scrollTop = scrollTop
+    if (workspace) workspace.scrollTop = workspaceTop
   }
 
   function drawColumns() {
-    clear(columnsBox)
+    const previous = new Map([...columnsBox.children].map(el => [el.dataset.channelId, el]))
+    const positions = new Map([...previous].map(([id, el]) => [id, el.querySelector('.column-body')?.scrollTop || 0]))
+    const board = columnsBox.parentElement
+    const boardLeft = board?.scrollLeft
+    const workspace = columnsBox.closest('.workspace-scroll')
+    const workspaceTop = workspace?.scrollTop
+    const nextColumns = []
     const cols = visibleColumns()
     if (!cols.length) {
-      columnsBox.appendChild(empty('Keine sichtbaren Kanäle. Lege zuerst einen Kanal an.'))
+      columnsBox.replaceChildren(empty('Keine sichtbaren Kanäle. Lege zuerst einen Kanal an.'))
       return
     }
     cols.forEach((col, index) => {
+      const channelId = col.channel.id
+      const hiddenGroups = state.hiddenGroups.get(channelId) || new Set()
+      // empty_on is calculated relative to now; only its displayed date matters.
+      const renderKey = JSON.stringify([
+        { ...col, empty_on: fmtDate(col.empty_on) }, state.channels, index, [...hiddenGroups].sort(),
+      ])
+      const oldColumn = previous.get(channelId)
+      if (oldColumn?.assignmentRenderKey === renderKey) {
+        nextColumns.push(oldColumn)
+        return
+      }
       const body = h('div', { class: 'column-body' })
-      // Auf DIESEM Kanal gelaufen? Die Sperre gilt pro Kanal – ein Bild, das
-      // auf X lief, bleibt für Fanvue offen und darf dort nicht verschwinden.
-      const usedHere = col.assets.filter((a) => (a.used_channel_ids || []).includes(col.channel.id))
-      const shown = state.showUsed
-        ? col.assets
-        : col.assets.filter((a) => !(a.used_channel_ids || []).includes(col.channel.id))
+      const counts = Object.fromEntries(CHANNEL_GROUPS.map(({ key }) => [key, 0]))
+      for (const asset of col.assets) counts[channelGroup(asset, channelId)]++
+      const shown = col.assets.filter((asset) => !hiddenGroups.has(channelGroup(asset, channelId)))
 
       if (!shown.length) {
         body.appendChild(h('div', { class: 'dropzone-hint' },
-          usedHere.length && !state.showUsed
-            ? `Alle ${usedHere.length} zugeordneten Bilder sind hier gelaufen`
-            : 'Bilder hierher ziehen'))
+          col.assets.length ? 'Keine Bilder für die sichtbaren Gruppen' : 'Bilder hierher ziehen'))
       } else {
         const tiles = h('div', { class: 'tiles small' })
         for (const asset of shown) {
@@ -284,7 +313,7 @@ export default async function renderAssign() {
         body.appendChild(tiles)
       }
 
-      const el = h('div', { class: 'column' },
+      const el = h('div', { class: 'column', dataset: { channelId } },
         h('div', { class: 'column-head' },
           h('div', { class: 'row', style: { gap: '6px' } },
             h('span', { class: 'hint' }, String(index + 1)),
@@ -297,20 +326,37 @@ export default async function renderAssign() {
             h('span', { class: 'hint' },
               `${col.count} zugeordnet · ${col.available} offen` + (col.days_left !== null ? ` · ${col.days_left} Tage` : '')),
           ),
-          usedHere.length
-            ? h('div', { class: 'hint', style: { fontSize: '10px' } },
-                state.showUsed
-                  ? `${usedHere.length} davon hier bereits gelaufen`
-                  : `${usedHere.length} bereits gelaufene ausgeblendet`)
-            : null,
+          h('div', { class: 'row', style: { gap: '4px', marginTop: '8px' } },
+            ...CHANNEL_GROUPS.map(({ key, label }) => h('button', {
+              class: 'chip' + (hiddenGroups.has(key) ? ' off' : ' on'),
+              'aria-pressed': String(!hiddenGroups.has(key)),
+              title: `${label} auf diesem Kanal ein- oder ausblenden`,
+              onClick: () => {
+                hiddenGroups.has(key) ? hiddenGroups.delete(key) : hiddenGroups.add(key)
+                state.hiddenGroups.set(channelId, hiddenGroups)
+                drawColumns()
+              },
+            }, `${label} (${counts[key]})`)),
+          ),
+          h('div', { class: 'hint', style: { fontSize: '10px', marginTop: '5px' } },
+            `${shown.length} von ${col.assets.length} Bildern sichtbar`),
           col.empty_on ? h('div', { class: 'hint', style: { fontSize: '10px' } }, 'leer am ' + fmtDate(col.empty_on)) : null,
           h('div', { class: 'hint', style: { fontSize: '10px' } }, 'max. NSFW: ' + col.channel.nsfw_level),
         ),
         body,
       )
+      el.assignmentRenderKey = renderKey
       wireColumnDrop(el, col)
-      columnsBox.appendChild(el)
+      nextColumns.push(el)
     })
+    if (nextColumns.length !== columnsBox.children.length || nextColumns.some((el, i) => el !== columnsBox.children[i])) {
+      columnsBox.replaceChildren(...nextColumns)
+    }
+    for (const el of nextColumns) {
+      el.querySelector('.column-body').scrollTop = positions.get(el.dataset.channelId) || 0
+    }
+    if (board) board.scrollLeft = boardLeft
+    if (workspace) workspace.scrollTop = workspaceTop
   }
 
   function drawToggles() {
@@ -325,11 +371,6 @@ export default async function renderAssign() {
         },
       }, h('i', { class: 'dot', style: { background: col.channel.color } }), col.channel.name)),
       h('span', { class: 'spacer' }),
-      h('button', {
-        class: 'chip' + (state.showUsed ? ' on' : ''),
-        title: 'Bilder, die auf dem jeweiligen Kanal schon veröffentlicht wurden',
-        onClick: () => { state.showUsed = !state.showUsed; drawColumns(); drawToggles() },
-      }, state.showUsed ? '✓ Gelaufene sichtbar' : 'Gelaufene einblenden'),
       h('span', { class: 'hint' }, 'Ziehen = kopieren · Alt+Ziehen = verschieben'),
     ])
   }
@@ -431,8 +472,12 @@ export default async function renderAssign() {
     let res = await api.searchMedia(q), pool = [...res.items]
     while (res.next_cursor && pool.length < wanted) { res = await api.searchMedia({ ...q, cursor: res.next_cursor }); pool.push(...res.items) }
     if (window.CreatorStudioLive.busy() || state.selected.size) return false
+    const poolChanged = JSON.stringify([state.pool, state.cursor, state.channels]) !== JSON.stringify([pool, res.next_cursor, channels])
+    const channelsChanged = JSON.stringify(state.columns.map(col => col.channel)) !== JSON.stringify(board.columns.map(col => col.channel))
     state.columns = board.columns; state.channels = channels; state.pool = pool; state.cursor = res.next_cursor
-    drawPool(); drawColumns(); drawToggles()
+    if (poolChanged || channelsChanged) drawPool()
+    drawColumns()
+    if (channelsChanged) drawToggles()
   }
   return livePage
 

@@ -103,3 +103,55 @@ async def test_reihenfolge_steuert_verplanung(db):
 
     pool = await assignment.channel_pool(db, channel.id)
     assert [a.id for a in pool] == reversed_ids
+
+
+@pytest.mark.asyncio
+async def test_board_liefert_vollstaendigen_kanalbestand(db):
+    from fastapi import FastAPI
+    from httpx import ASGITransport, AsyncClient
+    from autoposter.api.assignments import router
+    from autoposter.db import get_db
+    from autoposter.deps import current_user
+    from autoposter.models import MediaAsset, MediaStatus
+
+    channel = await make_channel(db, "Full board", "x")
+    # More than both the former default (60) and former maximum (500).
+    assets = [
+        MediaAsset(
+            filename=f"board-{i}.jpg", storage_path=f"board-{i}.jpg",
+            sha256=f"{i:064x}", status=MediaStatus.ready.value,
+            assigned_channel_ids=[str(channel.id)],
+            scheduled_channel_ids=[str(channel.id)] if i % 3 == 1 else [],
+            used_channel_ids=[str(channel.id)] if i % 3 == 2 else [],
+        )
+        for i in range(501)
+    ]
+    db.add_all(assets)
+    await db.flush()
+    db.add_all([
+        MediaAssignment(media_asset_id=a.id, channel_id=channel.id, priority=i)
+        for i, a in enumerate(assets)
+    ])
+    await db.flush()
+
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[current_user] = lambda: None
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/assignments/board")
+        assert response.status_code == 200
+        result = response.json()
+        limited_response = await client.get("/assignments/board?limit_per_channel=60")
+        assert limited_response.status_code == 200
+        limited = limited_response.json()
+
+    column = result["columns"][0]
+    assert column["count"] == 501
+    assert len(column["assets"]) == 501
+    assert {a["id"] for a in column["assets"]} == {str(a.id) for a in assets}
+    assert column["assets"][1]["scheduled_channel_ids"] == [str(channel.id)]
+    assert column["assets"][2]["used_channel_ids"] == [str(channel.id)]
+
+    assert limited["columns"][0]["count"] == 501
+    assert len(limited["columns"][0]["assets"]) == 60

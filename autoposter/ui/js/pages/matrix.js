@@ -1,6 +1,6 @@
 // Matrix: Bilder × Kanäle. Beantwortet auf einen Blick "was fehlt wo noch".
-import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
-import { h, clear, empty, toast, guard, attachPreview, fmtDate, spinner } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { api } from '../api.js?v=creatorstudio-matrix-reuse-20261006'
+import { h, clear, empty, toast, guard, attachPreview, fmtDate, spinner } from '../ui.js?v=creatorstudio-preview-bounds-20261006'
 
 const CELL = {
   none: {
@@ -22,11 +22,20 @@ const CELL = {
 }
 
 export default async function renderMatrix() {
-  const state = { rows: [], channels: [], cursor: null, onlyOpen: false, busy: new Set() }
+  const state = { rows: [], channels: [], cursor: null, onlyOpen: false, hiddenStates: new Set(), busy: new Set() }
 
   const box = h('div', { class: 'matrix-wrap card' })
   const moreBtn = h('button', { style: { marginTop: '12px', display: 'none' } }, 'Mehr laden')
   const counts = h('div', { class: 'row', style: { gap: '14px' } })
+  const visibleCount = h('span', { class: 'hint', 'aria-live': 'polite' })
+
+  function matchesFilters(row) {
+    const statuses = state.channels.map(channel => row.cells[channel.id] || 'none')
+    return !statuses.some(status => state.hiddenStates.has(status)) &&
+      (!state.onlyOpen || statuses.includes('none'))
+  }
+
+  const visibleRows = () => state.rows.filter(matchesFilters)
 
   // ------------------------------------------------------------ Laden
   async function load(cursor) {
@@ -58,13 +67,33 @@ export default async function renderMatrix() {
         }
         row.cells[channel.id] = 'assigned'
       }
-      paintCell(row, channel, cell)
-      drawCounts()
+      if (matchesFilters(row)) {
+        paintCell(row, channel, cell)
+        drawCounts()
+      } else {
+        draw()
+      }
     } catch (err) {
       toast.error(err.message)
     } finally {
       state.busy.delete(key)
       cell.classList.remove('busy')
+    }
+  }
+
+  async function releaseForReuse(row, channel, button) {
+    const key = row.asset.id + ':' + channel.id
+    if (state.busy.has(key)) return
+    state.busy.add(key)
+    button.disabled = true
+    try {
+      row.asset = await api.releaseForReuse(channel.id, row.asset.id)
+      row.cells[channel.id] = 'assigned'
+      draw()
+      toast.ok(`Bild für ${channel.name} erneut bereitgestellt`)
+    } finally {
+      state.busy.delete(key)
+      if (button.isConnected) button.disabled = false
     }
   }
 
@@ -76,11 +105,13 @@ export default async function renderMatrix() {
     cell.title = meta.title
     cell.disabled = stateKey === 'published' || stateKey === 'scheduled'
     cell.appendChild(h('span', { class: 'mcell-icon' }, meta.short))
-    cell.appendChild(h('span', { class: 'mcell-label' }, meta.label))
+    const label = stateKey === 'assigned' && (row.asset.reusable_channel_ids || []).includes(channel.id) ? 'erneut bereitgestellt' : meta.label
+    cell.appendChild(h('span', { class: 'mcell-label' }, label))
   }
 
   // ------------------------------------------------------------ Zeichnen
   function drawCounts() {
+    visibleCount.textContent = `${visibleRows().length} von ${state.rows.length} geladenen Bildern sichtbar`
     clear(counts)
     for (const channel of state.channels) {
       const assigned = state.rows.filter((r) => (r.cells[channel.id] || 'none') !== 'none').length
@@ -93,14 +124,18 @@ export default async function renderMatrix() {
   }
 
   function draw() {
+    const scrollTop = box.scrollTop, scrollLeft = box.scrollLeft
+    const workspace = box.closest('.workspace-scroll')
+    const workspaceTop = workspace?.scrollTop
     clear(box)
-    const rows = state.onlyOpen
-      ? state.rows.filter((r) => state.channels.some((c) => (r.cells[c.id] || 'none') === 'none'))
-      : state.rows
+    const rows = visibleRows()
+    // More results must stay reachable even when the loaded page is filtered out.
+    moreBtn.style.display = state.cursor ? '' : 'none'
 
     if (!rows.length) {
-      box.appendChild(empty(state.onlyOpen ? 'Alle Bilder sind überall zugeordnet.' : 'Keine Bilder.'))
+      box.appendChild(empty(state.rows.length ? 'Keine Bilder für die gewählten Filter.' : 'Keine Bilder.'))
       drawCounts()
+      if (workspace) workspace.scrollTop = workspaceTop
       return
     }
 
@@ -140,7 +175,17 @@ export default async function renderMatrix() {
           const cell = h('button', {})
           paintCell(row, channel, cell)
           cell.addEventListener('click', () => toggle(row, channel, cell))
-          return h('td', { class: 'mcol-cell' }, cell)
+          const published = (row.cells[channel.id] || 'none') === 'published'
+          const alreadyPlanned = (row.asset.scheduled_channel_ids || []).includes(channel.id)
+          return h('td', { class: 'mcol-cell' },
+            h('div', { class: 'col', style: { alignItems: 'center', gap: '5px' } }, cell,
+              published ? h('button', {
+                class: 'small', disabled: alreadyPlanned,
+                title: alreadyPlanned ? 'Auf diesem Kanal bereits erneut eingeplant' : 'Für eine weitere Verplanung auf diesem Kanal freigeben',
+                onClick: guard((event) => releaseForReuse(row, channel, event.currentTarget)),
+              }, alreadyPlanned ? 'Bereits erneut eingeplant' : 'Erneut bereitstellen') : null,
+            ),
+          )
         }),
       )
     })
@@ -149,8 +194,10 @@ export default async function renderMatrix() {
       h('thead', {}, head),
       h('tbody', {}, ...body),
     ))
-    moreBtn.style.display = state.cursor ? '' : 'none'
     drawCounts()
+    box.scrollTop = scrollTop
+    box.scrollLeft = scrollLeft
+    if (workspace) workspace.scrollTop = workspaceTop
   }
 
   // ------------------------------------------------------------ Kopfleiste
@@ -160,6 +207,21 @@ export default async function renderMatrix() {
     onlyOpenBtn.className = state.onlyOpen ? 'primary' : ''
     draw()
   })
+
+  const statusFilters = h('div', { class: 'row', style: { gap: '16px' }, 'aria-label': 'Bilder nach Status ausblenden' },
+    ...[
+      ['assigned', 'Zugeordnete ausblenden'],
+      ['scheduled', 'Eingeplante ausblenden'],
+      ['published', 'Veröffentlichte ausblenden'],
+    ].map(([key, label]) => {
+      const input = h('input', { type: 'checkbox' })
+      input.addEventListener('change', () => {
+        input.checked ? state.hiddenStates.add(key) : state.hiddenStates.delete(key)
+        draw()
+      })
+      return h('label', { class: 'inline' }, input, label)
+    }),
+  )
 
   const assignAllBtn = h('select', { style: { width: '230px' } },
     h('option', { value: '' }, 'Alle sichtbaren zuordnen zu …'))
@@ -171,7 +233,7 @@ export default async function renderMatrix() {
   assignAllBtn.addEventListener('change', guard(async () => {
     const channelId = assignAllBtn.value
     if (!channelId) return
-    const ids = state.rows
+    const ids = visibleRows()
       .filter((r) => (r.cells[channelId] || 'none') === 'none')
       .map((r) => r.asset.id)
     assignAllBtn.value = ''
@@ -195,6 +257,9 @@ export default async function renderMatrix() {
         'Zum Vergrößern mit der Maus über ein Bild fahren.'),
     ),
     h('div', { class: 'row' }, onlyOpenBtn, assignAllBtn, h('div', { class: 'spacer' }), counts),
+    statusFilters,
+    h('div', { class: 'hint' }, 'Ein Bild wird ausgeblendet, sobald es auf mindestens einem Kanal einen ausgewählten Status hat.'),
+    visibleCount,
     box,
     moreBtn,
     h('div', { class: 'row', style: { fontSize: '12px', color: 'var(--dim)', gap: '16px' } },
@@ -210,8 +275,11 @@ export default async function renderMatrix() {
     let data = await api.matrix(150), rows = [...data.rows]
     while (data.next_cursor && rows.length < wanted) { data = await api.matrix(150, data.next_cursor); rows.push(...data.rows) }
     if (window.CreatorStudioLive.busy() || state.busy.size) return false
+    const changed = JSON.stringify([state.channels, state.rows, state.cursor]) !== JSON.stringify([data.channels, rows, data.next_cursor])
+    const channelsChanged = JSON.stringify(state.channels) !== JSON.stringify(data.channels)
     state.channels = data.channels; state.rows = rows; state.cursor = data.next_cursor
-    draw(); fillAssignSelect()
+    if (changed) draw()
+    if (channelsChanged) fillAssignSelect()
   }
   return livePage
 

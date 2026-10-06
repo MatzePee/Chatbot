@@ -66,6 +66,8 @@
 .workspace-scroll::-webkit-scrollbar-track { background: #f5f5f7; }
 .workspace-scroll::-webkit-scrollbar-thumb { background: #dce0e6; border-radius: 6px; }
 main.workspace-content, .workspace-scroll #view { width: 100%; max-width: var(--workspace-content-width); margin: 0 auto; box-sizing: border-box; }
+/* The assignment board uses all space beside the sidebar. */
+.workspace-scroll #view.assignment-view { max-width: none; }
 /* Grid/flex children must be able to shrink below their content's natural width. */
 .workspace-content, #view, .modal { min-width: 0; overflow-wrap: anywhere; }
 .grid > *, .row > *, .page-head > *, .card, .field, .col, form { min-width: 0; }

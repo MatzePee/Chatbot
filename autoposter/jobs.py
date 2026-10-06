@@ -233,21 +233,9 @@ async def refresh_metrics(hours: int = 72) -> Dict[str, Any]:
 
 
 async def inventory_check() -> Dict[str, Any]:
+    from autoposter.services import problems
     async with session_scope() as db:
-        low = await inventory.low_inventory_channels(db)
-        for entry in low:
-            await notify.push(
-                db,
-                level="warning",
-                title=f"Bildvorrat knapp: {entry.channel_name}",
-                body=(
-                    f"Noch {entry.available} Bilder, reicht ca. {entry.days_left} Tage "
-                    f"(bis {entry.empty_on.date() if entry.empty_on else '?'})."
-                ),
-                entity="channel",
-                entity_id=str(entry.channel_id),
-            )
-        return {"warned": len(low)}
+        return await problems.check(db)
 
 
 async def nightly_maintenance() -> Dict[str, Any]:

@@ -291,6 +291,7 @@ class MediaOut(ORMModel):
     assigned_channel_ids: List[str]
     used_channel_ids: List[str]
     scheduled_channel_ids: List[str]
+    reusable_channel_ids: List[str] = []
     usage_count: int
     first_used_at: Optional[datetime]
     last_used_at: Optional[datetime]
@@ -520,6 +521,7 @@ class PostOut(ORMModel):
     thread_position: int
     external_post_id: Optional[str]
     external_url: str
+    retry_ready: bool = False
     error_message: str
     attempt_count: int
     metrics: Dict[str, Any]

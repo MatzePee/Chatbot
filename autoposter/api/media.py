@@ -45,7 +45,7 @@ from autoposter.schemas import (
     SavedViewIn,
     SavedViewOut,
 )
-from autoposter.services import library, lifecycle as lifecycle_service, media as media_service
+from autoposter.services import library, reuse, lifecycle as lifecycle_service, media as media_service
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -238,12 +238,13 @@ async def matrix(
         await db.execute(select(Channel).where(Channel.is_active.is_(True)).order_by(Channel.display_name))
     ).scalars().all()
 
+    releases = await reuse.all_channels(db)
     rows = []
     for asset in assets:
         cells = {}
         for channel in channels:
             cid = str(channel.id)
-            if cid in (asset.used_channel_ids or []):
+            if cid in (asset.used_channel_ids or []) and cid not in releases.get(str(asset.id), []):
                 cells[cid] = "published"
             elif cid in (asset.scheduled_channel_ids or []):
                 cells[cid] = "scheduled"
@@ -251,9 +252,11 @@ async def matrix(
                 cells[cid] = "assigned"
             else:
                 cells[cid] = "none"
+        out = _to_out(asset)
+        out.reusable_channel_ids = releases.get(str(asset.id), [])
         rows.append(
             {
-                "asset": _to_out(asset).model_dump(mode="json"),
+                "asset": out.model_dump(mode="json"),
                 "cells": cells,
             }
         )
@@ -475,7 +478,16 @@ async def delete_asset(
         await db.execute(select(MediaAsset).where(MediaAsset.id == asset_id))
     ).scalar_one_or_none()
     if asset:
+        open_posts = (await db.execute(select(Post).where(Post.status.notin_(
+            [PostStatus.published.value, PostStatus.cancelled.value, PostStatus.skipped.value]
+        )))).scalars().all()
+        if any(str(asset_id) in {str(value) for value in (post.media_asset_ids or [])} for post in open_posts):
+            raise HTTPException(409, "Dieses Bild wird noch in offenen Posts verwendet. Entferne es zuerst aus diesen Posts oder archiviere es stattdessen.")
+        releases = await reuse.all_channels(db)
+        for channel_id in releases.get(str(asset_id), []):
+            await reuse.consume(db, [asset_id], channel_id)
         await db.delete(asset)
+        await db.flush()
         library.invalidate_counts()
 
 

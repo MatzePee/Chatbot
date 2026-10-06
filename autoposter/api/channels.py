@@ -774,6 +774,9 @@ async def test_channel(
         db.add(channel)
         await db.flush()
 
+        from autoposter.services import problems
+        await problems.recheck_channel_failures(db, channel.id)
+
         # Warnen, wenn der verbundene Account nicht zum eingetragenen Handle passt.
         expected = channel.handle.lstrip("@").lower()
         actual = (info.username or "").lower()

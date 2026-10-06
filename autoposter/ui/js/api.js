@@ -73,6 +73,7 @@ export const api = {
 
   // --- Dashboard / Betrieb ---
   dashboard: () => get('/dashboard'),
+  checkProblems: () => post('/problems/check'),
   inventory: () => get('/inventory'),
   settings: () => get('/settings'),
   setRuntime: (d) => post('/settings/runtime', d),
@@ -165,6 +166,7 @@ export const api = {
 
   // --- Zuordnung ---
   board: () => get('/assignments/board'),
+  releaseForReuse: (channelId, assetId) => post(`/assignments/channel/${channelId}/assets/${assetId}/reuse`),
   assign: (d) => post('/assignments/batch', d),
   unassign: (d) => post('/assignments/remove', d),
   checkRemove: (d) => post('/assignments/check-remove', d),
