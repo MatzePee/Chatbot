@@ -10,6 +10,8 @@ import socket
 import sqlite3
 import sys
 import tempfile
+from contextlib import nullcontext
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -99,9 +101,17 @@ def run(source: Path):
         scheduler.stop_if_running = no_jobs
         from app.main import app
         from fastapi.testclient import TestClient
+        from autoposter.services import problems
+        async def no_problem_check(db):
+            return None
         with TestClient(app) as client:
             for path in ['/health', '/api/creatorpilot/health', '/settings/shared', '/system', '/autoposter/', '/api/v1/dashboard']:
-                result = client.get(path)
+                # The dashboard normally reconciles warnings and commits a check
+                # timestamp. Suppress only that request-time maintenance, not
+                # startup/migrations or other writes covered by the fingerprints.
+                probe = patch.object(problems, 'check_if_due', no_problem_check) if path == '/api/v1/dashboard' else nullcontext()
+                with probe:
+                    result = client.get(path)
                 assert result.status_code == 200, f'Startup route failed: {path} ({result.status_code})'
             assert started == [True], 'Production AutoChat worker would not start.'
             assert db.all_settings() == original_settings, 'Existing AutoChat settings changed.'

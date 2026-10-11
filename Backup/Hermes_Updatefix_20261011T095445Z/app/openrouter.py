@@ -1,0 +1,767 @@
+"""OpenRouter-Anbindung fuer die Antwort-Generierung.
+
+OpenRouter ist OpenAI-kompatibel: POST /api/v1/chat/completions.
+"""
+from __future__ import annotations
+
+import time
+from typing import Any
+
+import httpx
+
+from . import db, persona_context
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+class OpenRouterError(Exception):
+    pass
+
+
+def build_messages(system_prompt: str, history: list[dict[str, Any]], me_uuid: str,
+                   fan_notes: str = "", fan_memory: str = "") -> list[dict[str, str]]:
+    """Baut die OpenAI-kompatible messages-Liste aus dem Chatverlauf.
+
+    history: Liste von Fanvue-Nachrichten (alt -> neu), jeweils mit
+             sender.uuid und text. Eigene Nachrichten -> assistant, Fan -> user.
+
+    Zusaetzlich wird - falls aktiviert - der aktuelle Zeit-/Situationskontext
+    ans Ende des System-Prompts gehaengt (siehe persona_context). Ohne diesen
+    Block hat das Modell keinerlei Zeitinformation und raet die Tageszeit.
+    """
+    messages: list[dict[str, str]] = []
+    sys = system_prompt
+    if fan_notes.strip():
+        sys += f"\n\nWichtige Fakten ueber diesen Fan (beachten):\n{fan_notes.strip()}"
+    # Verdichtetes Gespraechsgedaechtnis NACH den Handnotizen: widersprechen sich
+    # beide, soll die Handarbeit des Creators gewinnen (sie steht weiter oben und
+    # ist als "wichtig" ausgezeichnet). Der Block ersetzt den langen Verlauf, den
+    # das Modell nicht mehr sieht - deshalb der Hinweis, ihn nicht auszuplaudern.
+    if fan_memory.strip():
+        sys += (f"\n\n{fan_memory.strip()}\n"
+                f"Nutze dieses Wissen NUR, wenn es natuerlich passt. Zaehle es niemals auf, "
+                f"und sage nie, dass du dir Notizen machst oder etwas gespeichert hast.")
+
+    # Zeitmarken im Verlauf nur, wenn aktiviert UND die API Zeitstempel liefert
+    with_stamps = bool(db.get_setting("timestamps_in_history", True))
+    now = persona_context.now_local()
+
+    # Zeitliche Einordnung: NUR fuer die letzte Fan-Nachricht, und als Satz im
+    # System-Prompt statt als Marke vor jeder Zeile.
+    #
+    # Frueher stand vor jeder Fan-Nachricht "[vor 2 Std.]". Das Modell hat
+    # dieses Muster schlicht nachgeahmt und seine eigenen Antworten mit
+    # "[gerade eben] ..." begonnen - in den echten Daten die mit Abstand
+    # haeufigste Ursache fuer eckige Klammern im Chat. Eine einzelne Angabe im
+    # System-Prompt liefert dieselbe Information, ohne eine Formatvorlage zu
+    # sein, die zum Nachmachen einlaedt.
+    letzte_marke = ""
+    if with_stamps:
+        for msg in reversed(history):
+            if (msg.get("sender") or {}).get("uuid", "") == me_uuid:
+                continue
+            if not (msg.get("text") or "").strip():
+                continue
+            letzte_marke = persona_context.relative_time(
+                persona_context.message_timestamp(msg), now)
+            break
+    if letzte_marke:
+        sys += (f"\n\nDie letzte Nachricht des Fans kam: {letzte_marke}. "
+                f"Beruecksichtige das (z.B. keine Morgen-Begruessung auf eine "
+                f"Nachricht von gestern Abend). Nenne diese Angabe nicht.")
+
+    # Zeit-/Situationskontext ganz ans Ende - je naeher am Gespraech, desto
+    # zuverlaessiger haelt sich das Modell daran.
+    context_block = persona_context.build_context_block(now)
+    if context_block:
+        sys += "\n\n" + context_block
+
+    messages.append({"role": "system", "content": sys})
+
+    for msg in history:
+        text = (msg.get("text") or "").strip()
+        if not text:
+            continue
+        sender_uuid = (msg.get("sender") or {}).get("uuid", "")
+        role = "assistant" if sender_uuid == me_uuid else "user"
+        messages.append({"role": role, "content": text})
+    return messages
+
+
+def resolve_model(task: str) -> tuple[str, str]:
+    """Liefert (Modell, API-Key) fuer eine Aufgabe. Leere Aufgaben-Modelle fallen
+    auf das Standard-Chat-Modell zurueck, damit nichts konfiguriert werden MUSS.
+    Aufgaben: 'chat', 'caption', 'classifier', 'vision', 'memory'."""
+    okey = db.get_setting("openrouter_api_key", "")
+    base = db.get_setting("openrouter_model", "openai/gpt-4o-mini")
+    if task == "classifier":
+        return (db.get_setting("classifier_model", "") or base, okey)
+    if task == "memory":
+        # Verdichten ist eine strukturierte JSON-Aufgabe - dafuer taugt ein
+        # guenstiges Modell genauso gut wie das teure Chat-Modell.
+        return (db.get_setting("memory_model", "") or base, okey)
+    if task == "caption":
+        m = db.get_setting("ppv_caption_model", "")
+        if m:
+            return (m, okey)
+        # Rueckwaertskompatibel: alte Vision-Umleitung fuer Captions
+        if db.get_setting("ppv_caption_use_vision", False):
+            return (db.get_setting("vision_model", "openai/gpt-4o-mini"),
+                    db.get_setting("vision_api_key", "") or okey)
+        return (base, okey)
+    if task == "vision":
+        return (db.get_setting("vision_model", "openai/gpt-4o-mini"),
+                db.get_setting("vision_api_key", "") or okey)
+    return (base, okey)  # 'chat'
+
+
+def _record_cost(data: dict, model: str, category: str) -> None:
+    """Schreibt die von OpenRouter gemeldeten Kosten (usage.cost, USD) in die DB."""
+    try:
+        cost = ((data or {}).get("usage") or {}).get("cost")
+        if cost:
+            db.add_api_cost(float(cost), model, category)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+
+def generate(messages: list[dict[str, str]], model: str = "", api_key: str = "",
+             category: str = "chat") -> str:
+    """Generiert Text. Ohne Angabe wird das Standard-Chat-Modell + OpenRouter-Key
+    verwendet; model/api_key koennen pro Aufgabe ueberschrieben werden."""
+    api_key = api_key or db.get_setting("openrouter_api_key", "")
+    model = model or db.get_setting("openrouter_model", "openai/gpt-4o-mini")
+    if not api_key:
+        raise OpenRouterError("Kein OpenRouter-API-Key hinterlegt")
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": float(db.get_setting("temperature", 0.9)),
+        "max_tokens": int(db.get_setting("max_tokens", 300)),
+        "usage": {"include": True},   # OpenRouter liefert dann usage.cost mit
+    }
+    # Denkprozess steuern. Manche Modelle schreiben ihre Ueberlegungen sonst
+    # mitten in die Antwort ("Wait, the fan is writing in German, so I need
+    # to..."), und genau das landet dann im Chat. Fuer kurze Flirt-Antworten
+    # bringt langes Nachdenken ohnehin nichts, kostet aber Tokens.
+    modus = str(db.get_setting("reasoning_mode", "none") or "none").strip().lower()
+    if modus == "none":
+        payload["reasoning"] = {"effort": "none", "exclude": True}
+    elif modus == "exclude":
+        payload["reasoning"] = {"exclude": True}
+    # "default" -> gar nichts mitschicken, Modell entscheidet selbst
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        # Von OpenRouter empfohlene (optionale) Attribution-Header:
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "AutoChat",
+    }
+    # Netzwerkfehler (Timeout, SSL-Handshake, DNS ...) als OpenRouterError
+    # kapseln. Sonst fliegen sie an generate_retry vorbei, das nur
+    # OpenRouterError abfaengt - ein voruebergehender Timeout fuehrte dann zu
+    # GAR KEINEM Wiederholungsversuch, und die Fan-Nachricht blieb unbeantwortet.
+    try:
+        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
+    except Exception as exc:  # noqa: BLE001 - httpx.TimeoutException, SSLError, ...
+        raise OpenRouterError(f"Netzwerkfehler bei OpenRouter: {exc}") from exc
+    if resp.status_code != 200:
+        raise OpenRouterError(f"OpenRouter-Fehler [{resp.status_code}]: {resp.text}")
+    try:
+        data = resp.json()
+    except ValueError as exc:
+        raise OpenRouterError(f"Antwort war kein JSON: {resp.text[:200]}") from exc
+    _record_cost(data, model, category)
+    # _extract_content behandelt content=None (Reasoning-Modelle), Listen-Content
+    # und Refusals robust – statt hart .strip() auf evtl. None aufzurufen.
+    text = _extract_content(data)
+    _log_if_suspicious(data, text, model, category)
+    return text
+
+
+def _log_if_suspicious(data: dict, text: str, model: str, category: str) -> None:
+    """Protokolliert die Rohantwort, wenn das Ergebnis unbrauchbar aussieht.
+
+    Ohne das laesst sich hinterher nicht mehr sagen, WARUM eine Antwort leer
+    oder nur ein Wortfetzen war: brach das Modell am Token-Limit ab, hat es
+    gefiltert, oder kam wirklich nur das zurueck? Genau diese Frage stand bei
+    Entwuerfen wie 'dilemma (1)' oder 'Mmm,' im Raum.
+    """
+    stripped = (text or "").strip()
+    if len(stripped) >= 25:
+        return
+    try:
+        choice = (data.get("choices") or [{}])[0]
+        msg = choice.get("message") or {}
+        usage = data.get("usage") or {}
+        details = usage.get("completion_tokens_details") or {}
+        info = {
+            "finish_reason": choice.get("finish_reason"),
+            "native_finish_reason": choice.get("native_finish_reason"),
+            "laenge": len(stripped),
+            "text": stripped[:120],
+            "prompt_tokens": usage.get("prompt_tokens"),
+            "completion_tokens": usage.get("completion_tokens"),
+            # Denk-Tokens zaehlen als Output und gehen von max_tokens ab
+            "reasoning_tokens": details.get("reasoning_tokens"),
+            "reasoning_feld": len(str(msg.get("reasoning") or "")),
+            "max_tokens": int(db.get_setting("max_tokens", 300)),
+            "modell": model,
+        }
+        db.log("warn", "generate",
+               f"Auffällig kurze Antwort ({len(stripped)} Zeichen) von {model}",
+               " · ".join(f"{k}={v}" for k, v in info.items() if v not in (None, "")))
+    except Exception:  # noqa: BLE001 - Diagnose darf nie etwas kaputt machen
+        pass
+
+
+def generate_retry(messages: list[dict[str, str]], model: str = "", api_key: str = "",
+                   attempts: int = 3, delay_seconds: float = 0.0,
+                   category: str = "chat") -> str:
+    """Wie generate(), wiederholt aber bei LEERER Antwort (Reasoning-Modelle liefern
+    manchmal nichts) bis zu `attempts` Mal. Zwischen den Versuchen wird `delay_seconds`
+    gewartet (0 = keine Pause; sinnvoll nur im Hintergrundbetrieb). Gibt "" zurueck,
+    wenn alle Versuche leer bleiben – der Aufrufer leitet dann zur manuellen Freigabe."""
+    attempts = max(1, attempts)
+    for i in range(attempts):
+        netzfehler = False
+        try:
+            text = generate(messages, model=model, api_key=api_key, category=category)
+        except OpenRouterError as exc:
+            text = ""
+            netzfehler = "Netzwerkfehler" in str(exc)
+            db.log("warn", "generate", f"Generierung-Versuch {i + 1}/{attempts} fehlgeschlagen",
+                   str(exc)[:200])
+        if text and text.strip():
+            return text
+        if i < attempts - 1:
+            # Zwei sehr verschiedene Faelle:
+            #  - LEERE Antwort: das Modell hat geantwortet, nur ohne Inhalt
+            #    (Reasoning-Modelle). Da lohnt eine laengere Pause.
+            #  - NETZWERKFEHLER: jeder Versuch laeuft schon bis zu 60s ins
+            #    Timeout. Mit der langen Pause wuerde ein einziger haengender
+            #    Chat den ganzen Poll-Zyklus minutenlang blockieren und alle
+            #    anderen Fans warten lassen. Deshalb kurz antesten und sonst
+            #    aufgeben - der Recheck-Zyklus versucht es spaeter erneut,
+            #    ohne den Betrieb aufzuhalten.
+            if netzfehler:
+                if i >= 1:
+                    db.log("warn", "generate",
+                           "Netzwerk weiterhin gestört – Entwurf geht zur späteren "
+                           "Wiederholung in die Queue", "")
+                    break
+                wait = 2.0
+            else:
+                wait = max(0.0, delay_seconds)
+            db.log("info", "generate",
+                   f"{'Netzwerkfehler' if netzfehler else 'Leere Antwort'} – "
+                   f"neuer Versuch {i + 2}/{attempts}" + (f" in {int(wait)}s" if wait >= 1 else ""), "")
+            if wait:
+                time.sleep(wait)
+    return ""
+
+
+def analyze_image(image_url: str, instruction: str = "") -> list[str]:
+    """Laesst ein multimodales Modell das Bild beschreiben und gibt Tags zurueck.
+    Nutzt einen eigenen Vision-API-Key, falls hinterlegt, sonst den Haupt-Key."""
+    api_key = db.get_setting("vision_api_key", "") or db.get_setting("openrouter_api_key", "")
+    if not api_key:
+        raise OpenRouterError("Kein OpenRouter-API-Key hinterlegt")
+    model = db.get_setting("vision_model", "openai/gpt-4o-mini")
+    instruction = instruction or db.get_setting("vision_prompt", "")
+    payload = {
+        "model": model,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": instruction},
+                {"type": "image_url", "image_url": {"url": image_url}},
+            ],
+        }],
+        "temperature": 0.3,
+        "max_tokens": 200,
+        "usage": {"include": True},
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "AutoChat",
+    }
+    resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
+    if resp.status_code != 200:
+        raise OpenRouterError(f"Bildanalyse-Fehler [{resp.status_code}]: {resp.text}")
+    data = resp.json()
+    _record_cost(data, model, "vision")
+    return parse_tags(_extract_content(data))
+
+
+def analyze_incoming_image(image_url: str) -> dict:
+    """Analysiert ein vom Fan geschicktes Bild.
+    Rueckgabe: {"woman": bool, "nude": bool, "penis": bool, "description": str}.
+    - woman = erwachsene weibliche Person prominent im Bild (dann kann der Bot nicht
+      wissen, ob es die Creatorin selbst ist -> vorsichtig antworten).
+    - nude  = nackte/explizit sexuelle weibliche Darstellung (Brueste/Genital sichtbar).
+    - penis = ein Penis ist zu sehen.
+    nude/penis gelten als Kaufsignal (PPV). Bei Fehlern: woman=True (vorsichtige
+    Default-Annahme), nude/penis=False, leere Beschreibung."""
+    import json as _json
+    api_key = db.get_setting("vision_api_key", "") or db.get_setting("openrouter_api_key", "")
+    if not api_key or not image_url:
+        return {"woman": True, "nude": False, "penis": False, "description": ""}
+    model = db.get_setting("vision_model", "openai/gpt-4o-mini")
+    instruction = (
+        "Du bekommst ein Bild, das ein Fan an eine Creatorin einer Adult-Plattform geschickt hat. "
+        "Antworte AUSSCHLIESSLICH mit kompaktem JSON, ohne Erklaerung, im Format: "
+        '{"woman": true|false, "nude": true|false, "penis": true|false, "description": "..."}. '
+        "woman=true, wenn eine erwachsene weibliche Person deutlich/prominent im Bild zu sehen "
+        "ist (Gesicht oder Koerper), sonst false. "
+        "nude=true, wenn eine weibliche Person nackt oder explizit sexuell dargestellt ist "
+        "(nackte Brueste oder Genitalien sichtbar), sonst false. "
+        "penis=true, wenn ein Penis zu sehen ist, sonst false. "
+        "description = eine kurze, sachliche Beschreibung des Bildinhalts auf DEUTSCH (1 Satz)."
+    )
+    payload = {
+        "model": model,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": instruction},
+                {"type": "image_url", "image_url": {"url": image_url}},
+            ],
+        }],
+        "temperature": 0,
+        "max_tokens": 150,
+        "usage": {"include": True},
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+               "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
+    try:
+        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
+        if resp.status_code != 200:
+            return {"woman": True, "nude": False, "penis": False, "description": ""}
+        full = resp.json()
+        _record_cost(full, model, "vision")
+        content = _extract_content(full)
+        if content.startswith("```"):
+            content = content.strip("`")
+            content = content[content.find("{"):content.rfind("}") + 1]
+        data = _json.loads(content)
+        return {"woman": bool(data.get("woman", True)),
+                "nude": bool(data.get("nude", False)),
+                "penis": bool(data.get("penis", False)),
+                "description": str(data.get("description", "") or "").strip()}
+    except (OpenRouterError, ValueError, KeyError, TypeError):
+        # Konnte nicht analysiert werden -> vorsichtige Annahme: koennte eine Frau sein
+        return {"woman": True, "nude": False, "penis": False, "description": ""}
+
+
+def _extract_content(data: dict) -> str:
+    """Holt den Text-Content robust aus einer OpenRouter-Antwort.
+    Behandelt content=None, Listen-Content (multimodal) und Refusals."""
+    try:
+        choice = data["choices"][0]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise OpenRouterError(f"Unerwartete OpenRouter-Antwort: {data}") from exc
+    msg = choice.get("message") or {}
+    content = msg.get("content")
+    if isinstance(content, list):  # manche Modelle liefern eine Content-Teile-Liste
+        content = " ".join(
+            part.get("text", "") for part in content if isinstance(part, dict)
+        )
+    if not content:  # None oder leer -> ggf. Refusal
+        refusal = msg.get("refusal")
+        if refusal:
+            raise OpenRouterError(f"Modell hat den Inhalt abgelehnt: {refusal}")
+        return ""
+    return str(content).strip()
+
+
+def classify_message(text: str, notes: str = "") -> dict:
+    """Bewertet eine Fan-Nachricht auf Kaufinteresse. Gibt ein Dict zurueck:
+    {sexual_energy: bool, intent_score: 1-5, describes_fantasy: bool, preferences: [str]}.
+    preferences werden IMMER als englische Tags geliefert (passend zu den PPV-Tags),
+    auch wenn der Fan Deutsch schreibt. notes = gespeicherte Fan-Notizen (Vorlieben).
+    Bei Fehlern wird ein leeres/neutrales Dict zurueckgegeben."""
+    import json as _json
+
+    model, api_key = resolve_model("classifier")
+    if not api_key or not (text or "").strip():
+        return {}
+    system = (
+        "Du bewertest die Nachricht eines Fans an eine Creatorin auf einer Adult-Plattform "
+        "hinsichtlich echtem Kaufinteresse an ihrem Bild-/Videocontent. "
+        "Antworte AUSSCHLIESSLICH mit kompaktem JSON, ohne Erklaerung, im Format: "
+        '{"sexual_energy": true|false, "intent_score": 1-5, "describes_fantasy": true|false, '
+        '"content_request": true|false, "emotional_distress": true|false, "preferences": ["tag", ...]}. '
+        "content_request=true, wenn der Fan EXPLIZIT fragt, ob du bestimmten Content/Bilder/Videos "
+        "hast, oder darum bittet, etwas Bestimmtes zu sehen (z.B. 'hast du content wo...', "
+        "'zeig mir...', 'kann ich ... sehen', 'schick mir...'). Sonst false. "
+        "emotional_distress=true, wenn der Fan gerade seelisch verletzlich ist oder eine emotionale "
+        "Ausnahmesituation schildert: Traurigkeit, Einsamkeit, Weinen, Schmerz, Angst, Depression, "
+        "Trennung/Liebeskummer, Verlust/Trauer, Krise, Ueberforderung, Selbstzweifel oder Andeutungen "
+        "von Selbstverletzung. In solchen Momenten ist KEIN Verkauf angebracht. Sonst false. "
+        "Bewerte STRENG und konservativ. Wichtige Regeln: "
+        "Witze, Sprueche, Provokationen, Off-Topic (z.B. Drogen, Party, allgemeine Vulgaritaet) "
+        "oder Aussagen ueber DRITTE sind KEIN Kaufinteresse -> intent_score 1 und sexual_energy=false. "
+        "sexual_energy=true nur bei echtem sexuellem/romantischem Interesse, das der Creatorin "
+        "SELBST gilt. describes_fantasy=true nur, wenn der Fan ernsthaft ein Szenario MIT der "
+        "Creatorin beschreibt, nicht bei beilaeufigen Vulgaritaeten. "
+        "intent_score: 1=Smalltalk/kein Kaufinteresse, 3=deutliches Interesse an ihr, "
+        "5=will explizit mehr/Bilder/Videos von ihr sehen. "
+        "preferences=konkret genannte oder aus den Fan-Notizen bekannte Vorlieben/Koerperteile/"
+        "Szenerien. WICHTIG: preferences IMMER als kurze ENGLISCHE Schlagworte ausgeben "
+        "(z.B. 'Fuesse' -> feet, 'Absaetze' -> heels, 'Dessous' -> lingerie), damit sie zu den "
+        "englischen Content-Tags passen. Leer, wenn keine erkennbar."
+    )
+    user_content = text[:1000]
+    if (notes or "").strip():
+        user_content += f"\n\n[Bekannte Vorlieben des Fans aus Notizen: {notes.strip()[:300]}]"
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
+        ],
+        "temperature": 0,
+        "max_tokens": 150,
+        "usage": {"include": True},
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+               "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
+    try:
+        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=45)
+        if resp.status_code != 200:
+            return {}
+        full = resp.json()
+        _record_cost(full, model, "classifier")
+        content = full["choices"][0]["message"]["content"].strip()
+        # eventuelle Code-Fences entfernen
+        if content.startswith("```"):
+            content = content.strip("`")
+            content = content[content.find("{"):content.rfind("}") + 1]
+        data = _json.loads(content)
+        return {
+            "sexual_energy": bool(data.get("sexual_energy", False)),
+            "intent_score": int(data.get("intent_score", 1) or 1),
+            "describes_fantasy": bool(data.get("describes_fantasy", False)),
+            "content_request": bool(data.get("content_request", False)),
+            "emotional_distress": bool(data.get("emotional_distress", False)),
+            "preferences": [str(p).strip().lower() for p in (data.get("preferences") or []) if str(p).strip()],
+        }
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def confirm_ppv(messages_chrono: list, me_uuid: str, reason: str,
+                set_name: str = "", price_cents: int = 0) -> dict:
+    """Zweitmeinung vor dem Versand eines PPV – MIT Gespraechsverlauf.
+
+    Der normale Klassifikator sieht nur die letzte Nachricht. Ohne Kontext ist
+    "maybe you could show me around yourself" kaum von einer Content-Anfrage zu
+    unterscheiden; mit den vorherigen Nachrichten (Stadtviertel, Kaffee) dagegen
+    sofort. Genau diese Faelle soll die Pruefung abfangen.
+
+    Rueckgabe: {"ok": bool, "grund": str, "geprueft": bool}
+    geprueft=False bedeutet: Pruefung war nicht moeglich (kein Key, Netzfehler).
+    """
+    ergebnis = {"ok": False, "grund": "", "geprueft": False}
+    api_key = db.get_setting("openrouter_api_key", "")
+    if not api_key:
+        ergebnis["grund"] = "kein API-Key"
+        return ergebnis
+
+    model = db.get_setting("classifier_model", "") or db.get_setting(
+        "openrouter_model", "openai/gpt-4o-mini")
+
+    # Verlauf kompakt aufbereiten - nur die letzten Nachrichten, gekuerzt
+    n = int(db.get_setting("ppv_confirm_context_messages", 8) or 8)
+    zeilen = []
+    for m in messages_chrono[-n:]:
+        text = (m.get("text") or "").strip()
+        if not text:
+            continue
+        wer = "Creatorin" if (m.get("sender") or {}).get("uuid", "") == me_uuid else "Fan"
+        zeilen.append(f"{wer}: {text[:300]}")
+    verlauf = "\n".join(zeilen) or "(kein Verlauf)"
+
+    system = (
+        "Du pruefst fuer eine Creatorin auf einer Adult-Plattform, ob es JETZT passend ist, "
+        "dem Fan kostenpflichtigen Content (ein Foto-Set oder Video) anzubieten. "
+        "Du siehst den Gespraechsverlauf. Der Automatik-Regel nach waere ein Angebot faellig; "
+        "du bist die Gegenprobe.\n\n"
+        "Antworte NUR mit kompaktem JSON: {\"ok\": true|false, \"grund\": \"kurze Begruendung\"}\n\n"
+        "ok=false, wenn:\n"
+        "- der Fan gar keinen Content will, sondern ueber etwas anderes spricht "
+        "(Alltag, Reise, Treffen, Gefuehle, Smalltalk)\n"
+        "- eine Formulierung nur zufaellig nach Content klingt "
+        "(z.B. 'show me around' = herumfuehren, 'zeig mir die Stadt')\n"
+        "- der Fan ein reales Treffen, ein Date oder Kontakt ausserhalb der Plattform anspricht\n"
+        "- der Fan gerade emotional belastet, traurig oder verletzlich wirkt\n"
+        "- der Fan sich gerade beschwert, unzufrieden ist oder ueber Geld klagt\n"
+        "- ein Angebot den Gespraechsfluss unangenehm unterbrechen wuerde\n\n"
+        "ok=true, wenn der Fan erkennbar mehr sehen will oder die Stimmung ein Angebot "
+        "natuerlich traegt.\n"
+        "Im Zweifel ok=false - ein Set kann jedem Fan nur EINMAL angeboten werden."
+    )
+    frage = (f"Gespraechsverlauf:\n{verlauf}\n\n"
+             f"Die Automatik wuerde jetzt anbieten. Ausloeser war: {reason}\n"
+             + (f"Geplantes Set: {set_name}\n" if set_name else "")
+             + (f"Preis: ${price_cents/100:.2f}\n" if price_cents else "")
+             + "\nIst ein Angebot jetzt angebracht?")
+
+    import json as _json
+    payload = {"model": model,
+               "messages": [{"role": "system", "content": system},
+                            {"role": "user", "content": frage}],
+               "temperature": 0, "max_tokens": 200}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+               "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
+    try:
+        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=45)
+        if resp.status_code != 200:
+            ergebnis["grund"] = f"HTTP {resp.status_code}"
+            return ergebnis
+        data = resp.json()
+        _record_cost(data, model, "ppv_confirm")
+        inhalt = _extract_content(data)
+        if inhalt.startswith("```"):
+            inhalt = inhalt.strip("`")
+            inhalt = inhalt[inhalt.find("{"):inhalt.rfind("}") + 1]
+        roh = _json.loads(inhalt)
+        ergebnis["ok"] = bool(roh.get("ok", False))
+        ergebnis["grund"] = str(roh.get("grund", ""))[:300]
+        ergebnis["geprueft"] = True
+    except Exception as exc:  # noqa: BLE001 - Pruefung darf nie den Ablauf sprengen
+        ergebnis["grund"] = f"Prüfung fehlgeschlagen: {exc}"[:200]
+    return ergebnis
+
+
+def parse_tags(text: str) -> list[str]:
+    """Wandelt eine LLM-Antwort in eine saubere Tag-Liste (kommagetrennt)."""
+    # Zeilenumbrueche und Aufzaehlungszeichen zu Kommas normalisieren
+    for ch in ["\n", ";", "•", "- ", "*"]:
+        text = text.replace(ch, ",")
+    seen: list[str] = []
+    for raw in text.split(","):
+        tag = raw.strip().strip(".").lstrip("0123456789. ").strip().lower()
+        if tag and tag not in seen:
+            seen.append(tag)
+    return seen[:15]
+
+
+def consolidate_memory(current: dict, new_messages: list[dict],
+                       limits: dict | None = None) -> dict:
+    """Verdichtet neue Nachrichten in das bestehende Gedaechtnis eines Fans.
+
+    Eingabe ist bewusst klein: der aktuelle Wissensstand plus die Nachrichten
+    seit der letzten Verdichtung - nicht der ganze Verlauf. Ausgabe ist der
+    VOLLSTAENDIGE neue Stand als JSON.
+
+    Der Prompt ist absichtlich streng. Ein erfundener Fakt ist schlimmer als
+    gar kein Gedaechtnis: er wandert in JEDE kuenftige Antwort und das Modell
+    behauptet ihn wochenlang mit voller Ueberzeugung.
+
+    Bei jedem Fehler wird {} geliefert - der Aufrufer laesst dann den alten
+    Stand stehen.
+    """
+    import json as _json
+
+    limits = limits or {}
+    max_long = int(limits.get("long", 14))
+    max_short = int(limits.get("short", 12))
+
+    model, api_key = resolve_model("memory")
+    if not api_key or not new_messages:
+        return {}
+
+    bestand = {
+        "long": [{"k": e.get("k", "sonstiges"), "v": e.get("v", ""),
+                  "src": e.get("src", "auto")} for e in (current.get("long") or [])],
+        "short": [{"d": e.get("d", ""), "v": e.get("v", ""),
+                   "open": e.get("open", 0), "due": e.get("due", ""),
+                   "src": e.get("src", "auto")} for e in (current.get("short") or [])],
+    }
+
+    system = (
+        "Du pflegst das Gedaechtnis einer Creatorin ueber EINEN einzelnen Fan. "
+        "Du bekommst den bisherigen Wissensstand und die neuen Nachrichten seit der "
+        "letzten Aktualisierung. Gib den VOLLSTAENDIGEN neuen Stand zurueck.\n"
+        "Es gibt ZWEI Schichten:\n"
+        "  long  = LANGZEIT. Was den Fan ausmacht. Bleibt dauerhaft.\n"
+        "  short = KURZZEIT. Worueber ihr zuletzt gesprochen habt. Verfaellt nach "
+        "wenigen Wochen von selbst.\n"
+        "Antworte AUSSCHLIESSLICH mit kompaktem JSON, ohne Erklaerung, im Format:\n"
+        '{"long": [{"k": "kategorie", "v": "Stichwort"}], '
+        '"short": [{"d": "YYYY-MM-DD", "v": "worum es ging", "open": 0, '
+        '"due": "YYYY-MM-DD"}]}\n'
+        "\nDie Kategorie \"k\" ist FEST VORGEGEBEN. Erlaubt ist AUSSCHLIESSLICH einer "
+        "dieser elf Werte - erfinde keine eigenen:\n"
+        "  name          Vorname oder wie er genannt werden will\n"
+        "  anrede        wie er SIE nennt und wie er genannt werden will "
+        "(Kosenamen, Spitznamen)\n"
+        "  alter         NUR Lebensalter in Jahren, Altersgruppe oder Geburtstag\n"
+        "  koerper       Koerpergroesse, Statur, Haare, Aussehen - seines, nicht ihres\n"
+        "  herkunft      Land, Stadt, Gegend, Zeitzone, Sprache\n"
+        "  beruf         Beruf, Arbeit, Schichten, Ausbildung\n"
+        "  familie       Partnerin, Kinder, Eltern, Haustiere\n"
+        "  vorlieben     was er mag: Hobbys, Interessen, Geschmack, Themen\n"
+        "  grenzen       was er NICHT mag oder ausdruecklich ablehnt\n"
+        "  kaufverhalten Preisgrenze, was er kauft und was nie "
+        "(\"nur unter 15 $\", \"nie Videos\")\n"
+        "  sonstiges     alles Dauerhafte, das in kein anderes Fach passt - "
+        "z.B. Wohnform, Lebensumstaende\n"
+        "\nIM ZWEIFEL IMMER \"sonstiges\". Ein Fakt im falschen Fach ist schlimmer als "
+        "einer in \"sonstiges\": die Creatorin liest das Fach als Aussage. Presse nichts "
+        "in ein Fach, nur weil es ungefaehr passen koennte.\n"
+        "Haeufige Verwechslungen - so NICHT:\n"
+        "  \"5'6.5\" (168.9 cm)\" ist eine KOERPERGROESSE, kein Alter -> koerper, "
+        "als \"1,69 m gross\"\n"
+        "  \"Homestead\" ist eine WOHNFORM, keine Familie -> sonstiges, als "
+        "\"lebt auf einem Homestead\"\n"
+        "  Eine Zahl mit Einheit (cm, kg, ft, \", \') gehoert NIE nach \"alter\".\n"
+        "\nREGELN - streng befolgen:\n"
+        "1. Halte NUR fest, was der Fan woertlich gesagt hat. Folgere nichts, schmuecke "
+        "nichts aus, rate nicht. Im Zweifel WEGLASSEN. Ein erfundener Fakt richtet mehr "
+        "Schaden an als eine Luecke - er geht in JEDE kuenftige Antwort ein.\n"
+        "2. Bestehende Eintraege NUR ersetzen, wenn der Fan ihnen ausdruecklich "
+        "widerspricht. Sonst behalten und hoechstens ergaenzen.\n"
+        "3. Eintraege mit \"src\": \"manual\" stammen von der Creatorin selbst: gib sie "
+        "unveraendert zurueck, aendere oder loesche sie NIEMALS.\n"
+        "4. long = STICHWORTE, keine Saetze. \"Elektriker\", nicht \"Er arbeitet als "
+        "Elektriker\". Ein Fakt pro Eintrag, max. 80 Zeichen. Nur was in einem halben "
+        "Jahr noch stimmt.\n"
+        "4b. Jeder Eintrag muss fuer sich verstaendlich sein, auch ohne das Fach "
+        "danebenzulesen. \"Homestead\" allein sagt nichts - \"lebt auf einem Homestead\" "
+        "schon. Lieber drei Woerter mehr als ein raetselhaftes Stichwort.\n"
+        "4c. AUSNAHMEN GEHOEREN DAZU, sonst dreht sich die Aussage um. Sagt der Fan "
+        "\"ich hasse Fuesse, ABER deine finde ich toll\", dann ist \"hasst Fuesse\" "
+        "grob falsch: der Bot wuerde genau das meiden, was dieser Fan will. Entweder "
+        "die Ausnahme mit aufnehmen (\"mag Fuesse sonst nicht, ihre aber schon\") oder "
+        "den Eintrag ganz weglassen. Nach \"grenzen\" gehoert nur, was auch IM CHAT "
+        "MIT IHR gilt.\n"
+        "5. short = ein Satz je Gespraechstag: worum es ging. Datum aus der Nachricht, "
+        "nicht von heute.\n"
+        "6. WICHTIGSTE REGEL - HOCHSTUFEN: Steht in short etwas, das dauerhaft gilt "
+        "(sein Name, sein Beruf, sein Hund), dann schreibe es zusaetzlich als Stichwort "
+        "nach long. Kurzzeitnotizen verfallen; was du nicht hochstufst, ist danach "
+        "endgueltig weg.\n"
+        "7. \"open\": 1 bei einem offenen Faden - etwas, worauf man spaeter zurueckkommen "
+        "kann (bevorstehender Termin, Plan, Sorge). Setze es zurueck auf 0, sobald das "
+        "Thema erledigt oder besprochen ist. \"due\" nur, wenn der Fan ein Datum genannt "
+        "hat.\n"
+        f"8. Obergrenzen: long max. {max_long}, short max. {max_short}. Beim Ueberlauf "
+        "in short das Aelteste streichen, in long das Unwichtigste.\n"
+        "9. NICHT speichern: Zahlungs- und Kontodaten, Passwoerter, Adressen, Klarnamen "
+        "Dritter, Gesundheitsdiagnosen, sowie alles, was der Fan ausdruecklich vertraulich "
+        "genannt hat.\n"
+        "10. Rein sexuelle Rollenspiel-Inhalte gehoeren NICHT ins Gedaechtnis - nur echte "
+        "Vorlieben, die fuer spaetere Gespraeche zaehlen.\n"
+        "11. Schreibe die Eintraege in der Sprache, in der der Fan schreibt.\n"
+        # Beobachtet am 08.09.2026: das Modell setzte woertliche Rede in
+        # Anfuehrungszeichen mitten in einen Wert ("er nennt sie "Kitten"") -
+        # damit war die ganze Antwort kein gueltiges JSON mehr und ein ganzer
+        # Block fiel aus. Der Riegel dagegen ist response_format unten, die
+        # Regel hier ist der Guertel dazu.
+        "12. Antworte ausschliesslich mit gueltigem JSON. Verwende in den Werten "
+        "KEINE doppelten Anfuehrungszeichen - schreibe woertliche Rede ohne "
+        "Anfuehrungszeichen oder mit einfachen."
+    )
+    user_content = (
+        "BISHERIGER STAND:\n" + _json.dumps(bestand, ensure_ascii=False)
+        + "\n\nNEUE NACHRICHTEN:\n" + _json.dumps(new_messages, ensure_ascii=False)
+    )
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content[:12000]},
+        ],
+        "temperature": 0,
+        # 2000 statt 900: das Modell gibt JEDES MAL den vollstaendigen Stand
+        # zurueck - 11 Faecher Langzeit plus Kurzzeitnotizen -, nicht nur die
+        # Ergaenzung. Bei einem gewachsenen Gedaechtnis reichte das alte Budget
+        # dafuer nicht mehr, die Antwort brach mittendrin ab und war kein
+        # gueltiges JSON mehr.
+        "max_tokens": 2000,
+        # Denkprozess aus, genau wie bei generate(). Ein Reasoning-Modell
+        # verbraucht das Budget sonst fuer Ueberlegungen und liefert content = ""
+        # - das war die Ursache der gehaeuften Meldung "Verdichtung
+        # fehlgeschlagen: Expecting value: line 1 column 1 (char 0)". Beim
+        # Einlesen faellt es besonders auf, weil dort Dutzende Aufrufe
+        # hintereinander laufen.
+        "reasoning": {"effort": "none", "exclude": True},
+        # Zwingt das Modell zu syntaktisch gueltigem JSON. Ohne das reicht ein
+        # einziges nicht maskiertes Anfuehrungszeichen im Text, um einen ganzen
+        # Block zu verlieren - der Parser bricht ab, und die Nachrichten dieses
+        # Blocks sind fuer das Gedaechtnis weg.
+        "response_format": {"type": "json_object"},
+        "usage": {"include": True},
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+               "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
+    roh = ""      # fuer die Fehlermeldung, siehe unten
+    try:
+        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
+        if resp.status_code != 200:
+            db.log("warn", "memory", f"Verdichtung: HTTP {resp.status_code}",
+                   resp.text[:300])
+            return {}
+        full = resp.json()
+        _record_cost(full, model, "memory")
+        content = _extract_content(full).strip()
+        roh = content
+        if not content:
+            # Ohne diese Meldung ist ein Fehlschlag nicht zu diagnostizieren:
+            # "kein JSON" verraet nicht, ob das Modell abgelehnt hat, das
+            # Token-Budget aufgebraucht war oder gar nichts zurueckkam.
+            wahl = ((full.get("choices") or [{}])[0]) or {}
+            grund = str(wahl.get("finish_reason") or "") + " " + str(
+                wahl.get("native_finish_reason") or "")
+            detail = (f"finish_reason={wahl.get('finish_reason')} "
+                      f"native={wahl.get('native_finish_reason')} "
+                      f"completion_tokens="
+                      f"{((full.get('usage') or {}).get('completion_tokens'))} "
+                      f"model={model}")
+            if "content_filter" in grund:
+                # Bewusst nur "info": bei diesem AutoChat filtert der Anbieter
+                # gelegentlich einen Block weg, das ist erwartet und nicht zu
+                # beheben. Verloren geht nur dieser eine Block, der bisherige
+                # Stand bleibt unangetastet. Als Warnung wuerde es die
+                # Aktivitaetsliste fuellen und echte Fehler verdecken.
+                db.log("info", "memory",
+                       "Verdichtung: Block vom Anbieter gefiltert (übersprungen)", detail)
+            else:
+                db.log("warn", "memory", "Verdichtung: leere Antwort vom Modell", detail)
+            return {}
+        if content.startswith("```"):
+            content = content.strip("`")
+        if "{" in content:
+            content = content[content.find("{"):content.rfind("}") + 1]
+        data = _json.loads(content)
+        if not isinstance(data, dict):
+            return {}
+        out = {k: [e for e in (data.get(k) or []) if isinstance(e, dict)]
+               for k in ("long", "short")}
+        # Ein Modell, das auf einmal ALLES vergisst, hat sich verrannt. Lieber den
+        # alten Stand behalten, als ein gewachsenes Gedaechtnis stillschweigend
+        # zu leeren.
+        hatte = sum(len(bestand[k]) for k in bestand)
+        jetzt = sum(len(out[k]) for k in out)
+        if hatte >= 3 and jetzt == 0:
+            db.log("warn", "memory", "Verdichtung verworfen: Ergebnis war leer", "")
+            return {}
+        return out
+    except Exception as exc:  # noqa: BLE001 - nie den Aufrufer mitreissen
+        # Den Anfang der Antwort mitloggen: bei einem Parser-Fehler ist genau
+        # das die einzige Spur, an der sich erkennen laesst, was das Modell
+        # stattdessen geschickt hat.
+        # Bei einem Parser-Fehler ist die FEHLERSTELLE aufschlussreicher als der
+        # Anfang der Antwort - dort steht, woran sich das JSON verschluckt hat.
+        stelle = ""
+        pos = getattr(exc, "pos", None)
+        if isinstance(pos, int) and roh:
+            stelle = f" | um Zeichen {pos}: {roh[max(0, pos - 90):pos + 60]!r}"
+        db.log("warn", "memory", "Verdichtung fehlgeschlagen",
+               f"{str(exc)[:200]} | Antwort begann mit: {roh[:150]!r}{stelle}")
+        return {}

@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><title>Live-Refresh Regressionstest</title>
+<style>.workspace-scroll {height:200px;overflow:auto}main {min-height:1000px}</style>
+<aside><div id="workspace-status">Alt</div><nav class="workspace-nav"><a href="/queue">Queue</a></nav></aside>
+<div class="workspace-scroll">
+<main><div id="draft-1" class="draft"><form action="/queue/1/save"><textarea>Original</textarea><button>Speichern</button></form></div><table id="logs"><tbody><tr><td>Alt</td></tr></tbody></table><details id="details" open><summary>Details</summary>Text</details><div id="si-body">Live-Auslastung</div></main><footer></footer></div><pre id="result">Prüfung läuft …</pre>
+<script>
+history.replaceState(null, '', '/queue');
+let tick, clock = Date.now(), fetches = 0;
+Date.now = () => clock;
+window.setInterval = fn => { tick = fn; return 1 };
+let markup = '<main><div id="draft-2" class="draft"><form action="/queue/2/save"><textarea>Neuer Entwurf</textarea><button>Speichern</button></form></div><div id="draft-1" class="draft"><form action="/queue/1/save"><textarea>Serveränderung</textarea><button>Speichern</button></form></div><table id="logs"><tbody><tr><td>Neu</td></tr><tr><td>Alt</td></tr></tbody></table><details id="details"><summary>Details</summary>Neu</details><div id="si-body">Platzhalter</div></main>';
+window.fetch = async () => { fetches++; return {ok:true,redirected:false,text:async()=>'<aside><div id="workspace-status">Verbunden</div><nav class="workspace-nav"><a href="/queue">Vorschläge <span class="badge">2</span></a></nav></aside>'+markup}; };
+</script>
+<script src="/static/live-refresh.js"></script>
+<script>
+(async () => {
+  const results=[]; const check=(x,label)=>{ if(!x)throw Error(label); results.push('✓ '+label) };
+  try {
+    const input=document.querySelector('textarea'); const form=input.form;
+    input.value='Ungespeicherte Antwort'; input.dispatchEvent(new Event('input',{bubbles:true}));
+    const scroller=document.querySelector('.workspace-scroll'); scroller.scrollTop=120;
+    clock += 3000; await tick();
+    check(scroller.scrollTop===120, 'Scrollposition im neuen Inhaltsbereich erhalten');
+    check(document.getElementById('workspace-status').textContent==='Verbunden', 'Verbindungsstatus in Seitenleiste aktualisiert');
+    check(document.querySelector('.workspace-nav .badge').textContent==='2', 'Vorschlagszähler in Seitenleiste aktualisiert');
+    check(input.value==='Ungespeicherte Antwort' && input.isConnected && input.form===form, 'Ungespeicherte Antwort und Formular erhalten');
+    check(document.querySelector('#logs').textContent==='NeuAlt', 'Protokoll ohne Neuladen aktualisiert');
+    check(document.getElementById('draft-2').textContent.includes('Neuer Entwurf'), 'Neuen Entwurf ergänzt');
+    check(document.getElementById('details').open, 'Geöffnete Details bleiben geöffnet');
+    check(document.getElementById('si-body').textContent==='Live-Auslastung', 'Bestehende Live-Komponente erhalten');
+    const n=fetches; input.focus(); await tick(); check(fetches===n, 'Kein Refresh während Eingabe'); input.blur();
+    window.CreatorStudioLive.begin(); await tick(); check(fetches===n, 'Kein Refresh während laufender Aktion'); window.CreatorStudioLive.end();
+    window.CreatorStudioLive.saved(form); await tick(); check(input.value==='Serveränderung', 'Nach Speichern wieder aktualisiert');
+    markup='<main><table id="logs"><tbody><tr><td>Entfernt</td></tr></tbody></table></main>'; await tick();
+    check(!document.getElementById('draft-1') && !document.getElementById('draft-2'), 'Erledigte Entwürfe entfernt');
+    document.getElementById('result').textContent=results.join('\n')+'\nAlle Prüfungen bestanden.';
+  } catch(e) { document.getElementById('result').textContent=results.join('\n')+'\nFEHLER: '+e.stack; }
+})();
+</script>

@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><title>OAuth</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body><main>
+<div class="card {% if ok %}ok{% else %}warn{% endif %}">
+  <h2>{% if ok %}✓ Erfolg{% else %}✗ Fehler{% endif %}</h2>
+  <p>{{ message }}</p>
+  <a class="btn-primary" href="/">Zum Dashboard</a>
+</div>
+</main></body></html>

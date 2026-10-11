@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<title>Zuordnung: Scrollposition bei Aktualisierung</title>
+<link rel="stylesheet" href="/autoposter/app.css">
+<link rel="stylesheet" href="/static/workspace.css">
+<div id="root" class="workspace-frame"><header class="workspace-topbar">Scroll-Regressionstest</header><div class="workspace-body shell"><aside class="workspace-sidebar"></aside><main class="workspace-scroll"><div id="view" class="assignment-view"></div></main></div></div>
+<div id="modals"></div><div id="toasts"></div><pre id="result" hidden></pre>
+<script type="module">
+import renderAssign from '/autoposter/js/pages/assign.js'
+const channel = id => ({id, name: id, display_name: id, color: '#0071e3', platform: 'x', nsfw_level: 'explicit'})
+const assets = Array.from({length: 620}, (_, i) => ({id: `asset-${i}`, filename: `asset-${i}.jpg`, lifecycle: 'assigned', assigned_channel_ids: ['A','B','C','D'], used_channel_ids: i % 3 === 2 ? ['A'] : [], scheduled_channel_ids: i % 3 === 1 ? ['A'] : [], thumb_url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="84" height="76"><rect width="84" height="76" fill="lightblue"/></svg>'}))
+const channels = ['A','B','C','D'].map(channel)
+let pool = assets.slice(0, 240)
+const columns = channels.map(channel => ({channel, assets: [...assets], count: assets.length, available: 400, days_left: 20, traffic_light: 'green', empty_on: '2026-10-26T12:00:00Z'}))
+window.fetch = async url => {
+  const pathname = new URL(url, location.href).pathname
+  const responses = {'/api/v1/media/tags': [], '/api/v1/assignments/board': {columns}, '/api/v1/channels': channels, '/api/v1/media/search': {items: pool, next_cursor: null}}
+  if (!(pathname in responses)) throw Error('Unexpected API: ' + pathname)
+  return Response.json(responses[pathname])
+}
+window.CreatorStudioLive = {busy: () => false, begin() {}, end() {}}
+const results = [], check = (value, label) => { if (!value) throw Error(label); results.push(label) }
+const column = id => document.querySelector(`.column[data-channel-id="${id}"]`)
+const scroll = id => column(id).querySelector('.column-body')
+try {
+  const page = await renderAssign()
+  document.querySelector('#view').appendChild(page)
+  const board = document.querySelector('.board'), library = document.querySelector('.pool-body')
+  const workspace = document.querySelector('.workspace-scroll')
+  scroll('A').scrollTop = 450; scroll('B').scrollTop = 700; library.scrollTop = 250; board.scrollLeft = 150
+  const positions = () => [scroll('A').scrollTop, scroll('B').scrollTop, library.scrollTop, board.scrollLeft, workspace.scrollTop]
+  const originalPositions = positions(), oldA = column('A'), oldB = column('B'), oldTile = library.querySelector('.tile')
+  for (let i = 0; i < 3; i++) {
+    columns.forEach(c => c.empty_on = `2026-10-26T12:00:0${i + 1}Z`)
+    await page.refresh()
+  }
+  check(oldA === column('A') && oldB === column('B') && oldTile === library.querySelector('.tile'), 'Unveränderte Bilder und Kanalspalten bleiben im DOM')
+  check(JSON.stringify(positions()) === JSON.stringify(originalPositions), 'Mehrere automatische Aktualisierungen erhalten alle Scrollpositionen')
+  columns[0].assets = [...columns[0].assets, {...assets[0], id: 'new-asset', filename: 'Neu.jpg'}]
+  columns[0].count++
+  pool = [...pool, {...assets[0], id: 'new-pool', filename: 'Neu im Pool.jpg'}]
+  await page.refresh()
+  check(column('A').querySelectorAll('.tile').length === 621 && library.querySelectorAll('.tile').length === 241, 'Neue Bilder erscheinen weiterhin automatisch')
+  check(oldB === column('B'), 'Eine geänderte Spalte baut andere Kanäle nicht neu auf')
+  check(JSON.stringify(positions()) === JSON.stringify(originalPositions), 'Auch geänderte Bestände behalten ihre Scrollpositionen')
+  columns.reverse()
+  await page.refresh()
+  check(JSON.stringify(positions()) === JSON.stringify(originalPositions), 'Scrollpositionen bleiben dem Kanal auch bei neuer Reihenfolge zugeordnet')
+  column('A').querySelector('button.chip').click()
+  check(scroll('B').scrollTop === 700 && board.scrollLeft === originalPositions[3], 'Gruppenfilter erhalten Scrollpositionen anderer Kanäle')
+  document.querySelector('button.chip').blur()
+  const beforeReload = positions()
+  await [...page.querySelectorAll('button')].find(b => b.textContent === 'Neu laden').click()
+  // The guarded click handler is asynchronous.
+  await new Promise(resolve => setTimeout(resolve, 100))
+  check(JSON.stringify(positions()) === JSON.stringify(beforeReload), 'Manuelles Aktualisieren erhält ebenfalls die Position')
+  if (innerWidth <= 1100) {
+    workspace.scrollTop = 600
+    const top = workspace.scrollTop
+    pool = [...pool, {...assets[0], id: 'mobile-pool'}]
+    columns[0].assets = [...columns[0].assets, {...assets[0], id: 'mobile-channel'}]
+    await page.refresh()
+    check(workspace.scrollTop === top, 'Mobile Ansicht behält den gescrollten Seitenbereich')
+  }
+  window.assignmentTestResult = {ok: true, results}
+} catch (error) { window.assignmentTestResult = {ok: false, results, error: error.stack} }
+document.querySelector('#result').textContent = JSON.stringify(window.assignmentTestResult, null, 2)
+</script>
+</html>

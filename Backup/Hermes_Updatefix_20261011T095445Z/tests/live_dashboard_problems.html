@@ -1,0 +1,36 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><title>Dashboard Problemprüfung Test</title>
+<link rel="stylesheet" href="/autoposter/app.css"><link rel="stylesheet" href="/static/workspace.css">
+<div id="root"></div><div id="toasts"></div><div id="modals"></div><pre id="result" hidden></pre>
+<script type="module">
+import renderDashboard from '/autoposter/js/pages/dashboard.js'
+let checks = 0, resolved = false, fail = false
+window.CreatorStudioLive = {begin() {}, end() {}, busy: () => false}
+window.fetch = async (url, options = {}) => {
+  const path = new URL(url, location.href).pathname
+  if (path === '/api/v1/dashboard') return Response.json({inventory: {channels: [], unassigned_assets: 0}, lifecycle_counts: {}, upcoming_posts: [], channel_health: [], recent_failures: [], notifications: resolved ? [] : [{title: 'Bildvorrat knapp: Test', body: 'Noch 9 Bilder', level: 'warning'}]})
+  if (path === '/api/v1/jobs') return Response.json({jobs: []})
+  if (path === '/api/v1/problems/check') {
+    checks++; if (options.method !== 'POST') throw Error('Expected POST')
+    if (fail) return Response.json({detail: 'Testfehler'}, {status: 503})
+    resolved = true; return Response.json({checked: 1, resolved: 1, updated: 0, created: 0, errors: []})
+  }
+  throw Error('Unexpected request: ' + path)
+}
+const results=[], check=(condition,label)=>{if(!condition)throw Error(label);results.push(label)}
+const settle=()=>new Promise(resolve=>setTimeout(resolve,100))
+try {
+  const page=await renderDashboard();document.querySelector('#root').appendChild(page)
+  const btn=[...page.querySelectorAll('button')].find(b=>b.textContent==='Jetzt prüfen')
+  check(btn.parentElement.tagName==='H2' && btn.parentElement.textContent.includes('Probleme'),'Button direkt hinter der Überschrift Probleme')
+  check(page.textContent.includes('Noch 9 Bilder'),'Bestehendes Problem zunächst sichtbar')
+  btn.click();await settle()
+  check(checks===1 && page.textContent.includes('Alles ruhig.') && !page.textContent.includes('Noch 9 Bilder'),'Manuelle Prüfung entfernt erledigte Meldung sofort ohne Seitenreload')
+  check(!btn.disabled && btn.textContent==='Jetzt prüfen','Button nach erfolgreicher Prüfung wieder nutzbar')
+  resolved=false;fail=true;const other=await renderDashboard();page.replaceWith(other)
+  const retry=[...other.querySelectorAll('button')].find(b=>b.textContent==='Jetzt prüfen')
+  retry.click();await settle()
+  check(other.textContent.includes('Noch 9 Bilder') && !retry.disabled,'Bei Prüfungsfehler bleibt die Meldung erhalten und Prüfung wiederholbar')
+  window.dashboardProblemTestResult={ok:true,results}
+} catch(error) {window.dashboardProblemTestResult={ok:false,results,error:error.stack}}
+document.querySelector('#result').textContent=JSON.stringify(window.dashboardProblemTestResult,null,2)
+</script></html>

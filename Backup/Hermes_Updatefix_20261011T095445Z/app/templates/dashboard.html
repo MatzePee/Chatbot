@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Übersicht</h1>
+
+{% if not connected %}
+<div class="card warn">
+  <strong>Noch nicht mit Fanvue verbunden.</strong>
+  Trage in den <a href="/settings/shared#fanvue">gemeinsamen Einstellungen</a> deine OAuth-Daten ein und klicke „Mit Fanvue verbinden".
+</div>
+{% endif %}
+
+
+<div class="grid">
+  <div class="card">
+    <h3>Master-Schalter</h3>
+    {% if preview %}<p><strong class="green-t">Mitlesen und Vorschläge aktiv.</strong></p><p class="muted">Der Versand bleibt technisch gesperrt. Der bisherige Server-Bot antwortet weiterhin.</p>{% else %}
+    <p>Der Bot {% if running %}<strong class="green-t">läuft</strong>{% else %}ist <strong>pausiert</strong>{% endif %}.</p>
+    <form method="post" action="/toggle-running">
+      <button class="{% if running %}btn-danger{% else %}btn-primary{% endif %}">
+        {% if running %}⏸ Pausieren (Kill-Switch){% else %}▶ Starten{% endif %}
+      </button>
+    </form>
+    <p class="muted">Modus: <strong>{{ mode }}</strong> · in Einstellungen änderbar.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>Status</h3>
+    <table class="kv">
+      <tr><td>Wartende Freigaben</td><td><strong>{{ pending_count }}</strong></td></tr>
+      <tr><td>Gesendet (gesamt)</td><td>{{ sent_count }}</td></tr>
+      <tr><td>Fehlgeschlagen</td><td>{{ failed_count }}</td></tr>
+      <tr><td>Worker</td>
+        <td>{% if poller_status.alive %}<strong class="green-t">aktiv</strong>
+            {%- else %}<strong class="red-t">GESTOPPT</strong>{% endif %}
+            {%- if poller_status.restarts %} <span class="muted">· {{ poller_status.restarts }}× neu gestartet</span>{% endif %}</td></tr>
+      <tr><td>Letzter Poll</td>
+        <td>{{ poller_status.last_poll | ts }}
+          {%- if poller_status.stale_seconds and poller_status.stale_seconds > 600 %}
+          <strong class="red-t">· seit {{ (poller_status.stale_seconds / 60) | round | int }} Min nichts mehr</strong>
+          {%- endif %}</td></tr>
+      <tr><td>Zyklen</td><td>{{ poller_status.cycles }}</td></tr>
+      {% if tokens and tokens['account_handle'] %}
+      <tr><td>Account</td><td>{{ tokens['account_handle'] }}</td></tr>
+      {% endif %}
+      {% if poller_status.last_error %}
+      <tr><td>Letzter Fehler</td><td class="red-t">{{ poller_status.last_error }}</td></tr>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>Heute</h3>
+    <table class="kv">
+      <tr><td>Nachrichten gesendet</td><td><strong>{{ today['messages'] }}</strong></td></tr>
+      <tr><td>PPV angeboten</td><td><strong>{{ today['offers'] }}</strong></td></tr>
+      <tr><td>PPV gekauft</td><td><strong class="green-t">{{ today['purchases'] }}</strong></td></tr>
+      <tr><td>Umsatz</td><td><strong>${{ today['revenue'] | dollars }}</strong></td></tr>
+      <tr><td>API-Kosten (OpenRouter)</td><td><strong>${{ '%.4f' | format(today['api_cost']) }}</strong></td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Gestern</h3>
+    <table class="kv">
+      <tr><td>Nachrichten gesendet</td><td><strong>{{ yesterday['messages'] }}</strong></td></tr>
+      <tr><td>PPV angeboten</td><td><strong>{{ yesterday['offers'] }}</strong></td></tr>
+      <tr><td>PPV gekauft</td><td><strong class="green-t">{{ yesterday['purchases'] }}</strong></td></tr>
+      <tr><td>Umsatz</td><td><strong>${{ yesterday['revenue'] | dollars }}</strong></td></tr>
+      <tr><td>API-Kosten (OpenRouter)</td><td><strong>${{ '%.4f' | format(yesterday['api_cost']) }}</strong></td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Top-Subscriber heute</h3>
+  {% if top_today %}
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+    <table class="logs">
+    <thead><tr><th>Subscriber</th><th>Nachrichten</th><th>Angeboten</th><th>Gekauft</th><th>Umsatz</th></tr></thead>
+    <tbody>
+      {% for s in top_today %}
+      <tr>
+        <td><a href="/chats?q={{ (s['handle'] or s['display_name']) | urlencode }}">{{ s['display_name'] }}{% if s['handle'] %} <span class="muted">@{{ s['handle'] }}</span>{% endif %}</a></td>
+        <td>{{ s['messages'] }}</td><td>{{ s['offers'] }}</td>
+        <td class="green-t">{{ s['purchases'] }}</td><td>${{ s['revenue_cents'] | dollars }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="muted">Heute noch keine Aktivität.</p>{% endif %}
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>Fast ausgeschöpft (&lt; 3 PPVs offen)</h3>
+    <p class="muted small">Von {{ total_enabled }} aktiven Sets sind diesen Fans nur noch wenige neu anbietbar.</p>
+    {% if low_quota %}
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+      <table class="logs table-compact">
+      <thead><tr><th>Subscriber</th><th>Offen</th><th>Gekauft</th></tr></thead>
+      <tbody>
+        {% for s in low_quota %}
+        <tr>
+          <td><a href="/chats?q={{ (s['handle'] or s['display_name']) | urlencode }}">{{ s['display_name'] }}</a></td>
+          <td>{{ s['remaining'] }}</td><td class="green-t">{{ s['purchased'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<p class="muted">Keine.</p>{% endif %}
+  </div>
+  <div class="card">
+    <h3>Ausgeschöpft (0 PPVs offen)</h3>
+    <p class="muted small">Diesen Fans wurden alle aktiven Sets angeboten.</p>
+    {% if exhausted_quota %}
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+      <table class="logs table-compact">
+      <thead><tr><th>Subscriber</th><th>Gekauft</th></tr></thead>
+      <tbody>
+        {% for s in exhausted_quota %}
+        <tr>
+          <td><a href="/chats?q={{ (s['handle'] or s['display_name']) | urlencode }}">{{ s['display_name'] }}</a></td>
+          <td class="green-t">{{ s['purchased'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<p class="muted">Keine.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h3>Letzte Aktivität</h3>
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Tabelle, seitlich scrollbar">
+    <table class="logs">
+    <thead><tr><th>Zeit</th><th>Kategorie</th><th>Meldung</th></tr></thead>
+    <tbody>
+      {% for l in logs %}
+      <tr class="lvl-{{ l['level'] }}">
+        <td class="nowrap">{{ l['ts'] | ts }}</td>
+        <td>{{ l['category'] }}</td>
+        <td>{{ l['message'] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="muted">Noch keine Aktivität.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}MP CreatorStudio{% endblock %}</title>
+  {# ?v=<mtime> erzwingt nach jeder Aenderung frische statische Dateien #}
+  <link rel="stylesheet" href="/static/style.css?v={{ css_v | default('0') }}">
+  <link rel="icon" type="image/svg+xml" href="/static/creatorpilot.svg?v={{ css_v | default('0') }}">
+  <link rel="stylesheet" href="/static/creatorpilot.css?v={{ css_v }}">
+  <link rel="stylesheet" href="/static/workspace.css?v={{ css_v }}">
+  <script src="/static/workspace.js?v={{ css_v }}" defer></script>
+</head>
+<body class="workspace-frame">
+{# Ladeanzeige. Manche Seiten - allen voran "Subs" - muessen Listen erst
+   seitenweise von Fanvue holen; bis die Antwort da ist, passiert im Browser
+   sichtbar nichts und die Seite wirkt haengengeblieben. Der Balken laeuft ab
+   dem Klick und verschwindet mit der neuen Seite von selbst. #}
+<div id="pageload" class="pageload" role="progressbar" aria-hidden="true"><span></span></div>
+{% set shared = workspace_area == 'settings' %}
+<header class="workspace-topbar">
+  <a class="workspace-brand" href="/" aria-label="MP CreatorStudio – Startseite">
+    <img src="/static/creatorpilot.svg?v={{ css_v }}" alt="" width="32" height="32">
+    <span>MP CreatorStudio</span>
+  </a>
+  <nav class="workspace-switcher" aria-label="Programmbereiche">
+    <a href="/"{% if not shared %} class="active" aria-current="true"{% endif %}>AutoChat</a>
+    <a href="/autoposter/">AutoPost</a>
+    <a href="/settings/shared"{% if shared %} class="active" aria-current="true"{% endif %}>Einstellungen</a>
+  </nav>
+  <button class="workspace-menu-button" type="button" aria-expanded="false" aria-controls="workspace-sidebar">☰ Menü</button>
+</header>
+<div class="workspace-body">
+  <button class="workspace-backdrop" type="button" aria-label="Menü schließen" tabindex="-1"></button>
+  <aside class="workspace-sidebar" id="workspace-sidebar" aria-label="{% if shared %}Gemeinsame Einstellungen{% else %}AutoChat{% endif %}">
+    <div class="workspace-section"><strong>{% if shared %}Einstellungen{% else %}AutoChat{% endif %}</strong></div>
+    <nav class="workspace-nav"{% if shared %} data-settings-nav{% endif %} aria-label="{% if shared %}Einstellungsseiten{% else %}AutoChat-Seiten{% endif %}">
+      {% if shared %}
+        <span class="workspace-nav-heading">Verbindungen</span>
+        <a href="/settings/shared#fanvue"{% if request.url.path == '/settings/shared' %} class="active" aria-current="location"{% endif %}><span class="workspace-icon" aria-hidden="true">◉</span><span>Fanvue</span></a>
+        <a href="/settings/shared#telegram"><span class="workspace-icon" aria-hidden="true">✉</span><span>Telegram</span></a>
+        <span class="workspace-nav-heading">Verwaltung</span>
+        {% set links = [('/system', '◫', 'Systemübersicht'), ('/settings/shared#updates', '↻', 'Programm-Updates'), ('/upload', '↥', 'GitHub-Veröffentlichung')] %}
+      {% else %}
+        {% set links = [('/', '◫', 'Dashboard'), ('/queue', '☷', 'Vorschläge' if preview else 'Freigabe'), ('/chats', '◉', 'Subs'), ('/ppv', '▦', 'PPV'), ('/reports', '▤', 'Reports'), ('/test', '▷', 'Test'), ('/logs', '≡', 'Logs'), ('/settings', '⚙', 'AutoChat-Einstellungen')] %}
+      {% endif %}
+      {% for href, icon, label in links %}
+        {% set active = request.url.path == href or (href not in ['/', '/settings', '/settings/shared'] and request.url.path.startswith(href + '/')) %}
+        <a href="{{ href }}"{% if active %} class="active" aria-current="page"{% endif %}><span class="workspace-icon" aria-hidden="true">{{ icon }}</span><span>{{ label }}</span>{% if href == '/queue' and pending_count %}<span class="badge">{{ pending_count }}</span>{% endif %}</a>
+      {% endfor %}
+    </nav>
+    <div class="workspace-sidefoot">
+      <div class="status" id="workspace-status">
+        <div>{% if connected %}<span class="dot green"></span>Fanvue verbunden{% else %}<span class="dot red"></span>Fanvue getrennt{% endif %}</div>
+        <div>{% if preview %}Mitlesen · Versand gesperrt{% elif running %}Läuft ({{ mode }}){% else %}AutoChat pausiert{% endif %}</div>
+      </div>
+    </div>
+  </aside>
+  <div class="workspace-scroll">
+    <div class="workspace-notices">
+      {% if deployment_pending %}<div class="preview-notice" role="status">Update wird geprüft. AutoChat und AutoPost pausieren bis zur erfolgreichen Startprüfung.</div>{% endif %}
+      {% if preview %}<div class="preview-notice" role="status"><strong>Geschützter Mitlesemodus</strong> · Live lesen &amp; Antwortvorschläge erzeugen. Senden, Posts, Lesebestätigungen und Token-Erneuerungen sind gesperrt. Dein bisheriger Bot läuft unabhängig weiter.</div>{% endif %}
+      {% if preview and poller_status.last_error %}<div class="preview-notice" role="alert">{{ poller_status.last_error }}</div>{% endif %}
+    </div>
+    <main class="workspace-content">
+      {% if account_missing %}
+      <div class="card warn">
+        <strong>⚠ Eigene Konto-Kennung fehlt.</strong>
+        AutoChat kann seine eigenen Nachrichten nicht von Fan-Nachrichten unterscheiden.
+        Prüfe die <a href="/settings/shared#fanvue">gemeinsame Fanvue-Verbindung</a>.
+      </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+    <footer>MP CreatorStudio · Dein Creator Workspace</footer>
+  </div>
+</div>
+<script>
+/* Ladeanzeige fuer normale Seitenwechsel.
+   Der Balken kann nicht wissen, wie weit der Server ist - er waechst deshalb
+   asymptotisch gegen 92% und wird nie von allein fertig. Das ist Absicht: er
+   zeigt "es passiert etwas", nicht "es ist zu X% fertig". Die neue Seite
+   ersetzt ihn ohnehin komplett. */
+(function () {
+  var box = document.getElementById('pageload');
+  if (!box) return;
+  var bar = box.firstElementChild;
+  var warten = null, ticker = null, breite = 0;
+
+  function start() {
+    if (warten || box.classList.contains('on')) return;
+    /* Kurz zoegern: schnelle Seiten sollen nicht kurz aufblitzen. */
+    warten = setTimeout(function () {
+      warten = null; breite = 8;
+      box.classList.add('on'); box.setAttribute('aria-hidden', 'false');
+      bar.style.width = breite + '%';
+      ticker = setInterval(function () {
+        breite += Math.max(0.3, (92 - breite) / 20);
+        if (breite > 92) breite = 92;
+        bar.style.width = breite + '%';
+      }, 170);
+    }, 120);
+  }
+
+  function stop() {
+    if (warten) { clearTimeout(warten); warten = null; }
+    if (ticker) { clearInterval(ticker); ticker = null; }
+    box.classList.remove('on'); box.setAttribute('aria-hidden', 'true');
+    bar.style.width = '0%';
+  }
+  window.pageLoadStart = start;
+
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest ? e.target.closest('a') : null;
+    if (!a || a.hasAttribute('download')) return;
+    if (a.target && a.target !== '_self') return;
+    var href = a.getAttribute('href') || '';
+    if (!href || href.charAt(0) === '#') return;
+    if (/^(mailto:|tel:|javascript:)/i.test(href)) return;
+    if (a.origin && a.origin !== location.origin) return;
+    /* Nur ein Sprung innerhalb derselben Seite? Dann laedt nichts nach. */
+    if (a.pathname === location.pathname && a.search === location.search && a.hash) return;
+    start();
+  }, true);
+
+  document.addEventListener('submit', function () { start(); }, true);
+
+  /* Zurueck-Knopf holt die Seite aus dem Verlaufsspeicher - dann darf kein
+     Balken von vorhin stehenbleiben. */
+  window.addEventListener('pageshow', stop);
+  window.addEventListener('pagehide', stop);
+})();
+</script>
+<script src="/static/live-refresh.js?v={{ css_v }}" defer></script>
+{% if preview %}<script>
+function protectPreviewForms() {
+  const allowed = path => ['/test', '/upload/publish', '/upload/settings'].includes(path) || /^\/queue\/\d+\/(regenerate|save|reject)$/.test(path);
+  document.querySelectorAll('form[method="post"] button, form[method="post"] input[type="submit"]').forEach(button => {
+    if (button.type === 'button') return;
+    const path = new URL(button.getAttribute('formaction') || button.form.action, location.href).pathname;
+    if (!allowed(path)) { button.disabled = true; button.title = 'Im Mitlesemodus gesperrt'; }
+  });
+}
+protectPreviewForms();
+document.addEventListener('creatorpilot:refresh', protectPreviewForms);
+document.addEventListener('submit', event => {
+  const button = event.submitter;
+  const path = new URL(button?.getAttribute('formaction') || event.target.action, location.href).pathname;
+  if (event.target.method === 'post' && !['/test', '/upload/publish', '/upload/settings'].includes(path) && !/^\/queue\/\d+\/(regenerate|save|reject)$/.test(path)) event.preventDefault();
+});
+</script>{% endif %}</body>
+</html>
