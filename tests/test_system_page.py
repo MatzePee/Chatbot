@@ -88,6 +88,8 @@ def test_settings_and_system_share_navigation(client, path):
     assert 'href="/settings/shared" class="active"' in top
     sidebar = re.search(r'<nav class="workspace-nav".*?</nav>', response.text, re.S).group()
     assert re.findall(r'href="([^"]+)"', sidebar) == [
+        '/settings/shared?section=shared', '/settings/shared?section=autochat',
+        '/settings/shared?section=autopost',
         '/settings/shared#fanvue', '/settings/shared#telegram', '/system',
         '/settings/shared#updates', '/upload']
     assert 'Verbindungen' in sidebar and 'Verwaltung' in sidebar

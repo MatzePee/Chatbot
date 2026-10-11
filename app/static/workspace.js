@@ -2,8 +2,10 @@
 (() => {
   function updateSettingsNavigation() {
     const links = [...document.querySelectorAll('[data-settings-nav] a')];
-    const samePage = links.filter(link => link.pathname === location.pathname);
-    const selected = samePage.find(link => link.hash === location.hash) || samePage[0];
+    const section = document.querySelector('[data-settings-section]')?.dataset.settingsSection;
+    const category = section && links.find(link => new URL(link.href).searchParams.get('section') === section);
+    const samePage = links.filter(link => link.pathname === location.pathname && link.search === location.search);
+    const selected = (location.hash && samePage.find(link => link.hash === location.hash)) || category || samePage[0];
     links.forEach(link => {
       link.classList.toggle('active', link === selected);
       if (link === selected) link.setAttribute('aria-current', link.hash ? 'location' : 'page');

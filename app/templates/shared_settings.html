@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+{% extends "settings_shell.html" %}
 {% block title %}Einstellungen · MP CreatorStudio{% endblock %}
-{% block content %}
+{% block settings_content %}
 <h1>Gemeinsame Einstellungen</h1>
 <p class="muted">Verbindungen und Programm-Updates für deinen gesamten Creator Workspace.</p>
 {% include "_deployment_status.html" %}
@@ -41,6 +41,7 @@
     <summary>Fanvue-Zugangsdaten</summary>
     <label>Client-ID <input name="fanvue_client_id" value="{{ s['fanvue_client_id'] }}"></label>
     <label>Client-Secret <input name="fanvue_client_secret" type="password" value="{{ s['fanvue_client_secret'] }}"></label>
+    <label class="chk"><input type="checkbox" name="clear_fanvue_client_secret"> Gespeichertes Client-Secret beim Speichern entfernen</label>
     <label>Redirect-URI (exakt in Fanvue-App hinterlegen)
       <input name="fanvue_redirect_uri" value="{{ s['fanvue_redirect_uri'] }}"></label>
     <label>API-Version <input name="fanvue_api_version" value="{{ s['fanvue_api_version'] }}"></label>
@@ -70,6 +71,7 @@
     <label>Bot-Token (von @BotFather)
       <input name="telegram_bot_token" type="password" value="{{ s['telegram_bot_token'] }}"
         placeholder="123456789:ABCdef..."></label>
+    <label class="chk"><input type="checkbox" name="clear_telegram_bot_token"> Gespeichertes Bot-Token beim Speichern entfernen</label>
     <label>Basis-URL dieser Oberfläche (für den Link in der Meldung)
       <input name="app_base_url" value="{{ s['app_base_url'] }}"
         placeholder="https://creatorstudio.example"></label>

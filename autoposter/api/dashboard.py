@@ -71,6 +71,8 @@ async def dashboard(
     assessments = {}
     superseded = set()
     for post in failures:
+        if await problems.failure_acknowledged(db, post):
+            continue
         out = PostOut.model_validate(post)
         try:
             if await problems.failure_superseded(db, post):
@@ -265,6 +267,7 @@ async def mark_read(
         await db.execute(select(Notification).where(Notification.id.in_(ids)))
     ).scalars().all()
     for row in rows:
+        await problems.acknowledge(db, row)
         row.is_read = True
         db.add(row)
     return {"updated": len(rows)}
@@ -470,3 +473,22 @@ async def get_image_comment(db: AsyncSession = Depends(get_db), _: User = Depend
 async def save_image_comment(payload: image_comments.CommentSettings,
                              db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     return await image_comments.save_settings(db, payload)
+
+
+@router.get('/analytics/x-followers')
+async def x_followers(db: AsyncSession = Depends(get_db), _: User = Depends(current_user)):
+    from autoposter.services import followers
+    return await followers.overview(db)
+
+@router.post('/problems/posts/{post_id}/ack')
+async def acknowledge_failure(post_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(current_user)):
+    post = await db.get(Post, post_id)
+    if post is None or post.status != PostStatus.failed.value:
+        raise HTTPException(404, 'Fehlgeschlagener Post nicht gefunden')
+    await problems.ack_failure(db, post)
+    notes = (await db.execute(select(Notification).where(Notification.entity == 'post', Notification.entity_id == str(post.id)))).scalars().all()
+    for note in notes:
+        if problems.kind(note) == 'post':
+            note.is_read = True
+            db.add(note)
+    return {'acknowledged': str(post.id)}

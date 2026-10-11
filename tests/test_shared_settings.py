@@ -75,7 +75,7 @@ def test_shared_controls_render_only_on_shared_page(client):
     assert 'name="openrouter_api_key"' in chat.text
     assert 'name="openrouter_api_key"' not in shared.text
     assert 'href="/settings/shared" class="active"' in shared.text
-    assert 'href="/" class="active"' in chat.text
+    assert 'href="/settings/shared" class="active"' in chat.text
 
 
 def test_shared_mutations_stay_blocked_in_preview(client, monkeypatch):

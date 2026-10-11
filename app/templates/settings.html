@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-{% block content %}
+{% extends "settings_shell.html" %}
+{% block settings_content %}
 <h1>AutoChat-Einstellungen</h1>
 
 <p class="muted">Modelle, Antwortverhalten und Abläufe für AutoChat. Die <a href="/settings/shared">Fanvue- und Telegram-Verbindungen sowie Programm-Updates</a> findest du oben unter Einstellungen.</p>
@@ -16,6 +16,7 @@
   <details class="card sect">
     <summary>OpenRouter</summary>
     <label>API-Key <input name="openrouter_api_key" type="password" value="{{ s['openrouter_api_key'] }}"></label>
+    <label class="chk"><input type="checkbox" name="clear_openrouter_api_key"> Gespeicherten OpenRouter-Key beim Speichern entfernen</label>
     <label>Chat-Modell (Antworten) <span class="info" tabindex="0" data-tip="Das Hauptmodell für die normalen Chat-Antworten. Hier gehört dein unzensiertes Modell hin.">ⓘ</span>
       <input name="openrouter_model" value="{{ s['openrouter_model'] }}"
       placeholder="z.B. cognitivecomputations/dolphin-mistral, sao10k/l3-euryale-70b"></label>
@@ -50,6 +51,7 @@
     <label>Vision-API-Key (optional, eigener Key)
       <input name="vision_api_key" type="password" value="{{ s['vision_api_key'] }}"
         placeholder="leer = OpenRouter-Key von oben"></label>
+    <label class="chk"><input type="checkbox" name="clear_vision_api_key"> Gespeicherten Vision-Key beim Speichern entfernen (OpenRouter-Key verwenden)</label>
     <label>Analyse-Prompt (Tags aus Bild)
       <textarea name="vision_prompt" rows="2">{{ s['vision_prompt'] }}</textarea></label>
   </details>
@@ -209,6 +211,7 @@
       <label>Prio-1-Gruppe – Fanvue-Liste <span class="info" tabindex="0" data-tip="Diese Fans werden schnell/häufig bearbeitet (Poll-Intervall in „Betrieb (allgemein)"). Für aktive Käufer.">ⓘ</span>
         <select name="chat_custom_list_id">
           <option value="" {% if not s['chat_custom_list_id'] %}selected{% endif %}>— keine (nur Gruppe oben) —</option>
+          {% if s['chat_custom_list_id'] and s['chat_custom_list_id'] not in custom_lists | map(attribute='uuid') | list %}<option value="{{ s['chat_custom_list_id'] }}" selected>{{ s['chat_custom_list_name'] or s['chat_custom_list_id'] }} — aktuell gespeichert</option>{% endif %}
           {% for lst in custom_lists %}
           <option value="{{ lst['uuid'] }}" {% if s['chat_custom_list_id']==lst['uuid'] %}selected{% endif %}>{{ lst['name'] }} ({{ lst['membersCount'] }})</option>
           {% endfor %}
@@ -230,6 +233,7 @@
       <label>Prio-2-Gruppe – Fanvue-Liste <span class="info" tabindex="0" data-tip="Diese Fans werden seltener bearbeitet (Intervall + Zufalls-Delay unten). Für Nur-Chatter, um Tokens zu sparen. Wer in Prio 1 UND Prio 2 ist, wird als Prio 1 behandelt.">ⓘ</span>
         <select name="prio2_custom_list_id">
           <option value="" {% if not s['prio2_custom_list_id'] %}selected{% endif %}>— keine —</option>
+          {% if s['prio2_custom_list_id'] and s['prio2_custom_list_id'] not in custom_lists | map(attribute='uuid') | list %}<option value="{{ s['prio2_custom_list_id'] }}" selected>{{ s['prio2_custom_list_name'] or s['prio2_custom_list_id'] }} — aktuell gespeichert</option>{% endif %}
           {% for lst in custom_lists %}
           <option value="{{ lst['uuid'] }}" {% if s['prio2_custom_list_id']==lst['uuid'] %}selected{% endif %}>{{ lst['name'] }} ({{ lst['membersCount'] }})</option>
           {% endfor %}

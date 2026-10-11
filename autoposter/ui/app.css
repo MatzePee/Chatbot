@@ -706,3 +706,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}a{
 .persona-post-panel[hidden] { display: none !important; }
 .persona-post-tabs { gap: 8px; }
 .persona-post-tabs button { min-height: 40px; }
+
+/* X followers only: keep the desktop table, use readable account cards on phones. */
+.x-followers-cards { display: none; }
+@media (max-width: 760px) {
+  .x-followers-table { display: none; }
+  .x-followers-cards { display: flex; margin-top: 12px; gap: 12px; }
+  .x-followers-account { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-1); overflow-wrap: anywhere; }
+  .x-followers-account h3 { margin: 0 0 12px; font-size: 14px; color: var(--text); }
+  .x-followers-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+  .x-followers-metric { min-width: 0; padding: 10px; border-radius: 8px; background: var(--bg-2); }
+  .x-followers-metric dt { margin-bottom: 4px; }
+  .x-followers-metric dd { margin: 0; font-size: 14px; }
+  .x-followers-measurement { margin-top: 12px; white-space: normal; }
+}
+@media (max-width: 350px) {
+  .x-followers-metrics { grid-template-columns: minmax(0, 1fr); }
+}

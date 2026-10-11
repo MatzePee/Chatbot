@@ -3,7 +3,7 @@ import '/static/live-refresh.js?v=creatorstudio-mobile-system-20260909'
 import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
 import { h, clear, append, toast } from './ui.js?v=creatorstudio-preview-bounds-20261006'
 
-import renderDashboard from './pages/dashboard.js?v=creatorstudio-current-failures-20261006'
+import renderDashboard from './pages/dashboard.js?v=creatorstudio-dashboard-20261011'
 import renderLibrary from './pages/library.js?v=creatorstudio-library-delete-20261006'
 import renderAssign from './pages/assign.js?v=creatorstudio-preview-bounds-20261006'
 import renderMatrix from './pages/matrix.js?v=creatorstudio-preview-bounds-20261006'
@@ -43,7 +43,7 @@ function buildShell() {
   const nav = h('nav', { class: 'workspace-nav', 'aria-label': 'AutoPost-Seiten' })
   for (const route of ROUTES) {
     nav.appendChild(h('a', {
-      href: '#/' + route.path,
+      href: route.path === 'settings' ? '/settings/shared?section=autopost' : '#/' + route.path,
       class: 'navlink',
       dataset: { path: route.path },
     }, h('span', { class: 'workspace-icon', 'aria-hidden': 'true' }, route.icon), h('span', { class: 'workspace-label' }, route.label)))
@@ -124,6 +124,10 @@ async function route() {
 
   const path = currentPath()
   const entry = ROUTES.find((r) => r.path === path) || ROUTES[0]
+  if (path === 'settings') {
+    location.replace('/settings/shared?section=autopost')
+    return
+  }
   const view = shell.view
   view.classList.toggle('assignment-view', path === 'assign')
   clear(view).appendChild(h('div', { class: 'empty' }, 'Lade …'))

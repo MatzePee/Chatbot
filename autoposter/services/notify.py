@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import smtplib
 from email.message import EmailMessage
 from typing import Optional
@@ -10,7 +12,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autoposter.config import settings
-from autoposter.models import Notification
+from autoposter.models import Notification, AppSetting
 
 
 async def push(
@@ -23,12 +25,13 @@ async def push(
     entity_id: Optional[str] = None,
     external: bool = True,
 ) -> Notification:
+    acknowledged = await db.get(AppSetting, ack_key(title[:200], body, entity, entity_id))
     note = Notification(
-        level=level, title=title[:200], body=body, entity=entity, entity_id=entity_id
+        level=level, title=title[:200], body=body, entity=entity, entity_id=entity_id, is_read=bool(acknowledged)
     )
     db.add(note)
     await db.flush()
-    if external and level in ("error", "warning"):
+    if external and not acknowledged and level in ("error", "warning"):
         await _fanout(title, body)
     return note
 
@@ -67,3 +70,8 @@ def _email(subject: str, body: str) -> None:
         if settings.smtp_user:
             smtp.login(settings.smtp_user, settings.smtp_password or "")
         smtp.send_message(message)
+
+
+def ack_key(title, body, entity, entity_id):
+    payload = json.dumps([title, body, entity, entity_id], ensure_ascii=False).encode()
+    return 'problem_ack_event:' + hashlib.sha256(payload).hexdigest()

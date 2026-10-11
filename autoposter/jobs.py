@@ -229,7 +229,9 @@ async def refresh_metrics(hours: int = 72) -> Dict[str, Any]:
                 post.metrics = metrics
                 db.add(post)
                 updated += 1
-    return {"updated": updated}
+        from autoposter.services import followers
+        follower_accounts = await followers.collect(db)
+    return {"updated": updated, "follower_accounts": follower_accounts}
 
 
 async def inventory_check() -> Dict[str, Any]:

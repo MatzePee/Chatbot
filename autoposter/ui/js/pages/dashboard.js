@@ -1,6 +1,14 @@
 import { renderUpcoming } from '../upcoming-posts.js?v=creatorstudio-translation-20260910'
-import { api } from '../api.js?v=creatorstudio-problem-check-20261006'
+import { api } from '../api.js?v=creatorstudio-dashboard-20261011'
 import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard, append, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+
+export function problemTime(raw) {
+  if (!raw) return 'Zeitpunkt unbekannt'
+  const value = /(?:Z|[+-]\d{2}:?\d{2})$/.test(raw) ? raw : raw + 'Z'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Zeitpunkt unbekannt'
+  return new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'long', timeZone: 'Europe/Berlin' }).format(date) + ' (Europe/Berlin)'
+}
 
 export default async function renderDashboard() {
   const data = await api.dashboard()
@@ -92,6 +100,42 @@ export default async function renderDashboard() {
   )
   page.appendChild(invCard)
 
+  // Cached account metrics only: no X requests from browser refresh.
+  try {
+    const accounts = await api.xFollowers()
+    const historyKeys = ['yesterday', 'days7', 'days30']
+    const historyText = value => value.count === null ? 'Keine Historie'
+      : `${value.count} (${value.growth === null ? 'Wachstum unbekannt' : (value.growth >= 0 ? '+' : '') + value.growth})`
+    const measurementText = a => `${problemTime(a.sampled_at)}${a.stale ? ' · veraltet' : ''} · ${a.status}`
+    const rows = accounts.map(a => h('tr', {},
+      h('td', {}, a.name),
+      h('td', { class: 'num' }, a.current ?? 'Keine Messung'),
+      ...historyKeys.map(key => h('td', { class: 'num' }, historyText(a[key]))),
+      h('td', { class: 'hint' }, measurementText(a)),
+    ))
+    // CSS display:none excludes the inactive view from both focus and accessibility trees.
+    // Both views use text nodes via h(), never account/status HTML.
+    const mobileAccounts = h('div', { class: 'x-followers-cards col' }, ...accounts.map(a =>
+      h('article', { class: 'x-followers-account' },
+        h('h3', {}, a.name),
+        h('dl', { class: 'x-followers-metrics' },
+          ...[a.current ?? 'Keine Messung', ...historyKeys.map(key => historyText(a[key]))].map((value, i) =>
+            h('div', { class: 'x-followers-metric' },
+              h('dt', { class: 'hint' }, ['Aktuell', 'Gestern (Δ)', 'Vor 7 Tagen (Δ)', 'Vor 30 Tagen (Δ)'][i]),
+              h('dd', { class: 'num' }, value))),
+        ),
+        h('div', { class: 'x-followers-measurement hint' },
+          h('b', {}, 'Messzeit / Status'), h('div', {}, measurementText(a))),
+      )))
+    page.appendChild(card('X-Follower · Stand und Wachstum',
+      h('div', { class: 'hint' }, 'Vergleich mit dem exakten Kalendertag (Europe/Berlin). Fehlende Messungen werden nicht geschätzt.'),
+      accounts.length ? h('div', { class: 'x-followers' },
+        h('div', { class: 'x-followers-table table-scroll', tabindex: 0 }, h('table', {},
+          h('thead', {}, h('tr', {}, ...['Account', 'Aktuell', 'Gestern (Δ)', 'Vor 7 Tagen (Δ)', 'Vor 30 Tagen (Δ)', 'Messzeit / Status'].map(t => h('th', {}, t)))),
+          h('tbody', {}, ...rows))), mobileAccounts) : empty('Keine X-Accounts.'),
+    ))
+  } catch { page.appendChild(card('X-Follower', empty('Follower-Übersicht derzeit nicht verfügbar.'))) }
+
   // ------------------------------------------------------------ Lebenszyklus
   const counts = data.lifecycle_counts
   const lc = h('div', { class: 'grid c6' })
@@ -121,6 +165,10 @@ export default async function renderDashboard() {
     for (const n of current.notifications) {
       problems.appendChild(h('div', { class: n.level === 'error' ? 'errbox' : 'warnbox' },
         h('div', {}, h('b', {}, n.title), h('div', { class: 'hint' }, n.body)),
+        h('div', { class: 'hint' }, problemTime(n.created_at)),
+        h('button', { class: 'small', title: 'Meldung ausblenden; behebt nicht die Ursache', onClick: guard(async () => {
+          await api.markRead([n.id]); drawProblems(await api.dashboard())
+        }) }, 'Zur Kenntnis genommen'),
       ))
     }
     for (const p of current.recent_failures) {
@@ -128,6 +176,10 @@ export default async function renderDashboard() {
       problems.appendChild(h('div', { class: p.retry_ready ? 'warnbox' : 'errbox' },
         h('b', {}, p.retry_ready ? 'Post wartet auf erneute Freigabe' : 'Veröffentlichung fehlgeschlagen'),
         h('div', { class: 'hint' }, p.error_message),
+        h('div', { class: 'hint' }, problemTime(p.last_attempt_at || p.created_at)),
+        h('button', { class: 'small', title: 'Nur diesen Fehlversuch ausblenden; kein erneuter Versand', onClick: guard(async () => {
+          await api.ackFailure(p.id); drawProblems(await api.dashboard())
+        }) }, 'Zur Kenntnis genommen'),
       ))
     }
   }

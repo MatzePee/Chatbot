@@ -1,0 +1,48 @@
+/* One scoped visual system for all settings; no dashboard overrides. */
+.settings-hub { --bg-2:#f2f4f7; --line:#e0e5ec; --dim:#687587; --accent:#0071e3; --accent-soft:#eaf3ff; --err:#c63740; color:#1d1d1f; max-width:1100px; margin:auto; }
+.settings-heading { margin-bottom:22px; }
+.settings-heading h1 { margin:0 0 10px; font-size:32px; }
+.settings-eyebrow { color:#687587; font-size:11px; letter-spacing:.1em; font-weight:600; margin:0 0 8px; }
+.settings-tabs { display:flex; gap:6px; flex-wrap:wrap; padding:6px; margin:0 0 28px; border:1px solid var(--line); border-radius:14px; background:#fff; }
+.settings-tabs a { flex:1; text-align:center; text-decoration:none; font-size:14px; font-weight:600; padding:12px 16px; border-radius:10px; color:#596779; }
+.settings-tabs a:hover,.settings-tabs a.active { background:var(--accent-soft); color:#0062c4; }
+.settings-content > h1,.settings-content .page > h1 { font-size:20px; margin:0 0 12px; }
+.settings-hub .page { padding:0; }
+.settings-hub .card { border:1px solid var(--line); border-radius:18px; background:#fff; padding:22px; box-shadow:0 4px 22px #182b4505; margin-bottom:18px; }
+.settings-hub .card > h2,.settings-hub summary { font-size:16px; font-weight:600; color:#263449; }
+.settings-hub summary { cursor:pointer; }
+.settings-hub details[open] > summary { margin-bottom:16px; }
+.settings-hub label,.settings-hub .field { font-size:13px; }
+.settings-hub .field { margin-bottom:14px; }
+.settings-hub .field > label { display:block; margin-bottom:7px; font-weight:500; }
+.settings-hub input:not([type=checkbox]):not([type=radio]),.settings-hub select,.settings-hub textarea { width:100%; min-width:0; background:#fafbfc; color:#1d1d1f; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font:inherit; box-sizing:border-box; }
+.settings-hub input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); flex:none; }
+.settings-hub button,.settings-hub .btn,.settings-hub .btn-primary,.settings-hub .btn-danger { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:10px 15px; border-radius:10px; border:1px solid var(--line); background:#f2f4f7; color:#263449; font:inherit; font-size:13px; font-weight:500; cursor:pointer; text-decoration:none; }
+.settings-hub button.primary,.settings-hub .btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.settings-hub button.danger,.settings-hub .btn-danger { color:#b92b37; background:#fff0f1; border-color:#efc9ce; }
+.settings-hub :disabled { opacity:.5; cursor:not-allowed; }
+.settings-hub .row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+.settings-hub .col { display:flex; flex-direction:column; gap:10px; }
+.settings-hub .inline { display:flex; align-items:center; gap:9px; }
+.settings-hub .grid { display:grid; gap:16px; }
+.settings-hub .grid.c2 { grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); }
+.settings-hub .grid.c3 { grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); }
+.settings-hub .hint { color:#687587; font-size:12px; line-height:1.6; }
+.settings-hub .big.num { font-size:28px; font-variant-numeric:tabular-nums; }
+.settings-hub .okbox,.settings-hub .warnbox,.settings-hub .errbox { padding:12px; border-radius:10px; margin:8px 0; overflow-wrap:anywhere; }
+.settings-hub .okbox { color:#21603d; background:#edf8f0; }
+.settings-hub .warnbox { color:#80570d; background:#fff7e8; }
+.settings-hub .errbox { color:#a32c3b; background:#fff0f1; }
+.settings-hub .bar { background:#e5e7eb; height:8px; border-radius:5px; overflow:hidden; }
+.settings-hub .bar i { display:block; height:100%; background:var(--accent); }
+.settings-hub .stack > * + * { margin-top:16px; }
+.settings-hub table { width:100%; }
+.settings-hub :focus-visible { outline:3px solid #0071e355; outline-offset:3px; }
+/* Existing AutoPost dialogs/toasts are appended to body, not inside the hub. */
+#toasts { position:fixed; right:20px; bottom:20px; z-index:10000; display:flex; flex-direction:column; gap:8px; }
+#toasts .toast { background:#fff; border:1px solid #dfe5ee; border-radius:12px; padding:14px 20px; box-shadow:0 8px 30px #182b4522; max-width:min(90vw,440px); }
+#modals .modal-bg { position:fixed; inset:0; z-index:9000; background:#182b4555; display:flex; align-items:center; justify-content:center; padding:20px; }
+#modals .modal { background:#fff; color:#1d1d1f; border-radius:18px; padding:24px; max-width:620px; width:100%; max-height:90vh; overflow:auto; box-shadow:0 20px 70px #182b4533; }
+#modals .modal .row { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; }
+#modals .modal button.danger { background:#c63740; color:#fff; }
+@media(max-width:760px) { .settings-hub .card { padding:16px; } .settings-heading h1 { font-size:27px; } .settings-tabs a { padding:11px 8px; } .settings-hub .row > label:not(.chk):not(.inline) { flex-basis:100%; } }

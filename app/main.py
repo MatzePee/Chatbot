@@ -1780,18 +1780,27 @@ _SHARED_SETTINGS_KEYS = _SHARED_FANVUE_KEYS | _SHARED_UPDATE_KEYS | _SHARED_TELE
 
 
 @app.get("/settings/shared", response_class=HTMLResponse)
-def shared_settings_page(request: Request, saved: str = ""):
+def shared_settings_page(request: Request, saved: str = "", section: str = "shared"):
+    if section == "autochat":
+        return settings_page(request)
     ctx = _base_ctx(request)
-    ctx.update(s=db.all_settings(), saved=saved)
-    return templates.TemplateResponse("shared_settings.html", ctx)
+    ctx.update(s=db.all_settings(), saved=saved, workspace_area="settings",
+               settings_section="autopost" if section == "autopost" else "shared")
+    return templates.TemplateResponse("autopost_settings.html" if section == "autopost" else "shared_settings.html", ctx)
 
 
 @app.post("/settings/shared/fanvue")
 async def save_shared_fanvue(request: Request):
     form = await request.form()
     for key in _SHARED_FANVUE_KEYS:
+        if key == "fanvue_client_secret" and "clear_" + key in form:
+            db.set_setting(key, "")
+            continue
         if key in form:
-            db.set_setting(key, str(form[key]).strip())
+            value = str(form[key]).strip()
+            if key == "fanvue_client_secret" and set(value) <= set("*•●"):
+                continue
+            db.set_setting(key, value)
     db.log("info", "system", "Gemeinsame Fanvue-Einstellungen gespeichert")
     return RedirectResponse("/settings/shared?saved=fanvue#fanvue", status_code=303)
 
@@ -1800,8 +1809,14 @@ async def save_shared_fanvue(request: Request):
 async def save_shared_telegram(request: Request):
     form = await request.form()
     for key in _SHARED_TELEGRAM_KEYS:
+        if key == "telegram_bot_token" and "clear_" + key in form:
+            db.set_setting(key, "")
+            continue
         if key in form:
-            db.set_setting(key, str(form[key]).strip())
+            value = str(form[key]).strip()
+            if key == "telegram_bot_token" and set(value) <= set("*•●"):
+                continue
+            db.set_setting(key, value)
     db.log("info", "system", "Gemeinsame Telegram-Verbindung gespeichert")
     return RedirectResponse("/settings/shared?saved=telegram#telegram", status_code=303)
 
@@ -1825,6 +1840,7 @@ async def save_shared_updates(request: Request):
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
     ctx = _base_ctx(request)
+    ctx.update(workspace_area="settings", settings_section="autochat")
     ctx["s"] = db.all_settings()
     # Eigene Fanvue-Listen live laden (nur wenn verbunden)
     ctx["custom_lists"] = []
@@ -1993,10 +2009,15 @@ _BOOL_KEYS = {"active_hours_enabled", "ppv_enabled", "ppv_use_llm_classifier",
 @app.post("/settings")
 async def save_settings(request: Request):
     form = await request.form()
+    previous_lists = {key: db.get_setting(key, "") for key in
+                      ("chat_custom_list_id", "chat_custom_list_name", "prio2_custom_list_id", "prio2_custom_list_name")}
     for key in db.DEFAULT_SETTINGS:
         # Shared controls have their own forms. Omitted checkboxes here must
         # never disable the updater or overwrite the shared connection.
         if key == "bot_running" or key in _SHARED_SETTINGS_KEYS:
+            continue
+        if key in {"openrouter_api_key", "vision_api_key"} and "clear_" + key in form:
+            db.set_setting(key, "")
             continue
         if key in _BOOL_KEYS:
             db.set_setting(key, key in form)
@@ -2004,6 +2025,8 @@ async def save_settings(request: Request):
         if key not in form:
             continue
         val = form[key]
+        if key in {"openrouter_api_key", "vision_api_key"} and set(str(val).strip()) <= set("*•●"):
+            continue
         if key in _INT_KEYS:
             try:
                 val = int(val)
@@ -2017,7 +2040,7 @@ async def save_settings(request: Request):
         db.set_setting(key, val)
     # Namen der gewaehlten eigenen Liste zur Anzeige aufloesen
     chosen = db.get_setting("chat_custom_list_id", "")
-    name = ""
+    name = previous_lists["chat_custom_list_name"] if chosen and chosen == previous_lists["chat_custom_list_id"] else ""
     if chosen and fanvue.is_connected():
         try:
             for lst in fanvue.list_custom_lists():
@@ -2029,7 +2052,7 @@ async def save_settings(request: Request):
     db.set_setting("chat_custom_list_name", name)
     # Prio-2-Listennamen ebenfalls aufloesen
     chosen2 = db.get_setting("prio2_custom_list_id", "")
-    name2 = ""
+    name2 = previous_lists["prio2_custom_list_name"] if chosen2 and chosen2 == previous_lists["prio2_custom_list_id"] else ""
     if chosen2 and fanvue.is_connected():
         try:
             for lst in fanvue.list_custom_lists():

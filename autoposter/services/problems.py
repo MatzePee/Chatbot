@@ -145,8 +145,14 @@ async def check(db: AsyncSession) -> dict:
                 note.body = inventory_body(entry)
         db.add(note)
 
+    ack = await db.get(AppSetting, "problem_ack_inventory")
+    acknowledged = dict(ack.value or {}) if ack else {}
+    acknowledged = {k: v for k, v in acknowledged.items() if k in low}
+    if ack:
+        ack.value = acknowledged
+        db.add(ack)
     for channel_id, entry in low.items():
-        if ("inventory", channel_id) not in seen:
+        if ("inventory", channel_id) not in seen and channel_id not in acknowledged:
             await notify.push(db, level="warning", title=f"Bildvorrat knapp: {entry.channel_name}",
                               body=inventory_body(entry), entity="channel", entity_id=channel_id, external=False)
             result["created"] += 1
@@ -176,3 +182,42 @@ async def check_if_due(db: AsyncSession):
     if previous is None or (datetime.now(timezone.utc) - previous).total_seconds() >= 3600:
         return await check(db)
     return None
+
+async def acknowledge(db, note):
+    if kind(note) != 'inventory' and note.entity != 'post':
+        row = AppSetting(key=notify.ack_key(note.title, note.body, note.entity, note.entity_id),
+                         value={'acknowledged_at': datetime.now(timezone.utc).isoformat()})
+        if await db.get(AppSetting, row.key) is None:
+            db.add(row)
+    if kind(note) == 'post':
+        try:
+            post = await db.get(Post, uuid.UUID(note.entity_id))
+        except (ValueError, TypeError):
+            post = None
+        if post:
+            await ack_failure(db, post)
+    if kind(note) == 'inventory':
+        row = await db.get(AppSetting, 'problem_ack_inventory')
+        if row is None:
+            row = AppSetting(key='problem_ack_inventory', value={})
+        row.value = {**(row.value or {}), note.entity_id: datetime.now(timezone.utc).isoformat()}
+        db.add(row)
+    await db.flush()
+
+
+def failure_stamp(post):
+    moment = post.last_attempt_at or post.created_at
+    return moment.replace(tzinfo=timezone.utc).isoformat() if moment else ''
+
+async def ack_failure(db, post):
+    key = 'problem_ack_post:' + str(post.id)
+    row = await db.get(AppSetting, key)
+    if row is None:
+        row = AppSetting(key=key)
+    row.value = {'attempt': failure_stamp(post), 'acknowledged_at': datetime.now(timezone.utc).isoformat()}
+    db.add(row)
+    await db.flush()
+
+async def failure_acknowledged(db, post):
+    row = await db.get(AppSetting, 'problem_ack_post:' + str(post.id))
+    return bool(row and (row.value or {}).get('attempt') == failure_stamp(post))

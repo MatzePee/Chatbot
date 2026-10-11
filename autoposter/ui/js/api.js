@@ -73,6 +73,8 @@ export const api = {
 
   // --- Dashboard / Betrieb ---
   dashboard: () => get('/dashboard'),
+  xFollowers: () => get('/analytics/x-followers'),
+  ackFailure: (id) => post('/problems/posts/' + encodeURIComponent(id) + '/ack'),
   checkProblems: () => post('/problems/check'),
   inventory: () => get('/inventory'),
   settings: () => get('/settings'),

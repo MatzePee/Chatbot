@@ -346,3 +346,20 @@ class XAdapter:
         metrics = dict(data.get("public_metrics", {}))
         metrics.update(data.get("non_public_metrics", {}) or {})
         return metrics or None
+
+    async def fetch_followers(self, cred: Credentials) -> int:
+        """GET only: own authenticated account public follower count."""
+        async with http_client() as client:
+            response = await client.get(
+                f"{self.base}/users/me",
+                headers={"Authorization": f"Bearer {cred.access_token}"},
+                params={"user.fields": "public_metrics"},
+            )
+            raise_for_response(response, "X Follower-Messung")
+        data = response.json().get('data', {})
+        if str(data.get('id')) != str(cred.external_user_id):
+            raise ValueError('X account mismatch')
+        count = data.get('public_metrics', {}).get('followers_count')
+        if type(count) is not int or count < 0:
+            raise ValueError('Missing follower count')
+        return count

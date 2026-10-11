@@ -36,6 +36,10 @@
     <div class="workspace-section"><strong>{% if shared %}Einstellungen{% else %}AutoChat{% endif %}</strong></div>
     <nav class="workspace-nav"{% if shared %} data-settings-nav{% endif %} aria-label="{% if shared %}Einstellungsseiten{% else %}AutoChat-Seiten{% endif %}">
       {% if shared %}
+        <span class="workspace-nav-heading">Einstellungsbereiche</span>
+        <a href="/settings/shared?section=shared">Gemeinsam</a>
+        <a href="/settings/shared?section=autochat">AutoChat</a>
+        <a href="/settings/shared?section=autopost">AutoPost</a>
         <span class="workspace-nav-heading">Verbindungen</span>
         <a href="/settings/shared#fanvue"{% if request.url.path == '/settings/shared' %} class="active" aria-current="location"{% endif %}><span class="workspace-icon" aria-hidden="true">◉</span><span>Fanvue</span></a>
         <a href="/settings/shared#telegram"><span class="workspace-icon" aria-hidden="true">✉</span><span>Telegram</span></a>
