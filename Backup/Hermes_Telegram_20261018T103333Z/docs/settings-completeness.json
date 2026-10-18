@@ -1,0 +1,3624 @@
+{
+  "shared": {
+    "source": "app/templates/shared_settings.html",
+    "target": "/settings/shared?section=shared",
+    "controls_actions": [
+      {
+        "tag": "form",
+        "action": "/oauth/disconnect"
+      },
+      {
+        "tag": "button"
+      },
+      {
+        "tag": "a",
+        "href": "/oauth/start"
+      },
+      {
+        "tag": "form",
+        "action": "/settings/shared/fanvue"
+      },
+      {
+        "tag": "input",
+        "name": "fanvue_client_id"
+      },
+      {
+        "tag": "input",
+        "name": "fanvue_client_secret",
+        "type": "password"
+      },
+      {
+        "tag": "input",
+        "name": "fanvue_redirect_uri"
+      },
+      {
+        "tag": "input",
+        "name": "fanvue_api_version"
+      },
+      {
+        "tag": "button"
+      },
+      {
+        "tag": "form",
+        "action": "/settings/shared/telegram",
+        "id": "telegram-form"
+      },
+      {
+        "tag": "a",
+        "href": "/settings#telegram"
+      },
+      {
+        "tag": "input",
+        "name": "telegram_chat_id"
+      },
+      {
+        "tag": "input",
+        "name": "telegram_bot_token",
+        "type": "password"
+      },
+      {
+        "tag": "input",
+        "name": "app_base_url"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "tg-chatid"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "tg-test"
+      },
+      {
+        "tag": "button"
+      },
+      {
+        "tag": "form",
+        "action": "/settings/shared/updates"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "update_check_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "update_notify_telegram"
+      },
+      {
+        "tag": "input",
+        "name": "update_check_interval_hours",
+        "type": "number"
+      },
+      {
+        "tag": "button"
+      },
+      {
+        "tag": "a",
+        "href": "/upload"
+      },
+      {
+        "tag": "a",
+        "href": "#telegram"
+      },
+      {
+        "tag": "form",
+        "action": "/system/restart-service"
+      },
+      {
+        "tag": "button"
+      }
+    ],
+    "original_select_options": [],
+    "counts": {
+      "form": 5,
+      "button": 7,
+      "a": 4,
+      "input": 10
+    },
+    "unique_named_fields": 10,
+    "mapping": [
+      {
+        "old": {
+          "tag": "form",
+          "action": "/oauth/disconnect"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "form",
+            "action": "/oauth/disconnect"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "button"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "a",
+          "href": "/oauth/start"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "a",
+            "href": "/oauth/start"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "form",
+          "action": "/settings/shared/fanvue"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "form",
+            "action": "/settings/shared/fanvue"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "fanvue_client_id"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "name": "fanvue_client_id"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "fanvue_client_secret",
+          "type": "password"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "name": "fanvue_client_secret",
+            "type": "password"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "fanvue_redirect_uri"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "name": "fanvue_redirect_uri"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "fanvue_api_version"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "name": "fanvue_api_version"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "button"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "form",
+          "action": "/settings/shared/telegram",
+          "id": "telegram-form"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "form",
+            "action": "/settings/shared/telegram",
+            "id": "telegram-form"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "a",
+          "href": "/settings#telegram"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "a",
+            "href": "/settings#telegram"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "telegram_chat_id"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "name": "telegram_chat_id"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "telegram_bot_token",
+          "type": "password"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "name": "telegram_bot_token",
+            "type": "password"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "app_base_url"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "name": "app_base_url"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button",
+          "type": "button",
+          "id": "tg-chatid"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "button",
+            "type": "button",
+            "id": "tg-chatid"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button",
+          "type": "button",
+          "id": "tg-test"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "button",
+            "type": "button",
+            "id": "tg-test"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "button"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "form",
+          "action": "/settings/shared/updates"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "form",
+            "action": "/settings/shared/updates"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "update_check_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "update_check_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "update_notify_telegram"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "update_notify_telegram"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "update_check_interval_hours",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "input",
+            "name": "update_check_interval_hours",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "button"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "a",
+          "href": "/upload"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "a",
+            "href": "/upload"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "a",
+          "href": "#telegram"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "a",
+            "href": "#telegram"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "form",
+          "action": "/system/restart-service"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "form",
+            "action": "/system/restart-service"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "button"
+          }
+        },
+        "save_backend_unchanged": true
+      }
+    ],
+    "save_semantics": "Separate POST groups /settings/shared/fanvue, /settings/shared/telegram, /settings/shared/updates; no cross-group writes; unchecked update booleans false; blank/masked secrets retained; explicit clear checkbox deletes. OAuth, Telegram test/discovery, updater and service controls unchanged."
+  },
+  "autochat": {
+    "source": "app/templates/settings.html",
+    "target": "/settings/shared?section=autochat",
+    "controls_actions": [
+      {
+        "tag": "a",
+        "href": "/settings/shared"
+      },
+      {
+        "tag": "a",
+        "id": "sect-all"
+      },
+      {
+        "tag": "a",
+        "id": "sect-none"
+      },
+      {
+        "tag": "form",
+        "action": "/settings"
+      },
+      {
+        "tag": "input",
+        "name": "openrouter_api_key",
+        "type": "password"
+      },
+      {
+        "tag": "input",
+        "name": "openrouter_model"
+      },
+      {
+        "tag": "input",
+        "name": "classifier_model"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_caption_model"
+      },
+      {
+        "tag": "input",
+        "name": "temperature",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "max_tokens",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "history_messages",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "reasoning_mode"
+      },
+      {
+        "tag": "input",
+        "name": "generation_retries",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "generation_retry_delay",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "vision_model"
+      },
+      {
+        "tag": "input",
+        "name": "vision_api_key",
+        "type": "password"
+      },
+      {
+        "tag": "textarea",
+        "name": "vision_prompt"
+      },
+      {
+        "tag": "textarea",
+        "name": "system_prompt"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "time_context_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "timestamps_in_history"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "time_guard_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "persona_timezone"
+      },
+      {
+        "tag": "textarea",
+        "name": "persona_schedule"
+      },
+      {
+        "tag": "select",
+        "id": "tc-weekday"
+      },
+      {
+        "tag": "input",
+        "id": "tc-time",
+        "type": "time"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "tc-btn"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "anti_ai_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "anti_ai_petnames"
+      },
+      {
+        "tag": "textarea",
+        "name": "anti_ai_rules"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "incoming_image_enabled"
+      },
+      {
+        "tag": "textarea",
+        "name": "incoming_image_react_prompt"
+      },
+      {
+        "tag": "textarea",
+        "name": "incoming_image_woman_prompt"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "tip_thanks_enabled"
+      },
+      {
+        "tag": "textarea",
+        "name": "tip_thanks_prompt"
+      },
+      {
+        "tag": "select",
+        "name": "tip_thanks_folder"
+      },
+      {
+        "tag": "input",
+        "name": "tip_thanks_folder"
+      },
+      {
+        "tag": "select",
+        "name": "mode"
+      },
+      {
+        "tag": "input",
+        "name": "chats_cache_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "chat_filter"
+      },
+      {
+        "tag": "input",
+        "name": "poll_interval_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "max_chats_per_cycle",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reply_cooldown_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "queue_context_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "send_delay_min_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "send_delay_max_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "active_hours_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "active_hour_start",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "active_hour_end",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "chat_custom_list_id"
+      },
+      {
+        "tag": "select",
+        "name": "prio2_custom_list_id"
+      },
+      {
+        "tag": "input",
+        "name": "prio2_interval_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "prio2_jitter_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "draft_recheck_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "draft_regen_on_stale"
+      },
+      {
+        "tag": "input",
+        "name": "draft_recheck_interval_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "draft_max_regen",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "bracket_max_regen",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_use_llm_classifier"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_caption_use_vision"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_block_on_distress"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_intent_threshold",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_min_fan_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_sexual_streak_trigger",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_max_media_per_set",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_offer_reset_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_thumb_cache_hours",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_cooldown_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_cooldown_outbound",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_cooldown_long_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_unpurchased_threshold",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_keywords"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_bodyparts_keywords"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_pic_request_keywords"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_freecontent_keywords"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_confirm_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_confirm_fail_open"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_confirm_context_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_keyword_exceptions"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_video_keywords"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_photo_keywords"
+      },
+      {
+        "tag": "textarea",
+        "name": "ppv_no_match_prompt"
+      },
+      {
+        "tag": "textarea",
+        "name": "ppv_sales_prompt"
+      },
+      {
+        "tag": "textarea",
+        "name": "ppv_freecontent_prompt"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "reactivation_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_inactive_hours",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_cooldown_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_max_per_cycle",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_max_attempts",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_max_silence_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_delay_min_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_delay_max_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "reactivation_folder"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_folder"
+      },
+      {
+        "tag": "textarea",
+        "name": "reactivation_prompt"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "memory_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "memory_consolidate_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "messages_store_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "memory_model"
+      },
+      {
+        "tag": "input",
+        "name": "memory_max_chars",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_trigger_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_quiet_hours",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_min_interval_hours",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_min_fan_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_max_per_cycle",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_sweep_hour",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_max_long",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_max_short",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_short_max_age_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "messages_retention_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_max_pages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_chunk",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_delay",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "memory_backfill_auto"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_max_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_per_hour",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "memory_reactivation_use_loops"
+      },
+      {
+        "tag": "a",
+        "href": "/chats"
+      },
+      {
+        "tag": "a",
+        "href": "/chats"
+      },
+      {
+        "tag": "input",
+        "name": "max_reply_chars",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "banned_words"
+      },
+      {
+        "tag": "input",
+        "name": "escalation_keywords"
+      },
+      {
+        "tag": "a",
+        "href": "/settings/shared#telegram"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "telegram_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "alert_keywords_enabled"
+      },
+      {
+        "tag": "textarea",
+        "name": "alert_keywords"
+      },
+      {
+        "tag": "input",
+        "id": "kw-probe",
+        "type": "text"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "kw-test"
+      },
+      {
+        "tag": "button"
+      }
+    ],
+    "original_select_options": [
+      {
+        "value": "none",
+        "{%": null,
+        "if": null,
+        "rm": "none",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "exclude",
+        "{%": null,
+        "if": null,
+        "rm": "exclude",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "default",
+        "{%": null,
+        "if": null,
+        "rm": "default",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": ""
+      },
+      {
+        "value": "{{ loop.index0 }}"
+      },
+      {
+        "value": ""
+      },
+      {
+        "value": "{{ f }}",
+        "{%": null,
+        "if": null,
+        "s['tip_thanks_folder']": "f",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "{{ s['tip_thanks_folder'] }}",
+        "selected": null
+      },
+      {
+        "value": "approval",
+        "{%": null,
+        "if": null,
+        "s['mode']": "approval",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "auto",
+        "{%": null,
+        "if": null,
+        "s['mode']": "auto",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "unread",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "unread",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "not_answered",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "not_answered",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "online",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "online",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "not_muted",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "not_muted",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "subscribers",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "subscribers",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "recent_subscribers",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "recent_subscribers",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "followers",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "followers",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "on_free_trial",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "on_free_trial",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "spenders",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "spenders",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "spent_more_than_50",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "spent_more_than_50",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "has_tipped",
+        "{%": null,
+        "if": null,
+        "s['chat_filter']": "has_tipped",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "",
+        "{%": null,
+        "if": null,
+        "not": null,
+        "s['chat_filter']": null,
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "",
+        "{%": null,
+        "if": null,
+        "not": null,
+        "s['chat_custom_list_id']": null,
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "{{ lst['uuid'] }}",
+        "{%": null,
+        "if": null,
+        "s['chat_custom_list_id']": "lst['uuid']",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "",
+        "{%": null,
+        "if": null,
+        "not": null,
+        "s['prio2_custom_list_id']": null,
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "{{ lst['uuid'] }}",
+        "{%": null,
+        "if": null,
+        "s['prio2_custom_list_id']": "lst['uuid']",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": ""
+      },
+      {
+        "value": "{{ f }}",
+        "{%": null,
+        "if": null,
+        "s['reactivation_folder']": "f",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "{{ s['reactivation_folder'] }}",
+        "selected": null
+      },
+      {
+        "value": "off",
+        "{%": null,
+        "if": null,
+        "s['memory_backfill_auto']": "off",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "manual",
+        "{%": null,
+        "if": null,
+        "s['memory_backfill_auto']": "manual",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      },
+      {
+        "value": "auto",
+        "{%": null,
+        "if": null,
+        "s['memory_backfill_auto']": "auto",
+        "%}selected{%": null,
+        "endif": null,
+        "%}": null
+      }
+    ],
+    "counts": {
+      "a": 6,
+      "form": 1,
+      "input": 98,
+      "select": 9,
+      "textarea": 12,
+      "button": 3
+    },
+    "unique_named_fields": 114,
+    "mapping": [
+      {
+        "old": {
+          "tag": "a",
+          "href": "/settings/shared"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "a",
+            "href": "/settings/shared"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "a",
+          "id": "sect-all"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "a",
+            "id": "sect-all"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "a",
+          "id": "sect-none"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "a",
+            "id": "sect-none"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "form",
+          "action": "/settings"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "form",
+            "action": "/settings"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "openrouter_api_key",
+          "type": "password"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "openrouter_api_key",
+            "type": "password"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "openrouter_model"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "openrouter_model"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "classifier_model"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "classifier_model"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_caption_model"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_caption_model"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "temperature",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "temperature",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "max_tokens",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "max_tokens",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "history_messages",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "history_messages",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "select",
+          "name": "reasoning_mode"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "select",
+            "name": "reasoning_mode"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "generation_retries",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "generation_retries",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "generation_retry_delay",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "generation_retry_delay",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "vision_model"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "vision_model"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "vision_api_key",
+          "type": "password"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "vision_api_key",
+            "type": "password"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "vision_prompt"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "vision_prompt"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "system_prompt"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "system_prompt"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "time_context_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "time_context_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "timestamps_in_history"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "timestamps_in_history"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "time_guard_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "time_guard_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "persona_timezone"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "persona_timezone"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "persona_schedule"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "persona_schedule"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "select",
+          "id": "tc-weekday"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "select",
+            "id": "tc-weekday"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "id": "tc-time",
+          "type": "time"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "id": "tc-time",
+            "type": "time"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button",
+          "type": "button",
+          "id": "tc-btn"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "button",
+            "type": "button",
+            "id": "tc-btn"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "anti_ai_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "anti_ai_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "anti_ai_petnames"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "anti_ai_petnames"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "anti_ai_rules"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "anti_ai_rules"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "incoming_image_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "incoming_image_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "incoming_image_react_prompt"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "incoming_image_react_prompt"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "incoming_image_woman_prompt"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "incoming_image_woman_prompt"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "tip_thanks_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "tip_thanks_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "tip_thanks_prompt"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "tip_thanks_prompt"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "select",
+          "name": "tip_thanks_folder"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "select",
+            "name": "tip_thanks_folder"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "tip_thanks_folder"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "tip_thanks_folder"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "select",
+          "name": "mode"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "select",
+            "name": "mode"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "chats_cache_seconds",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "chats_cache_seconds",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "select",
+          "name": "chat_filter"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "select",
+            "name": "chat_filter"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "poll_interval_seconds",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "poll_interval_seconds",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "max_chats_per_cycle",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "max_chats_per_cycle",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "reply_cooldown_seconds",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "reply_cooldown_seconds",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "queue_context_messages",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "queue_context_messages",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "send_delay_min_seconds",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "send_delay_min_seconds",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "send_delay_max_seconds",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "send_delay_max_seconds",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "active_hours_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "active_hours_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "active_hour_start",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "active_hour_start",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "active_hour_end",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "active_hour_end",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "select",
+          "name": "chat_custom_list_id"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "select",
+            "name": "chat_custom_list_id"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "select",
+          "name": "prio2_custom_list_id"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "select",
+            "name": "prio2_custom_list_id"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "prio2_interval_minutes",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "prio2_interval_minutes",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "prio2_jitter_minutes",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "prio2_jitter_minutes",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "draft_recheck_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "draft_recheck_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "draft_regen_on_stale"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "draft_regen_on_stale"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "draft_recheck_interval_seconds",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "draft_recheck_interval_seconds",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "draft_max_regen",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "draft_max_regen",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "bracket_max_regen",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "bracket_max_regen",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "ppv_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_use_llm_classifier"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "ppv_use_llm_classifier"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_caption_use_vision"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "ppv_caption_use_vision"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_block_on_distress"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "ppv_block_on_distress"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_intent_threshold",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_intent_threshold",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_min_fan_messages",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_min_fan_messages",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_sexual_streak_trigger",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_sexual_streak_trigger",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_max_media_per_set",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_max_media_per_set",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_offer_reset_days",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_offer_reset_days",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_thumb_cache_hours",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_thumb_cache_hours",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_cooldown_minutes",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_cooldown_minutes",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_cooldown_outbound",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_cooldown_outbound",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_cooldown_long_minutes",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_cooldown_long_minutes",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_unpurchased_threshold",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_unpurchased_threshold",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_keywords"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_keywords"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_bodyparts_keywords"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_bodyparts_keywords"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_pic_request_keywords"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_pic_request_keywords"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_freecontent_keywords"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_freecontent_keywords"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_confirm_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "ppv_confirm_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_confirm_fail_open"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "ppv_confirm_fail_open"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_confirm_context_messages",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_confirm_context_messages",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_keyword_exceptions"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_keyword_exceptions"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_video_keywords"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_video_keywords"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "ppv_photo_keywords"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "ppv_photo_keywords"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "ppv_no_match_prompt"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "ppv_no_match_prompt"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "ppv_sales_prompt"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "ppv_sales_prompt"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "ppv_freecontent_prompt"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "ppv_freecontent_prompt"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "reactivation_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "reactivation_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "reactivation_inactive_hours",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "reactivation_inactive_hours",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "reactivation_cooldown_days",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "reactivation_cooldown_days",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "reactivation_max_per_cycle",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "reactivation_max_per_cycle",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "reactivation_max_attempts",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "reactivation_max_attempts",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "reactivation_max_silence_days",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "reactivation_max_silence_days",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "reactivation_delay_min_minutes",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "reactivation_delay_min_minutes",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "reactivation_delay_max_minutes",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "reactivation_delay_max_minutes",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "select",
+          "name": "reactivation_folder"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "select",
+            "name": "reactivation_folder"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "reactivation_folder"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "reactivation_folder"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "reactivation_prompt"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "reactivation_prompt"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "memory_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "memory_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "memory_consolidate_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "memory_consolidate_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "messages_store_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "messages_store_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_model"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_model"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_max_chars",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_max_chars",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_trigger_messages",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_trigger_messages",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_quiet_hours",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_quiet_hours",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_min_interval_hours",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_min_interval_hours",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_min_fan_messages",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_min_fan_messages",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_max_per_cycle",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_max_per_cycle",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_sweep_hour",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_sweep_hour",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_max_long",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_max_long",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_max_short",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_max_short",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_short_max_age_days",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_short_max_age_days",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "messages_retention_days",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "messages_retention_days",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_backfill_max_pages",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_backfill_max_pages",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_backfill_chunk",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_backfill_chunk",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_backfill_delay",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_backfill_delay",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "select",
+          "name": "memory_backfill_auto"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "select",
+            "name": "memory_backfill_auto"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_backfill_max_messages",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_backfill_max_messages",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "memory_backfill_per_hour",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "memory_backfill_per_hour",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "memory_reactivation_use_loops"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "memory_reactivation_use_loops"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "a",
+          "href": "/chats"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "a",
+            "href": "/chats"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "a",
+          "href": "/chats"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "a",
+            "href": "/chats"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "max_reply_chars",
+          "type": "number"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "max_reply_chars",
+            "type": "number"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "banned_words"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "banned_words"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "name": "escalation_keywords"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "name": "escalation_keywords"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "a",
+          "href": "/settings/shared#telegram"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "a",
+            "href": "/settings/shared#telegram"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "telegram_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "telegram_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "alert_keywords_enabled"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "type": "checkbox",
+            "name": "alert_keywords_enabled"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "textarea",
+          "name": "alert_keywords"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "textarea",
+            "name": "alert_keywords"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "input",
+          "id": "kw-probe",
+          "type": "text"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "input",
+            "id": "kw-probe",
+            "type": "text"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button",
+          "type": "button",
+          "id": "kw-test"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "button",
+            "type": "button",
+            "id": "kw-test"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button"
+        },
+        "new": {
+          "url": "/settings/shared?section=autochat",
+          "identity": {
+            "tag": "button"
+          }
+        },
+        "save_backend_unchanged": true
+      }
+    ],
+    "save_semantics": "POST /settings; all original named fields and checkbox semantics; shared keys excluded; blank/masked secrets retained; explicit clear controls; offline list IDs/names preserved; preview/keyword tools remain separate read-only POST tools."
+  },
+  "updates": {
+    "source": "app/templates/_program_updates.html",
+    "target": "/settings/shared?section=shared",
+    "controls_actions": [
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "upd-now"
+      },
+      {
+        "tag": "form",
+        "action": "/system/update",
+        "id": "upd-install-form"
+      },
+      {
+        "tag": "button",
+        "type": "submit",
+        "id": "upd-install"
+      }
+    ],
+    "original_select_options": [],
+    "counts": {
+      "button": 2,
+      "form": 1
+    },
+    "unique_named_fields": 0,
+    "mapping": [
+      {
+        "old": {
+          "tag": "button",
+          "type": "button",
+          "id": "upd-now"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "button",
+            "type": "button",
+            "id": "upd-now"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "form",
+          "action": "/system/update",
+          "id": "upd-install-form"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "form",
+            "action": "/system/update",
+            "id": "upd-install-form"
+          }
+        },
+        "save_backend_unchanged": true
+      },
+      {
+        "old": {
+          "tag": "button",
+          "type": "submit",
+          "id": "upd-install"
+        },
+        "new": {
+          "url": "/settings/shared?section=shared",
+          "identity": {
+            "tag": "button",
+            "type": "submit",
+            "id": "upd-install"
+          }
+        },
+        "save_backend_unchanged": true
+      }
+    ]
+  },
+  "autopost": {
+    "source": "autoposter/ui/js/pages/settings.js",
+    "target": "/settings/shared?section=autopost",
+    "source_sha256": "2e6465a9bbc1000ea9586b72bf84ca2be409c0ac91f175a28b9e8f41beb80f6a",
+    "controls": [
+      [
+        "keyInput",
+        "input"
+      ],
+      [
+        "filterFree",
+        "input"
+      ],
+      [
+        "budget",
+        "input"
+      ],
+      [
+        "onlyFuture",
+        "input"
+      ],
+      [
+        "baseUrl",
+        "input"
+      ],
+      [
+        "xTier",
+        "select"
+      ],
+      [
+        "gap",
+        "input"
+      ],
+      [
+        "warn",
+        "input"
+      ],
+      [
+        "autoPlan",
+        "input"
+      ],
+      [
+        "autoDays",
+        "input"
+      ],
+      [
+        "autoEvery",
+        "input"
+      ],
+      [
+        "toggle",
+        "input"
+      ],
+      [
+        "enabled",
+        "input"
+      ],
+      [
+        "text",
+        "textarea"
+      ],
+      [
+        "url",
+        "input"
+      ]
+    ],
+    "api_calls": [
+      "archiveUsed",
+      "channels",
+      "clearSecret",
+      "deletePlanned",
+      "imageComment",
+      "integrations",
+      "llmUsage",
+      "maintenanceReport",
+      "openrouterModels",
+      "openrouterTest",
+      "rebuildCounters",
+      "saveImageComment",
+      "saveIntegrations",
+      "setRuntime",
+      "settings",
+      "testAllChannels",
+      "testChannel",
+      "updateChannel"
+    ],
+    "model_tasks": [
+      "openrouter_model_caption",
+      "openrouter_model_text",
+      "openrouter_model_vision",
+      "openrouter_model_fallback"
+    ],
+    "buttons": [
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'",
+      "h('button'"
+    ],
+    "save_semantics": "Existing renderer and API payloads retained unchanged; blank key omitted; explicit clearSecret action; channel switches save immediately; other cards save independently. Existing backend admin/editor/preview guards unchanged.",
+    "rendered_synthetic_fixture_count": 36,
+    "mapping": [
+      {
+        "old_api_action": "archiveUsed",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "archiveUsed"
+      },
+      {
+        "old_api_action": "channels",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "channels"
+      },
+      {
+        "old_api_action": "clearSecret",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "clearSecret"
+      },
+      {
+        "old_api_action": "deletePlanned",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "deletePlanned"
+      },
+      {
+        "old_api_action": "imageComment",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "imageComment"
+      },
+      {
+        "old_api_action": "integrations",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "integrations"
+      },
+      {
+        "old_api_action": "llmUsage",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "llmUsage"
+      },
+      {
+        "old_api_action": "maintenanceReport",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "maintenanceReport"
+      },
+      {
+        "old_api_action": "openrouterModels",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "openrouterModels"
+      },
+      {
+        "old_api_action": "openrouterTest",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "openrouterTest"
+      },
+      {
+        "old_api_action": "rebuildCounters",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "rebuildCounters"
+      },
+      {
+        "old_api_action": "saveImageComment",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "saveImageComment"
+      },
+      {
+        "old_api_action": "saveIntegrations",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "saveIntegrations"
+      },
+      {
+        "old_api_action": "setRuntime",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "setRuntime"
+      },
+      {
+        "old_api_action": "settings",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "settings"
+      },
+      {
+        "old_api_action": "testAllChannels",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "testAllChannels"
+      },
+      {
+        "old_api_action": "testChannel",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "testChannel"
+      },
+      {
+        "old_api_action": "updateChannel",
+        "new_url": "/settings/shared?section=autopost",
+        "same_api_action": "updateChannel"
+      }
+    ],
+    "permissions": "Existing current_user / require_admin / require_editor dependencies and preview middleware preserved; real user loaded via /api/v1/auth/me; unchanged APIs.",
+    "pre_visibility_source_sha256": "b3b96e76e00067e8dc61e939a6a6c1145300c5a7d3399d9a06f7c8877ad3791a",
+    "visibility_aging_addition": {
+      "source": "autoposter/ui/js/pages/visibility-aging.js",
+      "preservation": "Only an import and appended card were added to settings.js; all pre-existing source lines preserved."
+    }
+  }
+}

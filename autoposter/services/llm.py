@@ -20,6 +20,7 @@ from autoposter.services import rhythm
 from autoposter.services.appconfig import current as cfg
 
 PLATFORM_RULES = {
+    "telegram": "Plattform Telegram-Kanal. Eigene geplante Beiträge, keine X-Spiegelung. Klarer persönlicher Text; Plaintext ohne HTML/Markdown. Text max. 4096, Medien-Caption max. 1024 Zeichen inklusive Hashtags. Keine Fanvue-Zielgruppen oder X-Regeln.",
     "x": (
         "Plattform X (Twitter). Maximal 280 Zeichen inklusive Hashtags. Kurz, pointiert, "
         "kein Roman, keine Aufzählungen, maximal zwei Zeilenumbrüche."
@@ -686,6 +687,11 @@ class LlmClient:
             user_parts.append("Es gibt kein Bild. Schreibe einen reinen Textpost.")
         if theme and not has_image:
             user_parts.append(f"Thema des Tages: {theme}")
+        if platform == "telegram" and channel_id:
+            from autoposter.models import Channel
+            channel = await db.get(Channel, channel_id)
+            if channel and channel.platform == "telegram" and channel.policy and channel.policy.text_guidelines:
+                user_parts.append("Textvorgaben nur für diesen Telegram-Kanal: " + channel.policy.text_guidelines)
         if instruction:
             user_parts.append(f"Zusätzliche Anweisung: {instruction}")
         if persona and persona.hashtag_pool:

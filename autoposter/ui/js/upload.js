@@ -3,13 +3,13 @@
 import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
 import { h, clear, append, field, modal, toast, guard, spinner, fmtBytes } from './ui.js?v=creatorstudio-mobile-system-20260909'
 
-const ACCEPT = ['image/jpeg', 'image/png', 'image/webp']
+const ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4']
 //: Wie viele Dateien pro Anfrage. Kleine Bündel halten die Rückmeldung flüssig
 //: und die Schreibtransaktionen kurz.
 const BATCH_SIZE = 4
 
 function isUsable(file) {
-  return ACCEPT.includes(file.type) || /\.(jpe?g|png|webp|zip)$/i.test(file.name)
+  return ACCEPT.includes(file.type) || /\.(jpe?g|png|webp|mp4|zip)$/i.test(file.name)
 }
 
 /** Dateien aus einem Drop-Event einsammeln – auch aus Ordnern. */
@@ -54,7 +54,7 @@ export function createDropZone({ channels = [], onDone = () => {}, compact = fal
 
   const fileInput = h('input', {
     type: 'file', multiple: true, style: { display: 'none' },
-    accept: 'image/jpeg,image/png,image/webp,.zip',
+    accept: 'image/jpeg,image/png,image/webp,video/mp4,.mp4,.zip',
   })
   const listBox = h('div', { class: 'uploadlist' })
   const summary = h('div', { class: 'hint' })
@@ -133,9 +133,9 @@ export function createDropZone({ channels = [], onDone = () => {}, compact = fal
   // ------------------------------------------------------------ Ablagefläche
   const zone = h('div', { class: 'dropzone' + (compact ? ' compact' : '') },
     h('div', { class: 'dropzone-icon' }, '⇪'),
-    h('div', {}, h('b', {}, 'Bilder hierher ziehen'), ' oder ',
+    h('div', {}, h('b', {}, 'Bilder oder MP4 hierher ziehen'), ' oder ',
       h('button', { class: 'ghost', onClick: () => fileInput.click() }, 'Dateien auswählen')),
-    h('div', { class: 'hint' }, 'JPEG, PNG, WebP oder ZIP · ganze Ordner sind möglich'),
+    h('div', { class: 'hint' }, 'JPEG, PNG, WebP, MP4 (H.264/AAC, Telegram) oder Bild-ZIP · ganze Ordner sind möglich'),
     fileInput,
   )
 
@@ -255,7 +255,7 @@ export function createDropZone({ channels = [], onDone = () => {}, compact = fal
 
 /** Upload als Dialog. */
 export function openUploadDialog({ channels = [], files = [], onDone = () => {} } = {}) {
-  const { close } = modal('Bilder hochladen', () => {
+  const { close } = modal('Medien hochladen', () => {
     const dz = createDropZone({ channels, onDone })
     // Bereits gezogene Dateien direkt übernehmen.
     if (files && files.length) dz.addFiles(files.filter(isUsable))

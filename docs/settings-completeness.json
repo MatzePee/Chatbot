@@ -3415,7 +3415,7 @@
   "autopost": {
     "source": "autoposter/ui/js/pages/settings.js",
     "target": "/settings/shared?section=autopost",
-    "source_sha256": "b3b96e76e00067e8dc61e939a6a6c1145300c5a7d3399d9a06f7c8877ad3791a",
+    "source_sha256": "246d67ac1d7730d986faa9e660e3068b42dfd17d4d2eea6b8ef48118c002147b",
     "controls": [
       [
         "keyInput",
@@ -3614,6 +3614,11 @@
         "same_api_action": "updateChannel"
       }
     ],
-    "permissions": "Existing current_user / require_admin / require_editor dependencies and preview middleware preserved; real user loaded via /api/v1/auth/me; unchanged APIs."
+    "permissions": "Existing current_user / require_admin / require_editor dependencies and preview middleware preserved; real user loaded via /api/v1/auth/me; unchanged APIs.",
+    "pre_visibility_source_sha256": "b3b96e76e00067e8dc61e939a6a6c1145300c5a7d3399d9a06f7c8877ad3791a",
+    "visibility_aging_addition": {
+      "source": "autoposter/ui/js/pages/visibility-aging.js",
+      "preservation": "Only an import and appended card were added to settings.js; all pre-existing source lines preserved."
+    }
   }
 }

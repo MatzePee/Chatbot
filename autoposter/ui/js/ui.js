@@ -271,6 +271,12 @@ export function channelChips(asset, channels, max = 4) {
   return box
 }
 
+export function mediaPreview(asset, props = {}) {
+  return asset.mime === 'video/mp4'
+    ? h('video', {src:asset.url, poster:asset.thumb_url, controls:true, preload:'metadata', ...props})
+    : h('img', {src:asset.url, alt:'', ...props})
+}
+
 export function mediaTile(asset, channels, opts = {}) {
   const meta = LIFECYCLE[asset.lifecycle] || LIFECYCLE.new
   const consumed = asset.lifecycle === 'fully_used' || asset.lifecycle === 'archived'
@@ -300,7 +306,7 @@ export function mediaTile(asset, channels, opts = {}) {
   if (opts.onDragStart) el.addEventListener('dragstart', opts.onDragStart)
   // Beim Verweilen das Bild groß zeigen – in dichten Rastern der schnellste Weg,
   // ein Motiv zu erkennen, ohne es anzuklicken.
-  if (opts.preview !== false) attachPreview(el, asset.url, { delay: 400, size: 320 })
+  if (opts.preview !== false) attachPreview(el, asset.mime === 'video/mp4' ? asset.thumb_url : asset.url, { delay: 400, size: 320 })
   return el
 }
 

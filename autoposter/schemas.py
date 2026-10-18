@@ -144,6 +144,7 @@ class RhythmCheckResult(BaseModel):
 # Kanäle
 # --------------------------------------------------------------------------- #
 class PolicyBase(BaseModel):
+    text_guidelines: str = Field(default="", max_length=4000)
     posts_per_day: float = 2.0
     min_gap_minutes: int = 180
     jitter_minutes: int = 12
@@ -223,6 +224,11 @@ class ChannelUpdate(BaseModel):
     policy: Optional[PolicyBase] = None
 
 
+class TelegramSetup(BaseModel):
+    bot_token: str = Field(default="", repr=False)
+    destination: str
+
+
 class ChannelOut(ORMModel):
     id: uuid.UUID
     platform: str
@@ -246,6 +252,7 @@ class ChannelOut(ORMModel):
     token_expires_at: Optional[datetime] = None
     is_connected: bool = False
     connection_source: str = "channel"
+    has_bot_token: bool = False
     #: OAuth-App dieses Kanals
     uses_own_app: bool = False
     oauth_client_id: str = ""

@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Sequence, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autoposter.adapters import AdapterError, MediaRef, get_adapter
@@ -64,6 +64,20 @@ async def _reset_quota_if_needed(db: AsyncSession, channel: Channel) -> None:
 async def _upload_all(
     db: AsyncSession, adapter, cred, channel: Channel, assets: Sequence[MediaAsset]
 ) -> List[MediaRef]:
+    if channel.platform == "telegram":
+        if len(assets) > 10 or sum(asset.bytes or 0 for asset in assets) > 100_000_000:
+            raise AdapterError("Telegram: maximal 10 Medien und 100 MB pro Album.")
+        staged = []
+        total_bytes = 0
+        for asset in assets:
+            data = media_service.read_bytes(asset)
+            if asset.mime != 'video/mp4':
+                data = await asyncio.to_thread(watermark.apply_bytes, data, channel, mime=asset.mime)
+            total_bytes += len(data)
+            if total_bytes > 100_000_000:
+                raise AdapterError("Telegram: maximal 100 MB pro Album.")
+            staged.append(await adapter.upload_media(cred, asset, data))
+        return staged
     refs: List[MediaRef] = []
     now = datetime.now(timezone.utc)
     for asset in assets:
@@ -107,6 +121,8 @@ async def _upload_all(
 
 async def split_thread_if_needed(db: AsyncSession, post: Post, channel: Channel) -> List[Post]:
     """Bildersets mit mehr Bildern als die Plattform erlaubt als Self-Thread zerlegen."""
+    if channel.platform == "telegram":
+        return [post]  # Reject over-limit albums as one post, never partial threads.
     limits = get_adapter(channel.platform).limits()
     asset_ids = [str(a) for a in (post.media_asset_ids or [])]
     if len(asset_ids) <= limits.max_images_per_post:
@@ -164,10 +180,23 @@ async def publish_post(
         db.add(post)
         return False, post.error_message
 
+    if channel.platform == "telegram" and (post.generation_meta or {}).get("telegram_delivery", {}).get("state") in ("pending", "uncertain"):
+        return False, "Telegram-Versand unklar; vor weiteren Aktionen Zielkanal manuell prüfen. Nicht erneut senden."
+
     if settings.global_pause:
         return False, "Globaler Stopp aktiv"
     if not channel.is_active or channel.health == ChannelHealth.paused.value:
         return False, f"Kanal '{channel.display_name}' pausiert"
+
+    if channel.platform == "telegram" and not settings.dry_run:
+        original_meta = dict(post.generation_meta or {})
+        pending_meta = {**original_meta, "telegram_delivery": {"state":"pending"}}
+        claim = await db.execute(update(Post).where(Post.id == post.id, Post.generation_meta == original_meta).values(generation_meta=pending_meta).execution_options(synchronize_session=False))
+        if claim.rowcount != 1:
+            await db.rollback()
+            return False, "Telegram: bereits beansprucht; kein erneuter Versand."
+        post.generation_meta = pending_meta
+        await db.commit()  # Claim before any preflight/status/metadata write, including stale sessions.
 
     issues = await planner.preflight(db, post)
     blocking = [i for i in issues if i["level"] == "error"]
@@ -175,6 +204,8 @@ async def publish_post(
         post.status = PostStatus.failed.value
         post.error_message = "; ".join(i["message"] for i in blocking)[:900]
         post.generation_meta = {**(post.generation_meta or {}), "preflight_failure": True}
+        if channel.platform == "telegram":
+            post.generation_meta = {**post.generation_meta,"telegram_delivery":{"state":"rejected"}}
         db.add(post)
         await notify.push(
             db,
@@ -191,6 +222,8 @@ async def publish_post(
     await _reset_quota_if_needed(db, channel)
     policy: PostingPolicy = channel.policy or PostingPolicy()
     if channel.quota_used_today >= policy.daily_api_quota and not force:
+        if channel.platform == "telegram":
+            post.generation_meta = {**(post.generation_meta or {}),"telegram_delivery":{"state":"rejected"}}
         post.error_message = "Tageskontingent des Kanals erschöpft"
         post.scheduled_at = datetime.now(timezone.utc) + timedelta(hours=6)
         db.add(post)
@@ -240,11 +273,21 @@ async def publish_post(
     try:
         cred = await cred_service.get_valid_credentials(db, channel)
         refs = await _upload_all(db, adapter, cred, channel, assets)
+        if channel.platform == "telegram":
+            if len(assets) != len(post.media_asset_ids or []):
+                raise AdapterError("Telegram: Medien fehlen oder sind doppelt ausgewählt.")
+            await db.commit()  # Durable before send: crash recovery must not resend blindly.
         outcome = await adapter.publish(cred, channel, post, refs)
     except AdapterError as exc:
         attempt.finished_at = datetime.now(timezone.utc)
         attempt.http_status = exc.status
         attempt.outcome = "error"
+        if channel.platform == "telegram":
+            from autoposter.adapters.telegram import TelegramUncertain
+            uncertain = isinstance(exc, TelegramUncertain)
+            post.generation_meta = {**(post.generation_meta or {}), "telegram_delivery": {"state":"uncertain" if uncertain else "rejected", "message_ids":getattr(exc,"confirmed",[])}}
+            if uncertain:
+                attempt.outcome = "uncertain"
         attempt.response_excerpt = str(exc)[:1000]
         db.add(attempt)
 
@@ -280,6 +323,9 @@ async def publish_post(
         )
         return False, post.error_message
     except Exception as exc:  # pragma: no cover - defensiv
+        if channel.platform == "telegram":
+            exc = RuntimeError("Telegram: unerwarteter Fehler; Versand unklar. Zielkanal manuell prüfen; nicht erneut senden.")
+            post.generation_meta = {**(post.generation_meta or {}), "telegram_delivery":{"state":"uncertain"}}
         attempt.finished_at = datetime.now(timezone.utc)
         attempt.outcome = "error"
         attempt.response_excerpt = str(exc)[:1000]
@@ -292,6 +338,8 @@ async def publish_post(
     post.published_at = datetime.now(timezone.utc)
     post.external_post_id = outcome.external_post_id
     post.external_url = outcome.external_url
+    if channel.platform == "telegram":
+        post.generation_meta = {**(post.generation_meta or {}), "telegram_delivery": {"state":"confirmed", **outcome.raw}}
     post.error_message = ""
     attempt.finished_at = post.published_at
     attempt.http_status = outcome.http_status
@@ -344,6 +392,8 @@ async def retry_failed(db: AsyncSession, hours: int = 2) -> int:
             await db.execute(select(Channel).where(Channel.id == post.channel_id))
         ).scalar_one_or_none()
         policy = channel.policy if channel else None
+        if channel and channel.platform == "telegram":
+            continue  # No Bot API idempotency/readback; retries require deliberate review.
         if not policy or not policy.auto_retry_on_fail or post.attempt_count >= 3:
             continue
         post.status = PostStatus.scheduled.value

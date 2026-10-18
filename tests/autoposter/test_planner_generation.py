@@ -21,7 +21,7 @@ def generated_text():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('platform,kind', [('x', 'text'), ('x', 'image'), ('fanvue', 'image')])
+@pytest.mark.parametrize('platform,kind', [('x', 'text'), ('x', 'image'), ('fanvue', 'image'), ('telegram','text'), ('telegram','image')])
 @pytest.mark.parametrize('month', [1, 7])
 async def test_fill_generates_and_persists_posts_with_each_channels_local_time(db, monkeypatch, platform, kind, month):
     # Exercise the real non-dry-run fill path; only slots and the external LLM are fixed.
@@ -55,6 +55,8 @@ async def test_fill_generates_and_persists_posts_with_each_channels_local_time(d
     await db.flush()
     posts = (await db.execute(select(Post).where(Post.id.in_(result.created_post_ids)))).scalars().all()
     for post in posts:
+        if platform == 'telegram':
+            assert post.audience == ''
         assert post.body_text == 'A moment to remember.'
         assert post.body_text_variants[0]['translation_de'] == 'Ein Moment zum Erinnern.'
         assert post.scheduled_at == slot

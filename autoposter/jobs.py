@@ -35,6 +35,25 @@ logger = logging.getLogger("autoposter.jobs")
 # --------------------------------------------------------------------------- #
 # Veröffentlichung
 # --------------------------------------------------------------------------- #
+async def age_fanvue_visibility(*, manual=False, now=None):
+    from autoposter.services import visibility_aging
+    async with session_scope() as db:
+        result = await visibility_aging.run(db, manual=manual, now=now)
+        items = result.get('accounts', [])
+        has_result = not items or any(a.get('status') not in {'already_done','running','retry_wait'} for a in items)
+        if manual or result.get('status') not in {'disabled', 'paused', 'dry_run'} and has_result:
+            from autoposter.models import AppSetting
+            if db.bind.dialect.name == 'sqlite':
+                from sqlalchemy.dialects.sqlite import insert
+            else:
+                from sqlalchemy.dialects.postgresql import insert
+            value = {**result, 'recorded_at':datetime.now(timezone.utc).isoformat()}
+            stmt = insert(AppSetting).values(key='visibility_aging_last_run', value=value)
+            await db.execute(stmt.on_conflict_do_update(index_elements=['key'], set_={'value':value}))
+            await db.commit()
+        return result
+
+
 async def publish_one(post_id: uuid.UUID) -> Dict[str, Any]:
     """Einen einzelnen Post veröffentlichen (inkl. Thread-Aufteilung)."""
     async with session_scope() as db:
@@ -229,9 +248,19 @@ async def refresh_metrics(hours: int = 72) -> Dict[str, Any]:
                 post.metrics = metrics
                 db.add(post)
                 updated += 1
-        from autoposter.services import followers
+    # Collection owns short, durable claim transactions; do not mix post writes.
+    from autoposter.services import followers
+    async with session_scope() as db:
         follower_accounts = await followers.collect(db)
     return {"updated": updated, "follower_accounts": follower_accounts}
+
+
+async def collect_daily_followers(now=None) -> Dict[str, Any]:
+    """Minute poll; Berlin calendar slot is durably deduped per X account."""
+    from autoposter.services import followers
+    async with session_scope() as db:
+        count = await followers.collect(db, now=now, daily_only=True)
+    return {"follower_accounts": count, "schedule": "06:00 Europe/Berlin"}
 
 
 async def inventory_check() -> Dict[str, Any]:

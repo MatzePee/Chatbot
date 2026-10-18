@@ -20,6 +20,7 @@ const fixtures = {
  '/api/v1/channels': channels,
  '/api/v1/settings/image-comment':{enabled:true,text:'Fixture comment',url:'https://fixture.test'},
  '/api/v1/settings/openrouter/models':{models:Object.values(integrations).filter(v => typeof v==='string' && v.startsWith('fixture/')).map(id=>({id,vision:true,free:true})),cached:true},
+ '/api/v1/settings/visibility-aging': {enabled:false,days:7,active:false,status:'idle',channels:[]},
  '/api/deployment-status': {},
  '/api/update-check': {latest:null,update_available:false},
  '/settings/time-preview': {block:'Synthetic time preview'},
@@ -95,16 +96,18 @@ async function main(){
  await page.locator('.settings-tabs').getByRole('link',{name:'Gemeinsam',exact:true}).click()
  assert.equal(await page.locator('form form').count(),0)
  await page.screenshot({path:path.join(render,'shared-desktop.png'),fullPage:false})
- await page.setViewportSize({width:390,height:844})
+ for(const width of [320,390,1280]){
+ await page.setViewportSize({width,height:844})
  for(const section of ['shared','autochat','autopost']){
   await page.goto('http://settings.test/settings/shared?section='+section)
   if(section==='autopost') await page.locator('#autopost-settings section').last().waitFor()
   assert.equal(await page.locator('[data-settings-nav] a.active').getAttribute('href'),'/settings/shared?section='+section,'Sidebar must select actual settings category')
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'No mobile horizontal overflow: '+section)
-  await page.screenshot({path:path.join(render,section+'-mobile.png'),fullPage:false})
+  await page.screenshot({path:path.join(render,section+'-'+width+'.png'),fullPage:false})
+ }
  }
  assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[])
- console.log(JSON.stringify({autopost_controls_actions:baseline.length,mutations_on_load:0,synthetic_save_checks:writes.length,screenshots:6,errors,unexpected},null,2))
+ console.log(JSON.stringify({autopost_controls_actions:baseline.length,mutations_on_load:0,synthetic_save_checks:writes.length,screenshots:12,errors,unexpected},null,2))
  await browser.close()
 }
 main().catch(error=>{console.error(error);process.exit(1)})

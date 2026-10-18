@@ -135,6 +135,9 @@ def prepare_image(filename: str, data: bytes) -> PreparedImage:
     if len(data) > settings.max_upload_mb * 1024 * 1024:
         raise ValueError(f"Datei zu groß (> {settings.max_upload_mb} MB)")
 
+    if filename.lower().endswith('.mp4'):
+        from .video import prepare
+        return prepare(filename, data)
     normalized, width, height, mime = _strip_and_normalize(data)
     if mime not in settings.allowed_mimes:
         raise ValueError(f"Nicht unterstützter Typ: {mime}")
@@ -312,8 +315,16 @@ async def ensure_descriptions(
         if asset.status not in (MediaStatus.ready.value, MediaStatus.processing.value):
             continue
         try:
-            data = await asyncio.to_thread(read_bytes, asset)
-            result = await llm.describe_image(db, data, asset.mime)
+            if asset.mime == "video/mp4":
+                frame = thumb_path(asset)
+                if not frame:
+                    raise ValueError("MP4-Standbild fehlt")
+                data = await asyncio.to_thread(frame.read_bytes)
+                result = await llm.describe_image(db, data, "image/jpeg")
+                result["description"] = "Video-Standbild: " + str(result.get("description", "")) + " (Nur erster Frame; Videoablauf nicht analysiert.)"
+            else:
+                data = await asyncio.to_thread(read_bytes, asset)
+                result = await llm.describe_image(db, data, asset.mime)
         except Exception as exc:  # noqa: BLE001 – eine Beschreibung darf nichts abbrechen
             logger.warning("Bildbeschreibung für %s fehlgeschlagen: %s", asset.id, exc)
             continue

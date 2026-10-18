@@ -51,6 +51,8 @@ FIELDS: Dict[str, str] = {
     "cross_channel_min_gap_minutes": None,
     #: Stündliches automatisches Nachplanen. Standardmäßig AUS: Wer den
     #: Kalender selbst plant, will keine Posts, die von allein dazukommen.
+    "visibility_aging_enabled": None,
+    "visibility_aging_days": None,
     "auto_plan_enabled": None,
     "auto_plan_days": None,
     "auto_plan_interval_hours": None,
@@ -77,6 +79,8 @@ DEFAULTS: Dict[str, Any] = {
     #: Minuten ein. Der Mindestabstand INNERHALB eines Kanals steht davon
     #: unabhängig in den Kanal-Einstellungen.
     "cross_channel_min_gap_minutes": 0,
+    "visibility_aging_enabled": False,
+    "visibility_aging_days": 7,
     "auto_plan_enabled": False,
     "auto_plan_days": 14,
     "auto_plan_interval_hours": 24,
@@ -169,6 +173,12 @@ async def get(db: AsyncSession, field: str, default: Any = None) -> Any:
 async def set_many(db: AsyncSession, values: Dict[str, Any]) -> Dict[str, Any]:
     """Speichert nur bekannte Felder. Leere Geheimnisse lassen den alten Wert stehen,
     damit ein maskiert angezeigtes Feld beim Speichern nichts überschreibt."""
+    if 'visibility_aging_days' in values:
+        days = values['visibility_aging_days']
+        if type(days) is not int or not 1 <= days <= 36500:
+            raise ValueError('Sichtbarkeitsalter muss eine ganze Zahl von 1 bis 36500 Tagen sein.')
+    if 'visibility_aging_enabled' in values and type(values['visibility_aging_enabled']) is not bool:
+        raise ValueError('Sichtbarkeitsautomatik muss ein boolescher Wert sein.')
     stored = await _load_raw(db)
 
     for field, value in values.items():

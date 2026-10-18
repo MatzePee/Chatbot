@@ -540,7 +540,7 @@ async def fill_calendar(
             # Deterministisch statt zufällig, damit das Verhältnis auch bei
             # wenigen Posts stimmt.
             fixed = fixed_audience(channel)
-            audience = fixed or channel.default_audience or Audience.subscribers.value
+            audience = "" if channel.platform == "telegram" else fixed or channel.default_audience or Audience.subscribers.value
             if channel.platform == "fanvue" and not fixed:
                 planned_count += 1
                 target_free = policy.free_post_ratio * planned_count
@@ -585,7 +585,7 @@ async def fill_calendar(
                         ],
                         theme=theme,
                         variants=3,
-                        max_chars=limits.max_chars,
+                        max_chars=1024 if channel.platform == "telegram" and assets else limits.max_chars,
                         when_local=slot.astimezone(tz),
                     )
                     if generated.variants:
@@ -669,6 +669,12 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
             })
         elif post.type == PostType.text_only.value:
             issues.append({"level": "error", "code": "empty_text", "message": "Textpost ohne Text"})
+    if channel.platform == "telegram":
+        from autoposter.adapters.telegram import text_units, compose_text
+        limits.max_chars = 1024 if post.media_asset_ids else 4096
+        text_length = text_units(compose_text(post))
+        if len(post.media_asset_ids or []) > 10:
+            issues.append({"level":"error", "code":"telegram_album", "message":"Telegram: maximal 10 Medien, keine automatische Aufteilung."})
     if text_length > limits.max_chars:
         issues.append(
             {
@@ -686,6 +692,8 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
         assets = (
             await db.execute(select(MediaAsset).where(MediaAsset.id.in_(asset_ids)))
         ).scalars().all()
+        if channel.platform == "telegram" and len(assets) != len(asset_ids):
+            issues.append({"level":"error", "code":"telegram_missing_media", "message":"Telegram: Medien fehlen oder sind doppelt ausgewählt."})
         for asset in assets:
             reason = assignment.check_compatibility(asset, channel)
             if reason:
@@ -740,7 +748,7 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
                     }
                 )
 
-        if len(assets) > limits.max_images_per_post:
+        if len(assets) > limits.max_images_per_post and channel.platform != "telegram":
             issues.append(
                 {
                     "level": "warning",
@@ -1108,7 +1116,7 @@ async def plan_range(
                 )
 
                 fixed = fixed_audience(channel)
-                audience = fixed or channel.default_audience or Audience.subscribers.value
+                audience = "" if channel.platform == "telegram" else fixed or channel.default_audience or Audience.subscribers.value
                 if not fixed and wanted_audience:
                     # Im Dialog ausdrücklich angefordert – das schlägt jede Quote.
                     audience = wanted_audience
@@ -1157,7 +1165,7 @@ async def plan_range(
                             ],
                             theme=theme,
                             variants=3,
-                            max_chars=limits.max_chars,
+                            max_chars=1024 if channel.platform == "telegram" and assets else limits.max_chars,
                             when_local=slot.astimezone(tz),
                         )
                         if generated.variants:

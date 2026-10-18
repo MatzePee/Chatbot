@@ -3,7 +3,7 @@ import { openUploadDialog } from '../upload.js?v=creatorstudio-mobile-system-202
 import { openCreateSetDialog, openSetDialog } from '../sets.js?v=creatorstudio-mobile-system-20260909'
 import {
   h, append, clear, card, empty, field, modal, toast, guard, spinner,
-  mediaTile, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, fmtDateTime, fmtBytes, debounce, attachPreview,
+  mediaPreview, mediaTile, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, fmtDateTime, fmtBytes, debounce, attachPreview,
 } from '../ui.js?v=creatorstudio-preview-bounds-20261006'
 
 export default async function renderLibrary({ query }) {
@@ -143,7 +143,7 @@ export default async function renderLibrary({ query }) {
         h('i', { class: 'dot', style: { background: 'var(--accent)' } }),
         mediaSet ? mediaSet.name : 'Set'),
     )
-    attachPreview(el, cover.url, { delay: 400, size: 320 })
+    attachPreview(el, cover.mime === 'video/mp4' ? cover.thumb_url : cover.url, { delay: 400, size: 320 })
     return el
   }
 
@@ -339,7 +339,7 @@ export default async function renderLibrary({ query }) {
 
       return h('div', { class: 'grid c2' },
         h('div', {},
-          h('img', { src: d.url, alt: '', style: { width: '100%', borderRadius: '10px', border: '1px solid var(--line)' } }),
+          mediaPreview(d, { style: { width: '100%', borderRadius: '10px', border: '1px solid var(--line)' } }),
           h('div', { class: 'hint', style: { margin: '8px 0' } },
             `${d.width}×${d.height} · ${fmtBytes(d.bytes)} · ${d.mime}`),
           field('Tags (kommagetrennt)', tags),

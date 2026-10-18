@@ -50,6 +50,8 @@ from autoposter.services.fanvue_channels import audience_for, fixed_audience
 
 
 def _audience(channel, requested):
+    if channel.platform == "telegram":
+        return ""
     if not fixed_audience(channel):
         return requested or channel.default_audience
     try:
@@ -462,7 +464,7 @@ async def generate(
             has_image=bool(asset_ids),
             instruction=payload.instruction,
             variants=payload.variants,
-            max_chars=limits.max_chars,
+            max_chars=1024 if channel.platform == "telegram" and asset_ids else limits.max_chars,
             when_local=_local_time(post, channel),
         )
     except Exception as exc:
@@ -584,7 +586,7 @@ async def _bulk_generate(
                 has_image=bool(asset_ids),
                 instruction=payload.instruction,
                 variants=payload.variants,
-                max_chars=get_adapter(channel.platform).limits().max_chars,
+                max_chars=1024 if channel.platform == "telegram" and asset_ids else get_adapter(channel.platform).limits().max_chars,
                 when_local=_local_time(post, channel),
             )
         except Exception as exc:  # noqa: BLE001 – Sammelvorgang darf nicht abbrechen

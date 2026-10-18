@@ -74,7 +74,7 @@ export default async function renderChannels() {
         ),
         c.health_note ? h('div', { style: { fontSize: '11px', color: 'var(--warn)' } }, c.health_note) : null,
         h('div', { class: 'hint', style: { fontSize: '11px' } },
-          c.platform === 'fanvue' ? 'Gemeinsame Verbindung · AutoChat' : c.uses_own_app
+          c.platform === 'telegram' ? 'Eigener Telegram-Publikationsbot · kein Benachrichtigungsbot' : c.platform === 'fanvue' ? 'Gemeinsame Verbindung · AutoChat' : c.uses_own_app
             ? `Eigene App${c.oauth_app_name ? ' „' + c.oauth_app_name + '"' : ''} · ${c.oauth_client_id.slice(0, 12)}…`
             : (c.app_configured ? 'Globale App aus den Einstellungen' : 'Keine App hinterlegt')),
         // Eine Client-ID ohne Secret ist der häufigste stille Fehler: Der Kanal
@@ -96,6 +96,8 @@ export default async function renderChannels() {
         h('div', { class: 'row' },
           c.platform === 'fanvue'
             ? h('a', { class: 'btn small', href: '/settings/shared#fanvue' }, 'Gemeinsame Verbindung')
+            : c.platform === 'telegram'
+            ? h('button', {class:'small', onClick: () => openTelegram(c)}, 'Bot-Zugang')
             : c.is_connected
             ? h('button', { class: 'small', onClick: guard(async () => { await api.disconnect(c.id); toast.ok('Getrennt'); reload() }) }, 'Trennen')
             : h('button', {
@@ -110,7 +112,8 @@ export default async function renderChannels() {
             class: 'small',
             onClick: guard(async () => { await api.pauseChannel(c.id, c.is_active); toast.ok('Status geändert'); reload() }),
           }, c.is_active ? 'Pausieren' : 'Fortsetzen'),
-          c.platform !== 'fanvue' ? h('button', { class: 'small', onClick: () => openApp(c) }, 'API-Zugang') : null,
+          c.platform === 'x' ? h('button', { class: 'small', onClick: () => openApp(c) }, 'API-Zugang') : null,
+          c.platform === 'telegram' && c.has_bot_token ? h('button', {class:'small',onClick:guard(async()=>{ await api.disconnect(c.id); toast.ok('Getrennt'); reload() })}, 'Trennen') : null,
           h('button', { class: 'small', onClick: (e) => runTest(c, e.target) }, 'Testen'),
           h('button', { class: 'small', onClick: () => openPolicy(c) }, 'Einstellungen'),
           h('div', { class: 'spacer' }),
@@ -133,7 +136,9 @@ export default async function renderChannels() {
         h('div', { class: 'col' },
           h('div', { class: r.ok ? 'okbox' : 'errbox' }, r.message),
           r.warning ? h('div', { class: 'warnbox' }, r.warning) : null,
-          h('table', {}, h('tbody', {}, ...[
+          h('table', {}, h('tbody', {}, ...(channel.platform === 'telegram' ? [
+            ['Plattform','Telegram'], ['Bot-ID',r.account_id || '—'], ['Bot',r.account || '—'], ['Kanal-ID',r.chat_id || '—'], ['Prüfung','Nur lesend – keine Testnachricht'],
+          ] : [
             ['Plattform', r.platform],
             ['App', r.uses_own_app ? 'eigene App' + (r.app_name ? ` (${r.app_name})` : '') : 'globale App'],
             ['Account', r.account ? '@' + r.account : '—'],
@@ -141,7 +146,7 @@ export default async function renderChannels() {
             ['Scopes', (r.scopes || []).join(' ') || '—'],
             ['Token gültig bis', r.token_expires_at ? fmtDateTime(r.token_expires_at) : '—'],
             ['Redirect-URI', r.redirect_uri],
-          ].map(([k, v]) => h('tr', {},
+          ]).map(([k, v]) => h('tr', {},
             h('td', { class: 'hint', style: { width: '35%' } }, k),
             h('td', { style: { wordBreak: 'break-all' } }, String(v)))))),
           channel.platform !== 'fanvue' && !r.ok && r.step === 'oauth'
@@ -157,6 +162,20 @@ export default async function renderChannels() {
       btn.textContent = label; btn.disabled = false
     }
   })
+
+  function openTelegram(channel) {
+    modal(`Telegram Bot-Zugang — ${channel.display_name}`, close => {
+      const token = h('input', {type:'password',autocomplete:'new-password', 'aria-label':'Bot-Token',placeholder:channel.has_bot_token?'•••••••• (gespeichert)':''})
+      const destination = h('input', {value:channel.handle || '', 'aria-label':'Zielkanal',placeholder:'@kanalname oder -100…'})
+      return h('div', {class:'col'},
+        h('p', {}, 'Eigene geplante Telegram-Beiträge. Bot als Administrator mit „Nachrichten posten“ hinzufügen. Kein Zugriff auf Benachrichtigungsbot, keine Webhooks/Updates.'),
+        field('Bot-Token',token,'Verschlüsselt gespeichert. Leer/maskiert = unverändert.'),
+        field('Zielkanal',destination,'Öffentlicher @Name oder private numerische -100… Kanal-ID.'),
+        h('p',{class:'hint'},'Speichern verbindet noch nicht. Danach „Testen“ prüft getMe/getChat/getChatMember ohne Testnachricht. Aktivierung/Planung bleiben unverändert.'),
+        h('button',{class:'primary',onClick:guard(async()=>{await api.saveTelegram(channel.id,{bot_token:token.value.trim(),destination:destination.value.trim()});token.value='';toast.ok('Gespeichert – jetzt Rechte testen');close();reload()})},'Speichern'),
+        h('button',{onClick:close},'Abbrechen'))
+    })
+  }
 
   // ------------------------------------------------------------ API-Zugang
   function openApp(channel) {
@@ -271,7 +290,7 @@ export default async function renderChannels() {
   // ------------------------------------------------------------ Anlegen
   function openCreate() {
     modal('Kanal anlegen', (close) => {
-      const platform = h('select', {}, h('option', { value: 'x' }, 'X (Twitter)'))
+      const platform = h('select', {'aria-label':'Plattform'}, h('option', { value: 'x' }, 'X (Twitter)'), h('option',{value:'telegram'},'Telegram-Kanal'))
       const name = h('input', {})
       const handle = h('input', { placeholder: '@sallylarsen' })
       const color = h('input', { type: 'color', value: '#1d9bf0' })
@@ -294,10 +313,10 @@ export default async function renderChannels() {
       const appFields = h('div', {}, field('Name der App', appName), field('Client-ID', clientId), field('Client-Secret', clientSecret), callback.node)
       const connectHint = h('div', { class: 'warnbox', style: { margin: '12px 0' } }, 'Nach dem Anlegen den X-Kanal per OAuth verbinden.')
       platform.addEventListener('change', () => {
-        appFields.style.display = platform.value === 'fanvue' ? 'none' : ''
-        connectHint.style.display = platform.value === 'fanvue' ? 'none' : ''
+        appFields.style.display = platform.value === 'x' ? '' : 'none'
+        connectHint.style.display = platform.value === 'x' ? '' : 'none'
         schedRow.style.display = platform.value === 'fanvue' ? 'flex' : 'none'
-        appHint.textContent = platform.value === 'x'
+        appHint.textContent = platform.value === 'telegram' ? 'Telegram: eigene Beiträge mit eigener Planung. Nach dem Anlegen Bot-Token und Kanal unter Bot-Zugang speichern und Rechte testen. Neue Telegram-Kanäle sind pausiert; automatische Planung ist aus.' : platform.value === 'x'
           ? 'Bei X gehört zu jeder API-App genau ein Account. Für dieses Profil eine eigene App im Entwicklerportal anlegen und die Zugangsdaten hier eintragen.'
           : 'Die gemeinsame Fanvue-Verbindung wird automatisch mitverwendet. Keine zusätzlichen API-Daten oder Anmeldung nötig. Das Handle muss zum verbundenen Fanvue-Konto gehören.'
         handle.placeholder = platform.value === 'fanvue' ? 'sallylarsen' : '@sallylarsen'
@@ -334,24 +353,24 @@ export default async function renderChannels() {
               timezone: tz.value,
               nsfw_level: nsfw.value,
               platform_side_scheduling: platformSched.checked,
-              default_audience: isX ? '' : 'subscribers',
+              default_audience: platform.value === 'fanvue' ? 'subscribers' : '',
               oauth_client_id: isX ? clientId.value.trim() : '',
               oauth_client_secret: isX ? clientSecret.value.trim() : '',
               oauth_app_name: isX ? appName.value.trim() : '',
               ...(isX ? callback.values() : {}),
               policy: {
                 posts_per_day: 2, min_gap_minutes: 180, jitter_minutes: 12,
-                max_images_per_post: isX ? 4 : 20,
-                text_only_ratio: isX ? 0.3 : 0,
+                max_images_per_post: isX ? 4 : 10,
+                text_only_ratio: 0.3,
                 allowed_time_windows: [{ dow: [0, 1, 2, 3, 4, 5, 6], from: '09:00', to: '22:00' }],
                 reuse_cooldown_days: 0, phash_min_distance: 6, phash_lookback_posts: 20,
                 daily_api_quota: isX ? 25 : 100,
-                auto_approve: false, auto_retry_on_fail: true, allow_recycling: false,
+                auto_approve: false, auto_retry_on_fail: platform.value !== 'telegram', allow_recycling: false,
                 set_handling: null,
                 exclusive_pool_group: null,
               },
             })
-            toast.ok(isX ? 'Kanal angelegt — jetzt verbinden' : 'Kanal angelegt — verwendet die gemeinsame Fanvue-Verbindung')
+            toast.ok(isX ? 'Kanal angelegt — jetzt verbinden' : 'Telegram-Kanal pausiert angelegt — jetzt Bot-Zugang einrichten')
             close(); reload()
           }),
         }, 'Anlegen'),
@@ -379,6 +398,8 @@ export default async function renderChannels() {
         ...personas.map((x) => h('option', { value: x.id, selected: x.id === channel.persona_id }, x.name)))
       const poolGroup = h('input', { value: p.exclusive_pool_group || '', placeholder: 'leer = eigener Pool' })
       const watermark = watermarkEditor(channel)
+      const textGuidelines = h('textarea', {'aria-label':'Telegram-Textvorgaben',maxLength:4000,value:p.text_guidelines || ''})
+      textGuidelines.addEventListener('input',()=>{p.text_guidelines=textGuidelines.value})
       const sendAltText = h('input', { type: 'checkbox', checked: channel.x_send_alt_text !== false })
       const madeWithAi = h('input', { type: 'checkbox', checked: !!channel.x_made_with_ai })
 
@@ -408,12 +429,12 @@ export default async function renderChannels() {
           field('Farbe im Kalender', color),
           field('Persona', personaSel),
         ),
-        callback ? callback.node : h('div', { class: 'okbox' }, 'Fanvue verwendet die gemeinsame Verbindung. ', h('a', { href: '/settings/shared#fanvue' }, 'Callback-Adresse in den gemeinsamen Einstellungen ändern.')),
+        channel.platform === 'telegram' ? h('div',{class:'hint'},'Telegram: eigener Zeitplan, eigene Persona, eigene Medienzuordnung. Text 4096 / Caption 1024 Zeichen; Album 2–10 Medien. JPEG/PNG und H.264/AAC-MP4; keine automatischen Wiederholungen bei Telegram. Bot-Zugang separat verwalten.') : callback ? callback.node : h('div', { class: 'okbox' }, 'Fanvue verwendet die gemeinsame Verbindung. ', h('a', { href: '/settings/shared#fanvue' }, 'Callback-Adresse in den gemeinsamen Einstellungen ändern.')),
         h('div', { class: 'grid c3' },
           numField('posts_per_day', 'Posts pro Tag', null, '0.5'),
           numField('min_gap_minutes', 'Mindestabstand (Min.)'),
           numField('jitter_minutes', 'Zufallsversatz (Min.)', 'Gegen erkennbare Bot-Muster'),
-          numField('text_only_ratio', 'Anteil reiner Textposts', '0–1, nur X', '0.1'),
+          numField('text_only_ratio', 'Anteil reiner Textposts', '0–1, X und Telegram', '0.1'),
           numField('max_images_per_post', 'Max. Bilder pro Post'),
           numField('daily_api_quota', 'Tageskontingent API'),
           numField('reuse_cooldown_days', 'Wiederverwendung nach (Tagen)', '0 = auf diesem Kanal nie wiederverwenden'),
@@ -425,6 +446,7 @@ export default async function renderChannels() {
             ? numField('free_post_ratio', 'Anteil Free-Posts', '0 = nur Abonnenten, 1 = alles frei', '0.1')
             : null,
         ),
+        channel.platform === 'telegram' ? field('Telegram-Textvorgaben',textGuidelines,'Nur für diesen Kanal; ergänzt Persona und Telegram-Regeln bei manueller und automatischer Generierung.') : null,
         field('Gemeinsamer Pool (Gruppe)', poolGroup,
           'Nur setzen, wenn ein Bild bewusst nur auf EINEM Kanal der Gruppe laufen soll.'),
         field('Bild-Sets', setHandling,
@@ -504,11 +526,11 @@ export default async function renderChannels() {
 
   draw()
 
-  const livePage = h('div', { class: 'page stack' },
+  const livePage = h('div', { class: 'page stack channels-page' },
     h('div', { class: 'page-head' },
       h('h1', {}, 'Kanäle'),
       h('div', { class: 'spacer' }),
-      h('button', { class: 'primary', onClick: openCreate }, 'X-Kanal anlegen'),
+      h('button', { class: 'primary', onClick: openCreate }, 'Kanal anlegen'),
       h('a', { class: 'btn', href: '/settings/shared#fanvue' }, 'Fanvue-Verbindung'),
     ),
     list,

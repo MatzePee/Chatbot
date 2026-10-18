@@ -24,6 +24,16 @@ celery_app.conf.update(
 )
 
 celery_app.conf.beat_schedule = {
+    "age-fanvue-visibility": {
+        "task": "autoposter.age_fanvue_visibility",
+        "schedule": 60.0,
+    },
+    # Poll only: the shared collector gates on 06:00 Europe/Berlin (DST-safe),
+    # without changing the UTC timezone of any existing schedule.
+    "collect-daily-followers": {
+        "task": "autoposter.collect_daily_followers",
+        "schedule": 60.0,
+    },
     # Jede Minute: fällige Posts einreihen.
     "dispatch-due-posts": {
         "task": "autoposter.dispatch_due_posts",

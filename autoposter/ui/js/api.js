@@ -60,6 +60,7 @@ const qs = (params) => {
 }
 
 export const api = {
+  saveTelegram: (id,d) => request('/channels/' + id + '/telegram', {method:'PUT', body:JSON.stringify(d)}),
   imageComment: () => get('/settings/image-comment'),
   saveImageComment: d => post('/settings/image-comment', d),
   // --- Auth ---
@@ -82,6 +83,8 @@ export const api = {
   notifications: (unreadOnly = true) => get('/notifications?unread_only=' + unreadOnly),
   markRead: (ids) => post('/notifications/read', ids),
   llmUsage: () => get('/llm/usage'),
+  visibilityAgingStatus: () => get('/settings/visibility-aging'),
+  runVisibilityAging: () => post('/settings/visibility-aging/run'),
   integrations: () => get('/settings/integrations'),
   saveIntegrations: (d) => post('/settings/integrations', d),
   clearSecret: (field) => post('/settings/integrations/clear', { field }),

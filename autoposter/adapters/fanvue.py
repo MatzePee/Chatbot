@@ -69,6 +69,53 @@ class FanvueAdapter:
         self.base = settings.fanvue_api_base.rstrip("/")
 
     # ------------------------------------------------------------------ #
+    async def visibility_request(self, cred, method, path, **kwargs):
+        """Official v1 post API; bounded retry, never persist response bodies.
+
+        PATCH is deliberately an idempotent audience-only assignment. No create,
+        delete, scheduling, text, media or price fields are ever transmitted.
+        """
+        import re
+        allowed = path == '/v1/posts' or path == '/users/me' or re.fullmatch(r'/v1/posts/[0-9a-fA-F-]{36}', path)
+        if not allowed or method not in {'GET', 'PATCH'}:
+            raise AdapterError('Ungültige Sichtbarkeitsoperation')
+        if method == 'PATCH' and (path in {'/v1/posts', '/users/me'} or kwargs.get('json') != {'audience':'subscribers'}):
+            raise AdapterError('Nur audience=subscribers ist erlaubt')
+        async with http_client(timeout=30.0) as client:
+            for attempt in range(3):
+                try:
+                    response = await client.request(method, self.base + path, headers=self._headers(cred), **kwargs)
+                except httpx.TransportError:
+                    if attempt == 2:
+                        raise AdapterError('Fanvue Netzwerkfehler nach 3 Versuchen', retryable=True) from None
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                if response.status_code in {429, 500, 502, 503, 504} and attempt < 2:
+                    try:
+                        delay = max(0, float(response.headers.get('Retry-After', 2 ** attempt)))
+                    except ValueError:
+                        delay = 2 ** attempt
+                    if delay > 30:
+                        raise AdapterError('Fanvue Rate-Limit: später erneut versuchen', status=response.status_code, retryable=True)
+                    await asyncio.sleep(delay)
+                    continue
+                if response.status_code >= 400:
+                    hints = {
+                        401: 'Token ungültig oder abgelaufen; Verbindung prüfen',
+                        403: 'Berechtigung für diese Ressource fehlt',
+                        404: 'Ressource nicht gefunden oder für dieses Konto nicht verfügbar',
+                        410: 'API-Version nicht mehr verfügbar; konfigurierte API-Version prüfen',
+                    }
+                    hint = hints.get(response.status_code, 'Anfrage abgelehnt; später prüfen')
+                    raise AdapterError(f'Fanvue Sichtbarkeit: HTTP {response.status_code} bei {method} {path} – {hint}', status=response.status_code)
+                try:
+                    data = response.json()
+                    if not isinstance(data, dict):
+                        raise ValueError()
+                    return data
+                except ValueError:
+                    raise AdapterError('Fanvue lieferte ungültige JSON-Daten') from None
+
     def limits(self) -> ChannelLimits:
         return ChannelLimits(
             max_chars=MAX_TEXT,

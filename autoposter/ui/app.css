@@ -90,6 +90,9 @@ a { color: #818cf8; }
 .grid.c3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
 .grid.c6 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.channels-page .card, .channels-page .card .row > b { min-width: 0; overflow-wrap: anywhere; }
+body:has(.channels-page) .modal-head h3 { overflow-wrap: anywhere; }
+.telegram-planner .chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 .col { display: flex; flex-direction: column; gap: 8px; }
 .stack > * + * { margin-top: 14px; }
 

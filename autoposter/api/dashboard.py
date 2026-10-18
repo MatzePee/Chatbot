@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -347,13 +347,31 @@ async def get_integrations(
     return masked
 
 
+@router.get('/settings/visibility-aging')
+async def visibility_aging_status(db: AsyncSession = Depends(get_db), _: User = Depends(current_user)):
+    from autoposter.services import visibility_aging
+    return await visibility_aging.status(db)
+
+
+@router.post('/settings/visibility-aging/run', status_code=202)
+async def visibility_aging_run(background: BackgroundTasks, _: User = Depends(require_admin)):
+    from autoposter import jobs
+    if settings.global_pause or settings.dry_run:
+        raise HTTPException(409, 'Notfall-Stopp aktiv' if settings.global_pause else 'Trockenlauf aktiv – keine Sichtbarkeitsänderungen')
+    background.add_task(jobs.age_fanvue_visibility, manual=True)
+    return {'status':'accepted', 'message':'Prüfung im Hintergrund angefordert; Status aktualisieren. Gespeichertes Alter wird verwendet.'}
+
+
 @router.post("/settings/integrations")
 async def save_integrations(
     payload: Dict[str, Any],
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ) -> Dict[str, Any]:
-    values = await appconfig.set_many(db, payload)
+    try:
+        values = await appconfig.set_many(db, payload)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     return appconfig.mask(values)
 
 

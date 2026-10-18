@@ -468,7 +468,7 @@ export default async function renderCalendar() {
   // gemeinsamer Dialog müsste die Hälfte der Felder je nach Kanal ausgrauen.
   function openPlanner(platform) {
     const isFanvue = platform === 'fanvue'
-    modal(`Automatisch planen — ${isFanvue ? 'Fanvue' : 'X'}`, (close) => {
+    modal(`Automatisch planen — ${platform === 'telegram' ? 'Telegram' : isFanvue ? 'Fanvue' : 'X'}`, (close) => {
       const start = new Date()
       const end = new Date(); end.setDate(end.getDate() + 14)
 
@@ -689,7 +689,7 @@ export default async function renderCalendar() {
 
       setTimeout(checkFeasibility, 0)
 
-      return h('div', {},
+      return h('div', {class:platform === 'telegram' ? 'telegram-planner' : ''},
         h('div', { class: 'grid c2' },
           field('Von', fromInput),
           field('Bis', toInput),
@@ -765,6 +765,8 @@ export default async function renderCalendar() {
         ? h('button', { class: 'primary', onClick: () => openPlanner('x') },
             '⚡ X planen')
         : null,
+      state.channels.some((c) => c.platform === 'telegram')
+        ? h('button', { class: 'primary', onClick: () => openPlanner('telegram') }, '⚡ Telegram planen') : null,
       state.channels.some((c) => c.platform === 'fanvue')
         ? h('button', { class: 'primary', onClick: () => openPlanner('fanvue') },
             '⚡ Fanvue planen')

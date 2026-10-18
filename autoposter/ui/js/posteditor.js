@@ -9,7 +9,7 @@ import {
 export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
   const channel = channels.find((c) => c.id === post.channel_id)
   const isFanvue = channel && channel.platform === 'fanvue'
-  const maxChars = channel && channel.platform === 'x' ? 280 : 5000
+  const maxChars = channel?.platform === 'telegram' ? (post.media_asset_ids?.length ? 1024 : 4096) : channel?.platform === 'x' ? 280 : 5000
 
   modal(`Post — ${channel ? channel.display_name : ''}`, (close) => {
     const text = h('textarea', { style: { height: '130px' } })
@@ -49,7 +49,7 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
         src: `/api/v1/media/${assetId}/thumb?size=256`,
         class: 'daythumb', alt: '',
       })
-      attachPreview(img, `/api/v1/media/${assetId}/file`, { size: 360 })
+      attachPreview(img, channel?.platform === 'telegram' ? `/api/v1/media/${assetId}/thumb?size=512` : `/api/v1/media/${assetId}/file`, { size: 360 })
       mediaBox.appendChild(img)
     }
     if (!(post.media_asset_ids || []).length) {
@@ -58,7 +58,8 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
 
     const updateCounter = () => {
       translatedText.invalidate()
-      const len = text.value.length + hashtags.value.split(',').filter(Boolean).join(' ').length
+      const tags = hashtags.value.split(',').map(t=>t.trim()).filter(Boolean).map(t=>'#'+t.replace(/^#+/,'')).join(' ')
+      const len = channel?.platform === 'telegram' ? text.value.length + (tags ? tags.length + (text.value ? 2 : 0) : 0) : text.value.length + hashtags.value.split(',').filter(Boolean).join(' ').length
       counter.textContent = `${len} / ${maxChars} Zeichen`
       counter.style.color = len > maxChars ? 'var(--err)' : 'var(--dim)'
     }
@@ -139,6 +140,7 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
     return h('div', { class: 'grid c2' },
       h('div', {},
         mediaBox,
+        channel?.platform === 'telegram' ? h('div',{class:'hint'}, `Telegram · ${maxChars} Zeichen · Plaintext · keine automatische Aufteilung`, post.generation_meta?.telegram_delivery ? ' · Versand: ' + ({uncertain:'unklar – Zielkanal manuell prüfen, nicht erneut senden',pending:'unklar/läuft – nicht erneut senden',confirmed:'bestätigt',rejected:'abgelehnt'}[post.generation_meta.telegram_delivery.state] || post.generation_meta.telegram_delivery.state) : '') : null,
         post.generation_meta?.x_image_comment ? h('div', { class: 'hint', style: { marginTop: '12px', whiteSpace: 'pre-wrap' } },
           'X Auto-Kommentar · ' + ({ pending: 'Wartet', sending: 'Versand begonnen – bei Abbruch auf X prüfen', sent: 'Veröffentlicht', failed: 'Fehlgeschlagen – auf X prüfen', unknown: 'Status unklar – auf X prüfen', cancelled: 'Deaktiviert' }[post.generation_meta.x_image_comment.state] || post.generation_meta.x_image_comment.state),
           '\n' + post.generation_meta.x_image_comment.text,

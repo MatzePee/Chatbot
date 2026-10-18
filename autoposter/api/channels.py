@@ -40,6 +40,7 @@ from autoposter.models import (
     User,
 )
 from autoposter.schemas import (
+    TelegramSetup,
     ChannelCreate,
     ChannelOut,
     ChannelUpdate,
@@ -248,6 +249,11 @@ async def _to_out(db: AsyncSession, channel: Channel) -> ChannelOut:
         out.oauth_client_id = ''
         out.oauth_app_name = 'AutoChat'
         out.has_client_secret = bool(app.client_secret)
+    if channel.platform == "telegram":
+        out.app_configured = False
+        out.redirect_uri = ""
+        out.connection_source = "telegram_bot"
+        out.has_bot_token = bool(channel.credential_id)
     out.last_verified_at = channel.last_verified_at
     out.verified_account = channel.verified_account
     out.has_watermark = watermark.path_for(channel.id).exists()
@@ -281,7 +287,7 @@ async def create_channel(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ) -> ChannelOut:
-    if payload.platform not in ("x", "fanvue"):
+    if payload.platform not in ("x", "fanvue", "telegram"):
         raise HTTPException(400, "Unbekannte Plattform")
     try:
         redirect_base = oauthapp.normalize_redirect_base(payload.oauth_redirect_base, payload.platform)
@@ -310,6 +316,11 @@ async def create_channel(
         health=ChannelHealth.needs_reauth.value,
         health_note="Noch nicht verbunden",
     )
+    if channel.platform == "telegram":
+        channel.is_active = False
+        channel.auto_plan_enabled = False
+        channel.default_audience = ""
+        channel.platform_side_scheduling = False
     if channel.platform == 'fanvue':
         from autoposter.services import chatbot_fanvue
         tokens = chatbot_fanvue.chatbot_db.get_tokens()
@@ -343,6 +354,9 @@ async def update_channel(
         raise HTTPException(404, "Kanal nicht gefunden")
 
     data = payload.model_dump(exclude_unset=True)
+    if channel.platform == "telegram" and payload.handle is not None and payload.handle != channel.handle:
+        channel.last_verified_at = None
+        channel.health = ChannelHealth.needs_reauth.value
     fixed = fanvue_channels.fixed_audience(channel)
     alt_changed = (
         channel.platform == 'x' and 'x_send_alt_text' in data
@@ -565,6 +579,8 @@ async def oauth_start(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ) -> dict:
+    if platform == "telegram":
+        raise HTTPException(409, "Telegram verwendet Bot-Zugang, kein OAuth.")
     if platform == "fanvue":
         raise HTTPException(409, "Fanvue wird zentral im AutoChat verwaltet. Keine zweite Anmeldung erforderlich.")
     adapter = get_adapter(platform)
@@ -616,6 +632,8 @@ async def oauth_callback(
     error_hint: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
+    if platform == "telegram":
+        raise HTTPException(409, "Telegram verwendet Bot-Zugang, kein OAuth.")
     if platform == "fanvue":
         raise HTTPException(409, "Bitte die Fanvue-Verbindung im AutoChat verwalten.")
     def page(title: str, message: str, ok: bool) -> HTMLResponse:
@@ -679,6 +697,16 @@ async def oauth_callback(
     return page("Verbunden", f"Kanal '{name}' ist jetzt mit {platform} verbunden.", True)
 
 
+@router.put("/channels/{channel_id}/telegram", response_model=ChannelOut)
+async def save_telegram(channel_id: uuid.UUID, payload: TelegramSetup, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)) -> ChannelOut:
+    channel = await db.get(Channel, channel_id)
+    if not channel or channel.platform != "telegram":
+        raise HTTPException(404, "Telegram-Kanal nicht gefunden")
+    from autoposter.services import telegram_channels
+    await telegram_channels.save(db, channel, payload)
+    return await _to_out(db, channel)
+
+
 @router.post("/channels/{channel_id}/test")
 async def test_channel(
     channel_id: uuid.UUID,
@@ -696,6 +724,11 @@ async def test_channel(
     if not channel:
         raise HTTPException(404, "Kanal nicht gefunden")
 
+    if channel.platform == "telegram":
+        if _.role != "admin":
+            raise HTTPException(403, "Admin erforderlich")
+        from autoposter.services import telegram_channels
+        return await telegram_channels.test(db, channel)
     app = oauthapp.for_channel(channel)
     redirect = app.redirect_uri(channel.platform)
     result: Dict[str, Any] = {
@@ -841,6 +874,12 @@ async def disconnect(
         raise HTTPException(404, "Kanal nicht gefunden")
     if channel.platform == "fanvue":
         raise HTTPException(409, "Die gemeinsame Fanvue-Verbindung kann nur im AutoChat getrennt werden.")
+    if channel.platform == "telegram":
+        row = await db.get(ChannelCredential, channel.credential_id) if channel.credential_id else None
+        if row:
+            await db.delete(row)
+        channel.last_verified_at = None
+        channel.verified_account = ""
     channel.credential_id = None
     channel.health = ChannelHealth.needs_reauth.value
     channel.health_note = "Verbindung getrennt"

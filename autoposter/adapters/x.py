@@ -351,7 +351,7 @@ class XAdapter:
         """GET only: own authenticated account public follower count."""
         async with http_client() as client:
             response = await client.get(
-                f"{self.base}/users/me",
+                f"{self.base}/2/users/me",
                 headers={"Authorization": f"Bearer {cred.access_token}"},
                 params={"user.fields": "public_metrics"},
             )

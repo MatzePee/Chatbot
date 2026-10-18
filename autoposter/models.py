@@ -106,6 +106,7 @@ class Role(str, enum.Enum):
 class Platform(str, enum.Enum):
     x = "x"
     fanvue = "fanvue"
+    telegram = "telegram"
 
 
 class NsfwLevel(str, enum.Enum):
@@ -260,6 +261,7 @@ class PostingPolicy(Base, TimestampMixin):
     __tablename__ = "posting_policy"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
+    text_guidelines: Mapped[str] = mapped_column(Text, default="")
     posts_per_day: Mapped[float] = mapped_column(Float, default=2.0)
     min_gap_minutes: Mapped[int] = mapped_column(Integer, default=180)
     jitter_minutes: Mapped[int] = mapped_column(Integer, default=12)

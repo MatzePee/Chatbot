@@ -12,9 +12,11 @@ from autoposter.adapters.base import (  # noqa: F401
     PublishResult,
 )
 from autoposter.adapters.fanvue import FanvueAdapter
+from autoposter.adapters.telegram import TelegramAdapter
 from autoposter.adapters.x import XAdapter
 
 _REGISTRY: Dict[str, object] = {
+    "telegram": TelegramAdapter(),
     "x": XAdapter(),
     "fanvue": FanvueAdapter(),
 }
