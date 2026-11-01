@@ -61,8 +61,8 @@ export function createDropZone({ channels = [], onDone = () => {}, compact = fal
   const bar = h('div', { class: 'bar', style: { display: 'none' } }, h('i', { style: { width: '0%' } }))
 
   const tagsInput = h('input', { placeholder: 'z. B. beach, sommer' })
-  const nsfwSelect = h('select', {}, ...['sfw', 'suggestive', 'explicit'].map((v) =>
-    h('option', { value: v }, v)))
+  const nsfwSelect = h('select', {}, ...['sfw', 'explicit'].map((v) =>
+    h('option', { value: v }, v === 'sfw' ? 'SFW' : 'Explizit')))
   const channelSelect = h('select', { multiple: true, size: Math.min(5, Math.max(2, channels.length)) },
     ...channels.map((c) => h('option', { value: c.id }, `${c.display_name} (${c.platform})`)))
 
@@ -237,7 +237,7 @@ export function createDropZone({ channels = [], onDone = () => {}, compact = fal
 
   const options = h('div', { class: 'grid c3' },
     field('Tags (kommagetrennt, optional)', tagsInput),
-    field('NSFW-Level', nsfwSelect),
+    field('Bildkategorie', nsfwSelect),
     field('Direkt Kanälen zuordnen (optional)', channelSelect,
       'Mehrfachauswahl mit Strg/Cmd. Lässt sich später jederzeit unter „Zuordnung" ändern.'),
   )

@@ -89,7 +89,9 @@ async def _upload_all(
                 )
             )
         ).scalar_one_or_none()
-        if cached and (cached.expires_at is None or cached.expires_at > now):
+        # Explicit X uploads must carry the current adult-content label.
+        needs_label = channel.platform == "x" and asset.nsfw_level in ("explicit", "suggestive")
+        if cached and not needs_label and (cached.expires_at is None or cached.expires_at > now):
             refs.append(MediaRef(asset_id=str(asset.id), external_id=cached.external_id))
             continue
 
@@ -308,6 +310,11 @@ async def publish_post(
             post.scheduled_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
             post.error_message = f"Wiederholung in {delay}s: {exc}"[:900]
             db.add(post)
+            await notify.push(
+                db, level="error",
+                title=f"Veröffentlichung fehlgeschlagen: {channel.display_name}",
+                body=post.error_message, entity="post", entity_id=str(post.id),
+            )
             return False, post.error_message
 
         post.status = PostStatus.failed.value
@@ -332,6 +339,11 @@ async def publish_post(
         post.status = PostStatus.failed.value
         post.error_message = f"Unerwarteter Fehler: {exc}"[:900]
         db.add_all([post, attempt])
+        await notify.push(
+            db, level="error",
+            title=f"Veröffentlichung fehlgeschlagen: {channel.display_name}",
+            body=post.error_message, entity="post", entity_id=str(post.id),
+        )
         return False, post.error_message
 
     post.status = PostStatus.published.value

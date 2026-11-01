@@ -1,0 +1,17 @@
+# Top Posts X
+
+Unter AutoPost → Top Posts X erscheinen die 50 veröffentlichten AutoPost-X-Posts mit den meisten bekannten Views (impression_count), über alle gespeicherten X-Kanäle und ohne Altersgrenze. Trockenläufe und unbekannte View-Zahlen werden ausgeschlossen; Likes ersetzen keine Views. Gleichstände werden nach Veröffentlichungszeit und Post-ID sortiert.
+
+Das Alter wird nach Kalendertagen in Europe/Berlin berechnet: 0–14 Tage rot, 15–30 gelb, ab 31 Tagen grün. Der Datumsblock enthält die Wiederfreigabe. Bereits eingeplante oder erneut freigegebene Bilder deaktivieren den Button; das gilt für alle historischen Posts mit demselben Bild auf demselben gewählten Zielkanal.
+
+Jeder Post zeigt ausschließlich X-Kanäle als kompakte, nebeneinanderliegende Kästchen in einer Tabellenzeile. Jedes Kästchen enthält das letzte tatsächliche Veröffentlichungsdatum mit Altersfarbe und die Views dieser konkreten Veröffentlichung (fehlende Werte bleiben als nicht verfügbar erkennbar), aufklappbare frühere Veröffentlichungen, den Planungsstatus und eine eigene Freigabeaktion. Fanvue und Telegram werden hier weder angezeigt noch als Ziel angenommen. Eine Watermark-Spalte gibt es nicht; das Wasserzeichen wird weiterhin beim Versand nach der Konfiguration des X-Zielkanals angewendet. Die Daten stammen aus veröffentlichten Posts und der Bildnutzungshistorie; Planungsdaten und Trockenläufe werden nicht als Veröffentlichungen angezeigt. Bei mehreren Bildern wird angegeben, welche Bilder zur jeweiligen Veröffentlichung gehören. Die Verfügbarkeit wird für jeden Zielkanal getrennt ermittelt. Die Freigabe verwendet den vorhandenen kanalbezogenen Reuse-Pool. Sie erstellt keinen sofortigen Versand und verändert den historischen Post nicht. Archivierte Bilder werden dabei reaktiviert. Die Bilder bleiben über ihre Bibliotheks-IDs mit denselben Originaldateien verknüpft. Nur der Medien-Upload-Cache des gewählten Ziels wird bei der Freigabe verworfen. Beim späteren Versand werden die Originalbytes frisch eingelesen und mit dem aktuellen Wasserzeichen dieses Zielkanals verarbeitet. Der bisherige Post, andere Konten, Originaldateien und die üblichen Planungs-/Freigaberegeln bleiben erhalten. Textposts ohne Bilder können angesehen, aber nicht als Bilder freigegeben werden.
+
+## Datenerfassung
+
+Der Job collect_x_post_metrics prüft jede Minute einen dauerhaft gespeicherten Tagesslot und läuft einmal täglich ab 01:00 Uhr Europe/Berlin. Ein Start nach 01:00 holt den aktuellen Tag nach; Neustarts führen nicht zu einer zweiten Abfrage desselben Tages. Die vorhandene 30-Minuten-Erfassung verarbeitet künftig nur die übrigen Plattformen. In-process und Celery verwenden dieselbe Claim-Logik.
+
+X-Abfragen verwenden GET /2/tweets mit maximal 100 IDs und public_metrics,author_id. Vor jedem Kontolauf wird die tatsächliche X-Identität geprüft. Statistiken mit fremdem author_id werden nicht in das Ranking aufgenommen. Datenbank-Schreibsperren werden nicht über HTTP-Aufrufe gehalten. Teilfehler und fehlende Messungen bleiben auf der Seite sichtbar. Es werden nur in AutoPost gespeicherte Veröffentlichungen gemessen; fremde/manuell erstellte Posts werden nicht importiert.
+
+API-Vertrag: [X Post Lookup](https://docs.x.com/x-api/posts/lookup/introduction), [Get Posts by IDs](https://docs.x.com/x-api/posts/get-posts-by-ids).
+
+Tests: tests/autoposter/test_top_posts_x.py und der vollständig simulierte Browserlauf tests/top_posts_x_ui.py. Für den Browserlauf wird Playwright mit installiertem Chrome verwendet.

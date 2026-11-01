@@ -84,7 +84,7 @@ Werte der anderen Bereiche. Datenbank, Token-Verwaltung und Updateweg bleiben er
 
 ## Personas für Text- und Medienposts
 
-Unter AutoPost → Personas gibt es getrennte Bereiche **Text-Post** und
+Unter Einstellungen → Personas gibt es getrennte Bereiche **Text-Post** und
 **Medien-Post**, jeweils mit eigenem Systemprompt und eigenen Beispielposts für
 X und Fanvue. Der vorhandene Systemprompt bleibt als Text-Post-Prompt erhalten;
 das neue Medien-Promptfeld ergänzt die Datenbank ohne Änderung vorhandener Werte.
@@ -113,7 +113,7 @@ keinen Einfluss auf die Planung.
 
 ## X: ALT-Anzeige und KI-Label
 
-Unter **AutoPost → Kanäle → Einstellungen → X-Medienkennzeichnung** gibt es zwei
+Unter **Einstellungen → Kanäle → Einstellungen → X-Medienkennzeichnung** gibt es zwei
 unabhängige Optionen. **Bildbeschreibung an X senden (ALT)** steuert die Übermittlung
 von Alternativtext. Das ALT-Abzeichen wird von X angezeigt und ist kein Wasserzeichen.
 Nach dem Ausschalten erhalten neue Uploads keine Bildbeschreibung; vorhandene Posts
@@ -205,6 +205,13 @@ Backups werden nicht automatisch gelöscht; bei häufigen Neustarts Speicher pr�
 Medien liegen weiterhin im Datenordner und sind kein Teil dieser Datenbanksicherung.
 
 Tests: `.venv/bin/python -m pytest -q`
+
+Tests auf macOS (separate Umgebung, falls `.venv` vom Linux-Server stammt):
+`source "$HOME/.local/share/fanvue-chatbot/venv/bin/activate"`, danach
+`python -m pytest -q`. Die Umgebung liegt für schnelle Paketinstallation auf der
+lokalen Mac-Festplatte und verwendet Python 3.13 sowie `requirements-dev.txt`.
+Pakete aktualisieren mit
+`uv pip install --python "$HOME/.local/share/fanvue-chatbot/venv/bin/python" --only-binary :all: -r requirements-dev.txt`.
 Datenvergleich: `.venv/bin/python tools/verify_data.py ../Fanvue_Chatbot .`
 
 Ab v2.0.3 sind die Paketversionen auch für Python 3.14 abgestimmt. Vorher konnte

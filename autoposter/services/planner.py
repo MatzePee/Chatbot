@@ -304,8 +304,6 @@ async def pick_assets(
             continue
         if wanted_tags and not (wanted_tags & {t.lower() for t in (asset.tags or [])}):
             continue
-        if assignment.nsfw_rank(asset.nsfw_level) > assignment.nsfw_rank(channel.nsfw_level):
-            continue
         if str(channel.id) in (asset.used_channel_ids or []) and str(asset.id) not in released:
             if not cutoff or not asset.last_used_at or asset.last_used_at > cutoff:
                 continue
@@ -421,8 +419,6 @@ async def expand_to_set(
         if asset is None:
             continue  # nicht zugeordnet oder schon verbraucht
         if asset.id != first.id and asset.id in exclude:
-            continue
-        if assignment.nsfw_rank(asset.nsfw_level) > assignment.nsfw_rank(channel.nsfw_level):
             continue
         ordered.append(asset)
         if len(ordered) >= limit:

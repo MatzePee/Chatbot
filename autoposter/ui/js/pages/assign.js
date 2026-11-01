@@ -163,7 +163,7 @@ export default async function renderAssign() {
       e.preventDefault()
       const ids = Array.from(state.selected)
       const assets = state.pool.filter((a) => ids.includes(a.id))
-      const reject = assets.some((a) => (NSFW_RANK[a.nsfw_level] || 0) > (NSFW_RANK[column.channel.nsfw_level] || 0))
+      const reject = false
       el.classList.toggle('drop-no', reject)
       el.classList.toggle('drop-ok', !reject)
       e.dataTransfer.dropEffect = state.altDown ? 'move' : 'copy'
@@ -341,7 +341,7 @@ export default async function renderAssign() {
           h('div', { class: 'hint', style: { fontSize: '10px', marginTop: '5px' } },
             `${shown.length} von ${col.assets.length} Bildern sichtbar`),
           col.empty_on ? h('div', { class: 'hint', style: { fontSize: '10px' } }, 'leer am ' + fmtDate(col.empty_on)) : null,
-          h('div', { class: 'hint', style: { fontSize: '10px' } }, 'max. NSFW: ' + col.channel.nsfw_level),
+          h('div', { class: 'hint', style: { fontSize: '10px' } }, 'SFW und Explizit erlaubt'),
         ),
         body,
       )

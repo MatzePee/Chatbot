@@ -712,6 +712,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}a{
 
 /* X followers only: keep the desktop table, use readable account cards on phones. */
 .x-followers-cards { display: none; }
+.x-followers { min-width: 0; }
+.x-followers-table { max-width: 100%; overflow-x: auto; }
+.x-followers-table table { width: 100%; table-layout: fixed; }
+.x-followers-table td, .x-followers-table th { white-space: normal; overflow-wrap: anywhere; }
+.account-history details { white-space: normal; }
+.account-history table { width: 100%; table-layout: fixed; }
 @media (max-width: 760px) {
   .x-followers-table { display: none; }
   .x-followers-cards { display: flex; margin-top: 12px; gap: 12px; }
@@ -726,3 +732,55 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}a{
 @media (max-width: 350px) {
   .x-followers-metrics { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Bildnavigation bleibt auch in langen Bilddialogen erreichbar. */
+.library-detail-nav { justify-content: space-between; flex-wrap: nowrap; position: sticky; top: 0; z-index: 2; background: var(--bg, #fff); padding: 8px 0 12px; margin-bottom: 8px; }
+.library-detail-nav button { flex-shrink: 0; }
+@media (max-width: 520px) {
+  .library-detail-nav { gap: 6px; }
+  .library-detail-nav button { padding: 8px; font-size: 12px; }
+}
+
+/* Compact X leaderboard: one horizontal box per X destination. */
+.top-x-list { display:flex; flex-direction:column; gap:12px; }
+.top-x-post { display:grid; grid-template-columns:32px minmax(0,1fr) 150px; gap:12px; padding:14px; }
+.top-x-rank { font-size:20px; font-weight:700; color:var(--dim); }
+.top-x-content { min-width:0; display:grid; grid-template-columns:96px minmax(0,1fr); gap:6px 12px; align-content:start; }
+.top-x-content > .row { grid-column:1 / -1; }
+.top-x-pictures { grid-column:1; grid-row:2 / span 2; display:flex; flex-wrap:wrap; gap:6px; }
+.top-x-pictures img { width:90px; height:108px; object-fit:cover; border-radius:8px; }
+.top-x-text { grid-column:2; white-space:pre-wrap; overflow-wrap:anywhere; margin:0; font-size:13px; }
+.top-x-content > a { grid-column:2; align-self:start; font-size:12px; }
+.top-x-performance { display:flex; flex-direction:column; gap:4px; }
+.top-x-views { font-size:25px; }
+.top-x-age { border-radius:7px; padding:6px 10px; font-size:12px; }
+.top-x-channel-table { grid-column:2 / -1; min-width:0; overflow-x:auto; }
+.top-x-channel-table table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:6px 0; }
+.top-x-channel-table td { padding:0; vertical-align:top; border:0; background:transparent; }
+.top-x-channel-box { display:flex; flex-direction:column; gap:8px; padding:10px; border:1px solid var(--line); border-radius:10px; min-height:180px; font-size:12px; }
+.top-x-channel-name { overflow-wrap:anywhere; font-size:13px; }
+.top-x-channel-status { font-size:11px; line-height:1.4; min-height:30px; }
+.top-x-channel-box > button { margin-top:auto; width:100%; min-width:0; padding:8px; font-size:12px; white-space:normal; }
+.top-x-date.red,.top-x-age.red { background:#ffeded; color:#9b202c; border-color:#efb9bf; }
+.top-x-date.yellow,.top-x-age.yellow { background:#fff7d6; color:#755800; border-color:#e4ce76; }
+.top-x-date.green,.top-x-age.green { background:#e9f7ed; color:#1c6031; border-color:#a3d1ae; }
+.top-x-date.neutral { background:var(--bg-2); }
+.top-x-date button:disabled { background:#e1e4e8; border-color:#c5cbd2; color:#626b76; opacity:1; }
+.top-x-publication { display:flex; flex-wrap:wrap; align-items:center; gap:5px; border-radius:6px; font-size:12px; }
+.top-x-publication time { font-weight:600; }
+.top-x-publication .hint { flex-basis:100%; }
+.top-x-history { margin-top:2px; }
+.top-x-history summary { cursor:pointer; font-size:11px; }
+.top-x-history .top-x-publication { margin-top:6px; padding:5px; }
+.top-x-history .red { background:#ffeded; color:#9b202c; }
+.top-x-history .yellow { background:#fff7d6; color:#755800; }
+.top-x-history .green { background:#e9f7ed; color:#1c6031; }
+@media(max-width:760px) {
+  .top-x-post { grid-template-columns:24px minmax(0,1fr); gap:8px; padding:10px; }
+  .top-x-content { grid-template-columns:76px minmax(0,1fr); gap:5px 8px; }
+  .top-x-pictures img { width:72px; height:90px; }
+  .top-x-performance { grid-column:2; flex-direction:row; align-items:baseline; flex-wrap:wrap; gap:6px; }
+  .top-x-channel-table { grid-column:1 / -1; }
+}
+
+.top-x-publication-views { flex-basis:100%; font-weight:600; }

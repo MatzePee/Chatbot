@@ -184,7 +184,7 @@ class ChannelCreate(BaseModel):
     color: str = "#6366f1"
     persona_id: Optional[uuid.UUID] = None
     timezone: str = "Europe/Berlin"
-    nsfw_level: str = "suggestive"
+    nsfw_level: str = "explicit"
     platform_side_scheduling: bool = False
     default_audience: str = "subscribers"
     #: Eigene OAuth-App. Bei X gehört zu jeder App genau EIN Account, deshalb

@@ -76,7 +76,7 @@ async def test_move_entfernt_alte_zuordnungen(db):
 
 
 @pytest.mark.asyncio
-async def test_nsfw_inkompatibles_asset_wird_abgelehnt(db):
+async def test_explicit_asset_allowed_on_sfw_channel(db):
     sfw_channel = await make_channel(db, "Clean", "x", nsfw="sfw")
     asset = await media_service.ingest(
         db, filename="e.jpg", data=make_image(15), nsfw_level="explicit"
@@ -84,8 +84,8 @@ async def test_nsfw_inkompatibles_asset_wird_abgelehnt(db):
     result = await assignment.assign(
         db, AssignmentBatch(asset_ids=[asset.id], channel_ids=[sfw_channel.id])
     )
-    assert result.created == 0
-    assert result.rejected and "NSFW" in result.rejected[0]["reason"]
+    assert result.created == 1
+    assert not result.rejected
 
 
 @pytest.mark.asyncio

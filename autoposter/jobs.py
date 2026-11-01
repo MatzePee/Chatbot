@@ -237,6 +237,9 @@ async def refresh_metrics(hours: int = 72) -> Dict[str, Any]:
             ).scalar_one_or_none()
             if not channel or not cred_service.is_connected(channel):
                 continue
+            # X lifetime views are collected once nightly by collect_x_post_metrics.
+            if channel.platform == "x":
+                continue
             try:
                 cred = await cred_service.get_valid_credentials(db, channel)
                 metrics = await get_adapter(channel.platform).fetch_metrics(
@@ -252,6 +255,7 @@ async def refresh_metrics(hours: int = 72) -> Dict[str, Any]:
     from autoposter.services import followers
     async with session_scope() as db:
         follower_accounts = await followers.collect(db)
+        follower_accounts += await followers.collect(db, platform='telegram')
     return {"updated": updated, "follower_accounts": follower_accounts}
 
 
@@ -260,6 +264,7 @@ async def collect_daily_followers(now=None) -> Dict[str, Any]:
     from autoposter.services import followers
     async with session_scope() as db:
         count = await followers.collect(db, now=now, daily_only=True)
+        count += await followers.collect(db, now=now, daily_only=True, platform='telegram')
     return {"follower_accounts": count, "schedule": "06:00 Europe/Berlin"}
 
 
@@ -283,6 +288,15 @@ async def token_health() -> Dict[str, Any]:
             await db.execute(select(Channel).where(Channel.is_active.is_(True)))
         ).scalars().all()
         for channel in channels:
+            if channel.health == ChannelHealth.needs_reauth.value:
+                await notify.push(
+                    db, level="error",
+                    title=f"Token-Problem: {channel.display_name}",
+                    body=(f"{channel.platform.upper()} kann nicht posten. "
+                          "Bitte unter Einstellungen → Kanäle das Konto erneut verbinden.\n"
+                          + (channel.health_note or "Anmeldung abgelaufen.")),
+                    entity="channel", entity_id=str(channel.id),
+                )
             if not cred_service.is_connected(channel):
                 continue
             try:
@@ -302,3 +316,9 @@ async def token_health() -> Dict[str, Any]:
                     entity_id=str(channel.id),
                 )
     return {"checked": checked}
+
+
+async def collect_x_post_metrics():
+    from autoposter.services import x_post_metrics
+    async with session_scope() as db:
+        return await x_post_metrics.collect(db)

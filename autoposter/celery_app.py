@@ -24,6 +24,10 @@ celery_app.conf.update(
 )
 
 celery_app.conf.beat_schedule = {
+    "collect-x-post-metrics": {
+        "task": "autoposter.collect_x_post_metrics",
+        "schedule": 60.0,  # The persistent collector gates on 01:00 Europe/Berlin.
+    },
     "age-fanvue-visibility": {
         "task": "autoposter.age_fanvue_visibility",
         "schedule": 60.0,

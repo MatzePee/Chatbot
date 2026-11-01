@@ -609,7 +609,7 @@ class LlmClient:
                     "content": (
                         "Beschreibe das Bild sachlich für eine Redaktionsdatenbank. "
                         'Antworte als JSON: {"description": "...", "alt_text": "...", '
-                        '"tags": ["..."], "nsfw_level": "sfw|suggestive|explicit"}'
+                        '"tags": ["..."], "nsfw_level": "sfw|explicit"}'
                     ),
                 },
                 {

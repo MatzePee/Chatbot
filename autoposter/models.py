@@ -367,7 +367,7 @@ class Channel(Base, TimestampMixin):
         GUID, ForeignKey("posting_policy.id", ondelete="SET NULL"), nullable=True
     )
     timezone: Mapped[str] = mapped_column(String(60), default="Europe/Berlin")
-    nsfw_level: Mapped[str] = mapped_column(String(20), default=NsfwLevel.suggestive.value)
+    nsfw_level: Mapped[str] = mapped_column(String(20), default=NsfwLevel.explicit.value)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     #: Nur automatisches Nachplanen; manuelle Planung und Versand bleiben unabhängig.
     auto_plan_enabled: Mapped[bool] = mapped_column(Boolean, default=True)

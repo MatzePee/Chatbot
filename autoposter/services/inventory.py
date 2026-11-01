@@ -75,8 +75,6 @@ async def channel_inventory(db: AsyncSession, channel: Channel) -> ChannelInvent
     for asset in pool:
         if asset.status != MediaStatus.ready.value:
             continue
-        if assignment.nsfw_rank(asset.nsfw_level) > assignment.nsfw_rank(channel.nsfw_level):
-            continue
         if asset.id in used_ids and str(asset.id) not in released:
             if not cutoff or not asset.last_used_at or asset.last_used_at > cutoff:
                 continue

@@ -1783,10 +1783,11 @@ _SHARED_SETTINGS_KEYS = _SHARED_FANVUE_KEYS | _SHARED_UPDATE_KEYS | _SHARED_TELE
 def shared_settings_page(request: Request, saved: str = "", section: str = "shared"):
     if section == "autochat":
         return settings_page(request)
+    section = section if section in ("autopost", "channels", "personas") else "shared"
     ctx = _base_ctx(request)
     ctx.update(s=db.all_settings(), saved=saved, workspace_area="settings",
-               settings_section="autopost" if section == "autopost" else "shared")
-    return templates.TemplateResponse("autopost_settings.html" if section == "autopost" else "shared_settings.html", ctx)
+               settings_section=section)
+    return templates.TemplateResponse("autopost_settings.html" if section != "shared" else "shared_settings.html", ctx)
 
 
 @app.post("/settings/shared/fanvue")

@@ -107,11 +107,25 @@ function show(kind, message) {
 }
 
 // ---------------------------------------------------------------- Modal
-export function modal(title, bodyBuilder, { wide = false } = {}) {
+export function modal(title, bodyBuilder, { wide = false, beforeClose = null } = {}) {
   const host = document.getElementById('modals')
-  const close = () => {
+  let closing = null
+  const dismiss = () => {
     bg.remove()
     document.removeEventListener('keydown', onKey)
+  }
+  const close = () => {
+    if (!beforeClose) { dismiss(); return true }
+    if (closing) return closing
+    closing = Promise.resolve().then(beforeClose).then((allowed) => {
+      if (allowed === false) return false
+      dismiss()
+      return true
+    }).catch((error) => {
+      toast.error(error.message || 'Änderungen konnten nicht gespeichert werden')
+      return false
+    }).finally(() => { closing = null })
+    return closing
   }
   // Escape schließt nur den obersten Dialog. Liegt eine Rückfrage über einer
   // Maske, soll sie nicht beide auf einmal wegräumen.

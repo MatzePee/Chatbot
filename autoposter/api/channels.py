@@ -643,7 +643,7 @@ async def oauth_callback(
             <title>{title}</title><style>body{{font-family:system-ui;padding:48px;
             background:#0b1020;color:#e5e7eb}}h1{{color:{color}}}a{{color:#818cf8}}</style></head>
             <body><h1>{title}</h1><p>{message}</p>
-            <p><a href="/channels">Zurück zu AutoPoster</a></p>
+            <p><a href="/settings/shared?section=channels">Zurück zu den Kanälen</a></p>
             <script>setTimeout(()=>{{window.close()}},2500)</script></body></html>""",
             status_code=200 if ok else 400,
         )
@@ -679,6 +679,20 @@ async def oauth_callback(
     except AdapterError as exc:
         return page("Token-Tausch fehlgeschlagen", str(exc), False)
 
+    if platform == "x" and channel:
+        from autoposter.services.followers import x_account_matches
+        info = await adapter.verify(app, cred)
+        if not info.ok:
+            return page("Kontoprüfung fehlgeschlagen", html.escape(info.message), False)
+        if not x_account_matches(channel, info.username):
+            await db.delete(row)
+            await db.flush()
+            return page("Falsches X-Konto", "Verbunden wurde @" + html.escape(info.username or "unbekannt")
+                        + ", erwartet wird " + html.escape(channel.handle)
+                        + ". Bitte bei X das richtige Konto anmelden und erneut verbinden.", False)
+        cred.external_user_id = info.account_id
+        channel.verified_account = info.username
+        channel.last_verified_at = datetime.now(timezone.utc)
     credential = ChannelCredential(platform=platform)
     cred_service.store_credentials(credential, cred)
     db.add(credential)
@@ -798,6 +812,21 @@ async def test_channel(
         result.update(ok=False, step="token", message=f"Unerwarteter Fehler: {exc}")
         return result
 
+    if info.ok and channel.platform == "x":
+        from autoposter.services.followers import x_account_matches
+        if not x_account_matches(channel, info.username):
+            channel.verified_account = info.username or info.account_id
+            channel.health = ChannelHealth.needs_reauth.value
+            channel.health_note = f"Falsches X-Konto: @{info.username}; erwartet: {channel.handle}. Bitte neu verbinden."
+            db.add(channel)
+            await db.flush()
+            result.update(ok=False, step="account", message=channel.health_note,
+                          account=info.username, account_id=info.account_id, needs_reauth=True)
+            return result
+        credential = await db.get(ChannelCredential, channel.credential_id)
+        if credential:
+            credential.external_user_id = info.account_id
+            db.add(credential)
     if info.ok:
         channel.last_verified_at = datetime.now(timezone.utc)
         channel.verified_account = info.username or info.account_id

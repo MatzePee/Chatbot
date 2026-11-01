@@ -41,11 +41,6 @@ def check_compatibility(asset: MediaAsset, channel: Channel) -> Optional[str]:
     """Gibt einen Ablehnungsgrund zurück oder None."""
     if asset.status == MediaStatus.failed.value:
         return "Asset ist fehlerhaft verarbeitet"
-    if nsfw_rank(asset.nsfw_level) > nsfw_rank(channel.nsfw_level):
-        return (
-            f"NSFW-Level '{asset.nsfw_level}' ist für Kanal "
-            f"'{channel.display_name}' ({channel.nsfw_level}) nicht erlaubt"
-        )
     limits = get_adapter(channel.platform).limits()
     if asset.mime not in limits.mime_whitelist:
         return f"Dateityp {asset.mime} wird von {channel.platform} nicht unterstützt"

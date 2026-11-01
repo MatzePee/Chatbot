@@ -75,6 +75,9 @@ export const api = {
   // --- Dashboard / Betrieb ---
   dashboard: () => get('/dashboard'),
   xFollowers: () => get('/analytics/x-followers'),
+  topPostsX: () => get('/analytics/top-posts-x'),
+  reuseTopPostX: (id, channelId) => post('/analytics/top-posts-x/' + id + '/reuse' + (channelId ? '?channel_id=' + encodeURIComponent(channelId) : '')),
+  telegramMembers: () => get('/analytics/telegram-members'),
   ackFailure: (id) => post('/problems/posts/' + encodeURIComponent(id) + '/ack'),
   checkProblems: () => post('/problems/check'),
   inventory: () => get('/inventory'),

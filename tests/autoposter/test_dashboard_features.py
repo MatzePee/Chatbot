@@ -130,7 +130,7 @@ async def test_x_follower_adapter_uses_only_get_and_checks_account(monkeypatch):
         seen.append(request)
         assert request.method == 'GET'
         assert request.url.path == '/2/users/me'
-        assert dict(request.url.params) == {'user.fields': 'public_metrics'}
+        assert dict(request.url.params) == {'user.fields': 'public_metrics,username'}
         return httpx.Response(200, json={'data':{'id':'42','public_metrics':{'followers_count':123}}})
     @asynccontextmanager
     async def client():

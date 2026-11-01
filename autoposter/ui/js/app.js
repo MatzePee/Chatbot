@@ -4,12 +4,11 @@ import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
 import { h, clear, append, toast } from './ui.js?v=creatorstudio-preview-bounds-20261006'
 
 import renderDashboard from './pages/dashboard.js?v=creatorstudio-dashboard-20261011'
-import renderLibrary from './pages/library.js?v=creatorstudio-library-delete-20261006'
+import renderLibrary from './pages/library.js?v=creatorstudio-library-autosave-20261101'
 import renderAssign from './pages/assign.js?v=creatorstudio-preview-bounds-20261006'
 import renderMatrix from './pages/matrix.js?v=creatorstudio-preview-bounds-20261006'
+import renderTopPostsX from './pages/top-posts-x.js?v=top-posts-50-views-20261101'
 import renderCalendar from './pages/calendar.js?v=creatorstudio-translation-20260910'
-import renderChannels from './pages/channels.js?v=creatorstudio-x-labels-20260910'
-import renderPersonas from './pages/personas.js?v=creatorstudio-persona-types-20260910'
 import renderSettings from './pages/settings.js?v=creatorstudio-channel-autoplan-20260910'
 
 
@@ -19,8 +18,7 @@ const ROUTES = [
   { path: 'assign', label: 'Zuordnung',  icon: '⇄', render: renderAssign },
   { path: 'matrix', label: 'Matrix',     icon: '⊞', render: renderMatrix },
   { path: 'calendar', label: 'Kalender', icon: '▤', render: renderCalendar },
-  { path: 'channels', label: 'Kanäle',   icon: '◉', render: renderChannels },
-  { path: 'personas', label: 'Personas', icon: '☺', render: renderPersonas },
+  { path: 'top-posts-x', label: 'Top Posts X', icon: '↗', render: renderTopPostsX },
   { path: 'settings', label: 'AutoPost-Einstellungen', icon: '⚙', render: renderSettings },
 
 ]
@@ -124,8 +122,10 @@ async function route() {
 
   const path = currentPath()
   const entry = ROUTES.find((r) => r.path === path) || ROUTES[0]
-  if (path === 'settings') {
-    location.replace('/settings/shared?section=autopost')
+  const settingsSection = { settings: 'autopost', channels: 'channels', personas: 'personas' }[path]
+  if (settingsSection) {
+    const query = currentQuery().toString()
+    location.replace('/settings/shared?section=' + settingsSection + (query ? '&' + query : ''))
     return
   }
   const view = shell.view

@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from autoposter.api import channels
-from autoposter.adapters.base import Credentials
+from autoposter.adapters.base import Credentials, AccountInfo
 from autoposter.models import Channel
 from autoposter.services import oauthapp
 from autoposter.services.appconfig import _snapshot
@@ -53,6 +53,9 @@ async def test_saved_callback_is_used_for_authorization_and_token_exchange(callb
             exchanged.append((app.redirect_uri('x'), app.client_id, app.client_secret))
             return Credentials(access_token='TEST-ACCESS', refresh_token='TEST-REFRESH')
         monkeypatch.setattr(channels.get_adapter('x'), 'exchange_code', exchange)
+        async def verify(app, cred):
+            return AccountInfo(ok=True, account_id='123', username='sabrina')
+        monkeypatch.setattr(channels.get_adapter('x'), 'verify', verify)
         result = await client.get('/api/v1/oauth/x/callback', params={'code': 'TEST-CODE', 'state': auth['state']})
         assert result.status_code == 200, result.text
         assert exchanged == [(uri, 'TEST-CLIENT', 'TEST-SECRET')]
@@ -98,3 +101,23 @@ async def test_fanvue_still_uses_shared_callback(callback_app):
         assert result.status_code == 201, result.text
         assert result.json()['redirect_uri'] == uri
         assert result.json()['connection_source'] == 'chatbot'
+
+
+@pytest.mark.asyncio
+async def test_oauth_rejects_wrong_x_account_before_storing_credentials(callback_app, db, monkeypatch):
+    async with AsyncClient(transport=ASGITransport(app=callback_app), base_url='http://test') as client:
+        created = await client.post('/api/v1/channels', json={
+            'platform':'x','display_name':'Expected','handle':'@expected',
+            'oauth_client_id':'TEST-CLIENT','oauth_client_secret':'TEST-SECRET'})
+        channel_id = created.json()['id']
+        started = await client.get('/api/v1/oauth/x/start', params={'channel_id':channel_id})
+        async def exchange(app, code, verifier):
+            return Credentials('fake',external_user_id='wrong-id')
+        async def verify(app, cred):
+            return AccountInfo(ok=True, account_id='wrong-id', username='other')
+        monkeypatch.setattr(channels.get_adapter('x'),'exchange_code',exchange)
+        monkeypatch.setattr(channels.get_adapter('x'),'verify',verify)
+        result = await client.get('/api/v1/oauth/x/callback',params={'code':'fake','state':started.json()['state']})
+        assert result.status_code == 400
+        assert 'Falsches X-Konto' in result.text
+        assert (await db.get(Channel,UUID(channel_id))).credential_id is None

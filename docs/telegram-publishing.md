@@ -1,6 +1,6 @@
 # Telegram: eigene geplante Kanalbeiträge
 
-Telegram ist eine unabhängige AutoPost-Plattform, keine Weiterleitung von X. Ein eigener Kanal erhält eigene Posts/Queue, Medienzuordnungen und Nutzungsverlauf, Zeitzone, Zeitfenster, Freigabe, Abstände, Persona und **Telegram-Textvorgaben** unter Kanäle → Einstellungen. Telegram erscheint separat im Kalender mit „Telegram planen“. Bibliotheksmedien können weiterhin unabhängig auf X/Fanvue verwendet werden. Telegram meldet keine erfundenen Follower- oder Postmetriken.
+Telegram ist eine unabhängige AutoPost-Plattform, keine Weiterleitung von X. Ein eigener Kanal erhält eigene Posts/Queue, Medienzuordnungen und Nutzungsverlauf, Zeitzone, Zeitfenster, Freigabe, Abstände, Persona und **Telegram-Textvorgaben** unter Einstellungen → Kanäle → Einstellungen. Telegram erscheint separat im Kalender mit „Telegram planen“. Bibliotheksmedien können weiterhin unabhängig auf X/Fanvue verwendet werden. Telegram meldet keine erfundenen Follower- oder Postmetriken.
 
 ## Sichere Einrichtung
 

@@ -70,3 +70,8 @@ def nightly_maintenance() -> Dict[str, Any]:
 @shared_task(name="autoposter.token_health")
 def token_health() -> Dict[str, Any]:
     return run_async(jobs.token_health())
+
+
+@shared_task(name="autoposter.collect_x_post_metrics")
+def collect_x_post_metrics() -> Dict[str, Any]:
+    return run_async(jobs.collect_x_post_metrics())

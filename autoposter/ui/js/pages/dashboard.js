@@ -1,3 +1,4 @@
+import { historyChart } from '../account-history.js?v=analytics-20261019'
 import { renderUpcoming } from '../upcoming-posts.js?v=creatorstudio-translation-20260910'
 import { api } from '../api.js?v=creatorstudio-dashboard-20261011'
 import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard, append, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
@@ -101,18 +102,20 @@ export default async function renderDashboard() {
   page.appendChild(invCard)
 
   // Cached account metrics only: no X requests from browser refresh.
+  for (const platform of ['x', 'telegram']) {
+  const title = platform === 'x' ? 'X-Follower' : 'Telegram-Abonnenten / Kanalmitglieder'
   try {
-    const accounts = await api.xFollowers()
+    const accounts = await (platform === 'x' ? api.xFollowers() : api.telegramMembers())
     const historyKeys = ['yesterday', 'days7', 'days30']
     const historyText = value => value.count === null ? 'Keine Historie'
       : `${value.count} (${value.growth === null ? 'Wachstum unbekannt' : (value.growth >= 0 ? '+' : '') + value.growth})`
     const measurementText = a => `${problemTime(a.sampled_at)}${a.stale ? ' · veraltet' : ''} · ${a.status}`
-    const rows = accounts.map(a => h('tr', {},
+    const rows = accounts.flatMap(a => [h('tr', {},
       h('td', {}, a.name),
       h('td', { class: 'num' }, a.current ?? 'Keine Messung'),
       ...historyKeys.map(key => h('td', { class: 'num' }, historyText(a[key]))),
       h('td', { class: 'hint' }, measurementText(a)),
-    ))
+    ), h('tr', {}, h('td', { colspan: 6 }, historyChart(a)))])
     // CSS display:none excludes the inactive view from both focus and accessibility trees.
     // Both views use text nodes via h(), never account/status HTML.
     const mobileAccounts = h('div', { class: 'x-followers-cards col' }, ...accounts.map(a =>
@@ -126,15 +129,17 @@ export default async function renderDashboard() {
         ),
         h('div', { class: 'x-followers-measurement hint' },
           h('b', {}, 'Messzeit / Status'), h('div', {}, measurementText(a))),
+        historyChart(a),
       )))
-    page.appendChild(card('X-Follower · Stand und Wachstum',
+    page.appendChild(card(title + ' · Stand und Wachstum',
       h('div', { class: 'hint' }, 'Vergleich mit dem exakten Kalendertag (Europe/Berlin). Fehlende Messungen werden nicht geschätzt.'),
       accounts.length ? h('div', { class: 'x-followers' },
         h('div', { class: 'x-followers-table table-scroll', tabindex: 0 }, h('table', {},
           h('thead', {}, h('tr', {}, ...['Account', 'Aktuell', 'Gestern (Δ)', 'Vor 7 Tagen (Δ)', 'Vor 30 Tagen (Δ)', 'Messzeit / Status'].map(t => h('th', {}, t)))),
-          h('tbody', {}, ...rows))), mobileAccounts) : empty('Keine X-Accounts.'),
+          h('tbody', {}, ...rows))), mobileAccounts) : empty(platform === 'x' ? 'Keine X-Accounts.' : 'Keine Telegram-Kanäle.'),
     ))
-  } catch { page.appendChild(card('X-Follower', empty('Follower-Übersicht derzeit nicht verfügbar.'))) }
+  } catch { page.appendChild(card(title, empty('Messübersicht derzeit nicht verfügbar.'))) }
+  }
 
   // ------------------------------------------------------------ Lebenszyklus
   const counts = data.lifecycle_counts

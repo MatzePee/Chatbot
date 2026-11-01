@@ -67,7 +67,11 @@ def test_manifest_controls_actions_are_all_preserved(client):
                     self.items.append(dict(attrs))
         options = Options()
         options.feed((ROOT / manifest[section]['source']).read_text())
-        assert all(row in options.items for row in manifest[section]['original_select_options'])
+        # HTMLParser versions tokenize Jinja conditionals differently. Compare
+        # actual option values and multiplicity, not template syntax as HTML attrs.
+        expected_options = Counter(row.get('value') for row in manifest[section]['original_select_options'])
+        actual_options = Counter(row.get('value') for row in options.items)
+        assert not (expected_options - actual_options)
     source = ROOT / manifest['autopost']['source']
     assert hashlib.sha256(source.read_bytes()).hexdigest() == manifest['autopost']['source_sha256']
 
@@ -164,3 +168,14 @@ def test_secret_removal_requires_explicit_control(client, route, key):
     response = client.post(route, data={f'clear_{key}': 'on'}, follow_redirects=False)
     assert response.status_code == 303
     assert db.get_setting(key) == ''
+
+
+@pytest.mark.parametrize('section', ['channels', 'personas'])
+def test_channels_and_personas_are_settings_sections(client, section):
+    response = client.get('/settings/shared', params={'section': section})
+    assert response.status_code == 200
+    assert f'data-settings-section="{section}"' in response.text
+    assert f'data-settings-page="{section}"' in response.text
+    assert f'href="/settings/shared?section={section}" class="active"' in response.text
+    assert 'id="modals"' in response.text
+    assert '/static/settings-autopost.js' in response.text

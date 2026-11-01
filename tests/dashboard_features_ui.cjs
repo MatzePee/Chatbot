@@ -14,8 +14,8 @@ const data={inventory:{channels:[],unassigned_assets:0}, lifecycle_counts:{},upc
 const acknowledged=[];
 const api={dashboard:async()=>data, xFollowers:async()=>[{name:'Account',current:100,yesterday:{count:90,growth:10},days7:{count:null,growth:null},days30:{count:120,growth:-20},sampled_at:'2026-10-11T10:00:00Z',stale:false,status:'OK'}],jobs:async()=>({jobs:[]}),markRead:async ids=>{acknowledged.push(ids);data.notifications=[]},ackFailure:async id=>{acknowledged.push(id);data.recent_failures=[]}};
 let source=fs.readFileSync('autoposter/ui/js/pages/dashboard.js','utf8').replace(/^import [^\n]*\n/gm,'').replace('export function','function').replace('export default async function','async function');
-const build=new Function('api','h','card','empty','guard','clear','renderUpcoming','LIFECYCLE_ORDER','toast','fmtDate','fmtDateTime','spinner','append','confirmDialog',source+';return {renderDashboard,problemTime}');
-const mod=build(api,h,card,empty,guard,clear,()=>{},[],{},()=>'',()=>'',()=>h('i',{}),()=>{},()=>{});
+const build=new Function('api','h','card','empty','guard','clear','renderUpcoming','LIFECYCLE_ORDER','toast','fmtDate','fmtDateTime','spinner','append','confirmDialog','historyChart',source+';return {renderDashboard,problemTime}');
+const mod=build(api,h,card,empty,guard,clear,()=>{},[],{},()=>'',()=>'',()=>h('i',{}),()=>{},()=>{},()=>h('figure',{})); // Chart SVG/real DOM is covered by dashboard_member_history.cjs.
 const flat=n=>n instanceof Node ? n.children.flatMap(flat):[String(n)];
 const nodes=n=>n instanceof Node ? [n,...n.children.flatMap(nodes)]:[];
 (async()=>{

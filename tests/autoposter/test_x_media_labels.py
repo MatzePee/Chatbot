@@ -109,3 +109,23 @@ async def test_additive_upgrade_keeps_existing_channel_settings(tmp_path):
         assert after['x_send_alt_text'] == 1 and after['x_made_with_ai'] == 0
     finally:
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('level', ['explicit', 'suggestive'])
+@pytest.mark.parametrize('status', [200, 403])
+async def test_adult_warning_required_even_without_alt_text(level, status):
+    from autoposter.adapters.base import AdapterError
+    adapter = x.XAdapter()
+    with respx.mock() as mock:
+        setup_upload(mock, adapter)
+        meta = mock.post(f'{adapter.base}/2/media/metadata').respond(status, json={'data': {}})
+        source = asset()
+        source.nsfw_level = level
+        if status == 200:
+            await adapter.upload_media(Credentials('fake'), source, b'image', include_alt_text=False)
+        else:
+            with pytest.raises(AdapterError):
+                await adapter.upload_media(Credentials('fake'), source, b'image', include_alt_text=False)
+        assert json.loads(meta.calls.last.request.content)['metadata'] == {
+            'sensitive_media_warning': {'adult_content': True}}

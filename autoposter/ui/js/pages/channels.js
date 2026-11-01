@@ -48,7 +48,7 @@ export default async function renderChannels() {
   let [channels, personas] = await Promise.all([api.channels(), api.personas()])
   const list = h('div', { class: 'grid c3' })
 
-  const reload = () => { location.hash = '#/channels'; location.reload() }
+  const reload = () => { location.href = '/settings/shared?section=channels' }
 
   function draw() {
     clear(list)
@@ -90,7 +90,7 @@ export default async function renderChannels() {
               (c.last_verified_at ? ' · ' + fmtDateTime(c.last_verified_at) : ''))
           : null,
         h('div', { class: 'hint', style: { fontSize: '11px' } },
-          `${c.policy ? c.policy.posts_per_day : '?'}/Tag · NSFW max ${c.nsfw_level} · ` +
+          `${c.policy ? c.policy.posts_per_day : '?'}/Tag · ` +
           `${c.quota_used_today}/${c.policy ? c.policy.daily_api_quota : '?'} heute` +
           (c.platform === 'fanvue' && c.platform_side_scheduling ? ' · plattformseitige Planung' : '')),
         h('div', { class: 'row' },
@@ -296,8 +296,6 @@ export default async function renderChannels() {
       const color = h('input', { type: 'color', value: '#1d9bf0' })
       const persona = h('select', {}, h('option', { value: '' }, 'keine'),
         ...personas.map((p) => h('option', { value: p.id }, p.name)))
-      const nsfw = h('select', {}, ...['sfw', 'suggestive', 'explicit'].map((v) =>
-        h('option', { value: v, selected: v === 'suggestive' }, v)))
       const tz = h('input', { value: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin' })
       const clientId = h('input', { autocomplete: 'off', placeholder: 'leer = globale App' })
       const clientSecret = h('input', { type: 'password', autocomplete: 'off' })
@@ -331,7 +329,6 @@ export default async function renderChannels() {
         field('Handle', handle),
         h('div', { class: 'row' },
           h('div', { style: { flex: '1' } }, field('Persona', persona)),
-          h('div', { style: { flex: '1' } }, field('Max. NSFW-Level', nsfw)),
         ),
         field('Zeitzone', tz),
         schedRow,
@@ -351,7 +348,7 @@ export default async function renderChannels() {
               color: color.value,
               persona_id: persona.value || null,
               timezone: tz.value,
-              nsfw_level: nsfw.value,
+              nsfw_level: 'explicit',
               platform_side_scheduling: platformSched.checked,
               default_audience: platform.value === 'fanvue' ? 'subscribers' : '',
               oauth_client_id: isX ? clientId.value.trim() : '',

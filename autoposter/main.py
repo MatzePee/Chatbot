@@ -52,6 +52,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
+    # Retire the old middle category without losing its adult-content warning.
+    from sqlalchemy import update
+    from autoposter.models import MediaAsset, MediaSet, Channel
+    async with engine.begin() as conn:
+        for model in (MediaAsset, MediaSet, Channel):
+            await conn.execute(update(model).where(model.nsfw_level == "suggestive").values(nsfw_level="explicit"))
+
     # create_all legt nur fehlende TABELLEN an. Wächst das Modell um Spalten,
     # bleibt eine bestehende Datenbank sonst stumm veraltet und jede Abfrage
     # scheitert mit "no such column". Deshalb hier zusätzlich abgleichen.

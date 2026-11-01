@@ -43,6 +43,10 @@ async def get_valid_credentials(db: AsyncSession, channel: Channel) -> Credentia
     Die Refresh-Token-Rotation wird atomar gespeichert: X gibt bei jedem Refresh
     ein neues Refresh-Token aus und macht das alte ungültig.
     """
+    if channel.platform == "x" and channel.verified_account:
+        from .followers import x_account_matches
+        if not x_account_matches(channel, channel.verified_account):
+            raise AdapterError("Falsches X-Konto verbunden. Unter Einstellungen → Kanäle mit dem richtigen Konto neu verbinden.", needs_reauth=True)
     if channel.platform == "fanvue":
         from . import chatbot_fanvue
         return await chatbot_fanvue.credentials(channel)

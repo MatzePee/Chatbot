@@ -90,6 +90,7 @@ def test_settings_and_system_share_navigation(client, path):
     assert re.findall(r'href="([^"]+)"', sidebar) == [
         '/settings/shared?section=shared', '/settings/shared?section=autochat',
         '/settings/shared?section=autopost',
+        '/settings/shared?section=channels', '/settings/shared?section=personas',
         '/settings/shared#fanvue', '/settings/shared#telegram', '/system',
         '/settings/shared#updates', '/upload']
     assert 'Verbindungen' in sidebar and 'Verwaltung' in sidebar

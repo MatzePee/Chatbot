@@ -319,7 +319,7 @@ async function connectionCard(channels) {
       'ob eine App auf das falsche Profil zeigt — zu jeder X-App gehört genau ein Account.'),
     h('div', { class: 'row', style: { marginBottom: '12px' } },
       testAll,
-      h('a', { class: 'btn', href: '#/channels' }, 'Kanäle verwalten →'),
+      h('a', { class: 'btn', href: '/settings/shared?section=channels' }, 'Kanäle verwalten →'),
     ),
     results,
   )
@@ -421,7 +421,7 @@ function platformDefaultsCard(integrations) {
     ),
     h('div', { class: 'row' },
       h('button', { class: 'primary', onClick: save }, 'Speichern'),
-      h('a', { class: 'btn', href: '#/channels' }, 'Zugangsdaten pflegen → Kanäle'),
+      h('a', { class: 'btn', href: '/settings/shared?section=channels' }, 'Zugangsdaten pflegen → Kanäle'),
     ),
   )
 }

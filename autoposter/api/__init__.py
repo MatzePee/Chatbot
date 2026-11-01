@@ -1,7 +1,7 @@
 """API-Router-Zusammenbau."""
 from fastapi import APIRouter
 
-from autoposter.api import system, assignments, auth, channels, dashboard, media, posts
+from autoposter.api import system, assignments, auth, channels, dashboard, media, posts, top_posts
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
@@ -16,3 +16,5 @@ api_router.include_router(posts.calendar_router)
 api_router.include_router(posts.runs_router)
 api_router.include_router(dashboard.router)
 
+
+api_router.include_router(top_posts.router)

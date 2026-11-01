@@ -38,7 +38,7 @@ const dashboard={inventory:{channels:[],unassigned_assets:0},lifecycle_counts:{}
   const axNameOccurrences=ax.split('\n').filter(line=>line.includes(name) && (mobile ? /^\s*- heading /.test(line) : /^\s*- cell /.test(line))).length;
   const documentFits=await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
   const expectedHeaders=['Account','Aktuell','Gestern (Δ)','Vor 7 Tagen (Δ)','Vor 30 Tagen (Δ)','Messzeit / Status'];
-  assert.deepEqual(await section.locator('th').allTextContents(),expectedHeaders,'Desktop columns must stay unchanged');
+  assert.deepEqual(await section.locator('.x-followers-table > table > thead > tr > th').allTextContents(),expectedHeaders,'Desktop columns must stay unchanged');
   for(const value of [name,status,'1234567890','1234567880 (+10)','1234567990 (-100)','Keine Historie','Keine Messung','0 (Wachstum unbekannt)','0 (+0)','Zeitpunkt unbekannt','veraltet']) assert(ax.replaceAll('\\"','"').includes(value),`Visible/accessibility data lost at ${width}: ${value}`);
   assert.equal(ax.includes('- table:'),!mobile,'Only the active representation reaches screen readers');
   results.push({width,...checks,documentFits,axNameOccurrences,pass:documentFits && (!mobile || checks.noOverflow) && checks.cards===(mobile?2:0) && checks.tableVisible===!mobile && (!mobile || checks.tiles.every(n=>n===4)) && checks.safe && checks.fullName && checks.fullStatus && axNameOccurrences===1});

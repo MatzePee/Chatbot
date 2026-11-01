@@ -64,7 +64,7 @@ async function main(){
  await page.goto('http://settings.test/settings/shared?section=autopost');await page.locator('#autopost-settings section').last().waitFor()
  assert.deepEqual(await inventory('#autopost-settings'),baseline,'Every old AutoPost control/action and prepopulation must survive')
  assert.equal(writes.length,0,'Loading settings must never save')
- assert.equal(await page.locator('#autopost-settings a[href="/autoposter/#/channels"]').count(),2)
+ assert.equal(await page.locator('#autopost-settings a[href="/settings/shared?section=channels"]').count(),2)
  const openrouter=page.locator('#autopost-settings section').filter({has:page.getByRole('heading',{name:'OpenRouter verbinden',exact:true})})
  await openrouter.getByRole('button',{name:'Speichern',exact:true}).click()
  assert.equal(writes.at(-1).path,'/api/v1/settings/integrations')

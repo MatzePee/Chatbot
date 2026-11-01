@@ -246,14 +246,22 @@ class XAdapter:
 
             # X zeigt bei hinterlegter Bildbeschreibung sein eigenes ALT-Abzeichen.
             alt = (asset.caption_hint or asset.ai_description or "")[:1000]
+            metadata = {}
+            explicit = asset.nsfw_level in ("explicit", "suggestive")
+            if explicit:
+                metadata["sensitive_media_warning"] = {"adult_content": True}
             if include_alt_text and alt:
+                metadata["alt_text"] = {"text": alt}
+            if metadata:
                 meta = await client.post(
                     f"{self.base}/2/media/metadata",
                     headers={**headers, "Content-Type": "application/json"},
-                    json={"id": media_id, "metadata": {"alt_text": {"text": alt}}},
+                    json={"id": media_id, "metadata": metadata},
                 )
-                if meta.status_code >= 400 and meta.status_code not in (403, 404):
-                    raise_for_response(meta, "X Alt-Text")
+                if explicit or (meta.status_code >= 400 and meta.status_code not in (403, 404)):
+                    raise_for_response(meta, "X Medienkennzeichnung")
+                    if explicit and meta.json().get("errors"):
+                        raise AdapterError("X hat die Kennzeichnung als Erwachseneninhalt nicht bestaetigt")
 
         return MediaRef(asset_id=str(asset.id), external_id=media_id,
                         expires_at=datetime.now(timezone.utc) + timedelta(hours=20))
@@ -347,18 +355,34 @@ class XAdapter:
         metrics.update(data.get("non_public_metrics", {}) or {})
         return metrics or None
 
+    async def fetch_metrics_batch(self, cred: Credentials, post_ids: List[str]) -> Dict[str, Any]:
+        if not post_ids:
+            return {"data": [], "errors": []}
+        if len(post_ids) > 100:
+            raise ValueError("X erlaubt maximal 100 Post-IDs pro Abfrage")
+        async with http_client() as client:
+            response = await client.get(
+                f"{self.base}/2/tweets", headers=self._auth(cred),
+                params={"ids": ",".join(post_ids), "tweet.fields": "public_metrics,author_id"},
+            )
+            raise_for_response(response, "X Post-Statistik")
+        return response.json()
+
     async def fetch_followers(self, cred: Credentials) -> int:
         """GET only: own authenticated account public follower count."""
         async with http_client() as client:
             response = await client.get(
                 f"{self.base}/2/users/me",
                 headers={"Authorization": f"Bearer {cred.access_token}"},
-                params={"user.fields": "public_metrics"},
+                params={"user.fields": "public_metrics,username"},
             )
             raise_for_response(response, "X Follower-Messung")
         data = response.json().get('data', {})
         if str(data.get('id')) != str(cred.external_user_id):
             raise ValueError('X account mismatch')
+        expected = (cred.raw_meta.get('expected_x_username') or '').strip().lstrip('@').casefold()
+        if expected and (data.get('username') or '').casefold() != expected:
+            raise ValueError('X account username mismatch')
         count = data.get('public_metrics', {}).get('followers_count')
         if type(count) is not int or count < 0:
             raise ValueError('Missing follower count')

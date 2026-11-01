@@ -3415,7 +3415,7 @@
   "autopost": {
     "source": "autoposter/ui/js/pages/settings.js",
     "target": "/settings/shared?section=autopost",
-    "source_sha256": "246d67ac1d7730d986faa9e660e3068b42dfd17d4d2eea6b8ef48118c002147b",
+    "source_sha256": "ac2569cee218f76a8d8484d7204aa2a894869742504ac4d142814173f1643511",
     "controls": [
       [
         "keyInput",

@@ -493,6 +493,19 @@ async def save_image_comment(payload: image_comments.CommentSettings,
     return await image_comments.save_settings(db, payload)
 
 
+@router.get('/analytics/telegram-members')
+async def telegram_members(db: AsyncSession = Depends(get_db), _: User = Depends(current_user)):
+    from autoposter.services import followers
+    return await followers.overview(db, platform='telegram')
+
+
+@router.post('/analytics/x-followers/refresh')
+async def refresh_x_followers(db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
+    from autoposter.services import followers
+    updated = await followers.collect(db, force=True)
+    return {"updated": updated, "accounts": await followers.overview(db)}
+
+
 @router.get('/analytics/x-followers')
 async def x_followers(db: AsyncSession = Depends(get_db), _: User = Depends(current_user)):
     from autoposter.services import followers

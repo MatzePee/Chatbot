@@ -175,3 +175,14 @@ async def test_simultaneous_daily_and_metrics_dedupe_file_database(db, account, 
         assert account == [1]
     finally:
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_explicit_refresh_bypasses_throttle_without_erasing_history(db, account):
+    now=datetime(2026,11,1,12,tzinfo=timezone.utc)
+    assert await followers.collect(db,now)==1
+    assert await followers.collect(db,now)==0
+    assert await followers.collect(db,now,force=True)==1
+    row=await db.get(AppSetting,'x_followers:daily-id')
+    assert row.value['days']['2026-11-01']==42
+    assert len(account)==2

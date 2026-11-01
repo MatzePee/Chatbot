@@ -167,5 +167,22 @@ class TelegramAdapter:
         url=f'https://t.me/{username}/{ids[0]}' if username else f'https://t.me/c/{chat_id[4:]}/{ids[0]}'
         return PublishResult(','.join(map(str,ids)),url,raw={'chat_id':chat_id,'message_ids':ids})
 
+    async def fetch_members(self, cred):
+        """Read-only subscriber count for the previously verified canonical channel."""
+        destination = cred.raw_meta.get('destination', '')
+        expected = cred.raw_meta.get('chat_id', '')
+        if not isinstance(expected, str) or not re.fullmatch(r'-100[0-9]+', expected) or not destination:
+            raise AdapterError('Telegram: Zielkanal zuerst verbinden und prüfen.')
+        chat = await self._call(cred, 'getChat', {'chat_id': destination})
+        if (not isinstance(chat, dict) or type(chat.get('id')) is not int
+                or str(chat['id']) != expected or chat.get('type') != 'channel'
+                or (destination.startswith('@') and chat.get('username', '').lower() != destination[1:].lower())
+                or (not destination.startswith('@') and destination != expected)):
+            raise AdapterError('Telegram: Kanalbindung stimmt nicht überein.')
+        count = await self._call(cred, 'getChatMemberCount', {'chat_id': expected})
+        if type(count) is not int or count < 0:
+            raise AdapterError('Telegram: ungültige Kanalmitgliederzahl.')
+        return count
+
     async def fetch_metrics(self,cred,external_post_id):
         return None  # Bot API offers no generic message GET or follower analytics.

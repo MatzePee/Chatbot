@@ -4,7 +4,7 @@ import { openCreateSetDialog, openSetDialog } from '../sets.js?v=creatorstudio-m
 import {
   h, append, clear, card, empty, field, modal, toast, guard, spinner,
   mediaPreview, mediaTile, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, fmtDateTime, fmtBytes, debounce, attachPreview,
-} from '../ui.js?v=creatorstudio-preview-bounds-20261006'
+} from '../ui.js?v=creatorstudio-library-autosave-20261101'
 
 export default async function renderLibrary({ query }) {
   const [channels, views, tagList] = await Promise.all([api.channels(), api.views(), api.tags()])
@@ -297,11 +297,96 @@ export default async function renderLibrary({ query }) {
 
   // ------------------------------------------------------------ Detail
   async function openDetail(id) {
-    const d = await api.mediaDetail(id)
-    modal(d.filename, (close) => {
-      const tags = h('input', { value: (d.tags || []).join(', ') })
-      const nsfw = h('select', {},
-        ...['sfw', 'suggestive', 'explicit'].map((v) => h('option', { value: v, selected: v === d.nsfw_level }, v)))
+    // Keep the current search order even when edits change filter membership.
+    const ids = state.items.map((asset) => asset.id)
+    let d = await api.mediaDetail(id)
+    let dialog, tags, nsfw, saveStatus, saved, timer
+    let queue = Promise.resolve()
+    let busy = false
+    let removed = false
+    const values = () => ({
+      tags: tags.value.split(',').map((tag) => tag.trim()).filter(Boolean),
+      nsfw_level: nsfw.value,
+    })
+    const saveNow = () => {
+      clearTimeout(timer)
+      const payload = values()
+      const assetId = d.id
+      const serialized = JSON.stringify(payload)
+      queue = queue.catch(() => {}).then(async () => {
+        if (serialized === saved) return
+        saveStatus.textContent = 'Speichert …'
+        try {
+          await api.updateMedia(assetId, payload)
+          saved = serialized
+          saveStatus.textContent = JSON.stringify(values()) === saved ? 'Gespeichert' : 'Änderungen werden gespeichert …'
+        } catch (error) {
+          saveStatus.textContent = 'Nicht gespeichert – bitte erneut versuchen'
+          throw error
+        }
+      })
+      return queue
+    }
+    const saveError = (error) => toast.error(error.message || 'Speichern fehlgeschlagen')
+    const renderCurrent = () => {
+      clear(dialog.body).appendChild(buildDetail(dialog.close))
+      dialog.body.closest('.modal').querySelector('h3').textContent = d.filename
+    }
+    const changeAsset = async (action) => {
+      if (busy) return
+      busy = true
+      dialog.body.inert = true
+      try {
+        await saveNow()
+        await action()
+        d = await api.mediaDetail(d.id)
+        renderCurrent()
+        await load()
+        await refreshCounts()
+      } finally {
+        busy = false
+        dialog.body.inert = false
+      }
+    }
+    const navigate = async (direction) => {
+      if (busy) return
+      busy = true
+      dialog.body.inert = true
+      try {
+        await saveNow()
+        const index = ids.indexOf(d.id)
+        if (direction > 0 && index === ids.length - 1 && state.cursor) {
+          await load(true)
+          for (const asset of state.items) if (!ids.includes(asset.id)) ids.push(asset.id)
+        }
+        const nextId = ids[index + direction]
+        if (nextId) {
+          d = await api.mediaDetail(nextId)
+          renderCurrent()
+          dialog.body.scrollTop = 0
+          dialog.body.closest('.modal-bg').scrollTop = 0
+        } else {
+          renderCurrent()
+        }
+      } finally {
+        busy = false
+        dialog.body.inert = false
+      }
+    }
+    function buildDetail(close) {
+      tags = h('input', { value: (d.tags || []).join(', ') })
+      nsfw = h('select', {},
+        ...['sfw', 'explicit'].map((v) => h('option', { value: v, selected: v === (d.nsfw_level === 'suggestive' ? 'explicit' : d.nsfw_level) }, v === 'sfw' ? 'SFW' : 'Explizit')))
+
+      saved = JSON.stringify(values())
+      saveStatus = h('span', { class: 'hint', role: 'status', 'aria-live': 'polite' }, 'Änderungen werden automatisch gespeichert')
+      tags.addEventListener('input', () => {
+        clearTimeout(timer)
+        saveStatus.textContent = 'Änderungen werden gespeichert …'
+        timer = setTimeout(() => { saveNow().catch(saveError) }, 350)
+      })
+      tags.addEventListener('change', () => { saveNow().catch(saveError) })
+      nsfw.addEventListener('change', () => { saveNow().catch(saveError) })
 
       const history = d.history.length
         ? h('div', { class: 'col' }, ...d.history.map((e) => {
@@ -330,73 +415,95 @@ export default async function renderLibrary({ query }) {
         .map((c) => h('button', {
           class: 'chip',
           onClick: guard(async () => {
-            const r = await api.assign({ asset_ids: [d.id], channel_ids: [c.id] })
-            if (r.rejected.length) { toast.error(r.rejected[0].reason); return }
-            toast.ok('Zu ' + c.display_name + ' zugeordnet')
-            close(); await load(); await refreshCounts()
+            await changeAsset(async () => {
+              const r = await api.assign({ asset_ids: [d.id], channel_ids: [c.id] })
+              if (r.rejected.length) throw new Error(r.rejected[0].reason)
+              toast.ok('Zu ' + c.display_name + ' zugeordnet')
+            })
           }),
         }, '+ ' + c.display_name)))
 
-      return h('div', { class: 'grid c2' },
-        h('div', {},
-          mediaPreview(d, { style: { width: '100%', borderRadius: '10px', border: '1px solid var(--line)' } }),
-          h('div', { class: 'hint', style: { margin: '8px 0' } },
-            `${d.width}×${d.height} · ${fmtBytes(d.bytes)} · ${d.mime}`),
-          field('Tags (kommagetrennt)', tags),
-          field('NSFW-Level', nsfw),
-          d.ai_description ? field('KI-Beschreibung', h('p', { class: 'hint', style: { margin: 0 } }, d.ai_description)) : null,
-          h('div', { class: 'row' },
-            h('button', { class: 'primary', onClick: guard(async () => {
-              await api.updateMedia(d.id, {
-                tags: tags.value.split(',').map((t) => t.trim()).filter(Boolean),
-                nsfw_level: nsfw.value,
-              })
-              toast.ok('Gespeichert'); close(); await load()
-            }) }, 'Speichern'),
-            h('button', { onClick: guard(async () => {
-              await api.archiveMedia(d.id, d.lifecycle !== 'archived')
-              toast.ok('Status geändert'); close(); await load(); await refreshCounts()
-            }) }, d.lifecycle === 'archived' ? 'Reaktivieren' : 'Archivieren'),
-            h('button', { class: 'danger', onClick: () => {
-              modal('Bild löschen', (closeConfirm) => {
-                const deleteBtn = h('button', { class: 'danger' }, 'Bild löschen')
-                deleteBtn.addEventListener('click', guard(async () => {
-                  if (deleteBtn.disabled) return
-                  deleteBtn.disabled = true
-                  deleteBtn.textContent = 'Lösche …'
-                  try {
-                    await api.deleteMedia(d.id)
-                    state.selected.delete(d.id)
-                    closeConfirm(); close()
-                    toast.ok('Bild gelöscht')
-                    await load()
-                    await Promise.all([refreshCounts(), refreshSets()])
-                  } finally {
-                    deleteBtn.disabled = false
-                    deleteBtn.textContent = 'Bild löschen'
-                  }
-                }))
-                return h('div', { class: 'col' },
-                  h('p', {}, `„${d.filename}“ endgültig aus der Bibliothek löschen? Zugehörige Zuordnungen und Set-Mitgliedschaften werden entfernt. Bereits veröffentlichte Beiträge auf X oder Fanvue bleiben bestehen.`),
-                  h('div', { class: 'row' }, deleteBtn, h('button', { onClick: closeConfirm }, 'Abbrechen')),
-                )
-              })
-            } }, 'Löschen'),
-          ),
+      const index = ids.indexOf(d.id)
+      return h('div', { class: 'library-detail' },
+        h('div', { class: 'row library-detail-nav', 'aria-label': 'Bildnavigation' },
+          h('button', { type: 'button', disabled: index <= 0, 'aria-label': 'Vorheriges Bild', onClick: guard(() => navigate(-1)) }, '← Vorheriges Bild'),
+          h('span', { class: 'hint num' }, (index + 1) + ' / ' + ids.length),
+          h('button', { type: 'button', disabled: index === ids.length - 1 && !state.cursor, 'aria-label': 'Nächstes Bild', onClick: guard(() => navigate(1)) }, 'Nächstes Bild →'),
         ),
-        h('div', { class: 'stack' },
+        h('div', { class: 'grid c2' },
           h('div', {},
-            h('label', { class: 'lbl' }, 'Status'),
-            h('span', { style: { color: LIFECYCLE[d.lifecycle].color } }, LIFECYCLE[d.lifecycle].label),
+            mediaPreview(d, { style: { width: '100%', borderRadius: '10px', border: '1px solid var(--line)' } }),
+            h('div', { class: 'hint', style: { margin: '8px 0' } },
+              `${d.width}×${d.height} · ${fmtBytes(d.bytes)} · ${d.mime}`),
+            field('Tags (kommagetrennt)', tags),
+            field('Bildkategorie', nsfw),
+            d.ai_description ? field('KI-Beschreibung', h('p', { class: 'hint', style: { margin: 0 } }, d.ai_description)) : null,
+            h('div', { class: 'row' },
+              h('button', { class: 'primary', onClick: close }, 'Schließen'),
+              h('button', { onClick: guard(async () => {
+                await changeAsset(() => api.archiveMedia(d.id, d.lifecycle !== 'archived'))
+                toast.ok('Status geändert')
+              }) }, d.lifecycle === 'archived' ? 'Reaktivieren' : 'Archivieren'),
+              h('button', { class: 'danger', onClick: () => {
+                modal('Bild löschen', (closeConfirm) => {
+                  const deleteBtn = h('button', { class: 'danger' }, 'Bild löschen')
+                  deleteBtn.addEventListener('click', guard(async () => {
+                    if (deleteBtn.disabled) return
+                    deleteBtn.disabled = true
+                    deleteBtn.textContent = 'Lösche …'
+                    try {
+                      await saveNow()
+                      await api.deleteMedia(d.id)
+                      removed = true
+                      state.selected.delete(d.id)
+                      closeConfirm(); close()
+                      toast.ok('Bild gelöscht')
+                      await load()
+                      await Promise.all([refreshCounts(), refreshSets()])
+                    } finally {
+                      deleteBtn.disabled = false
+                      deleteBtn.textContent = 'Bild löschen'
+                    }
+                  }))
+                  return h('div', { class: 'col' },
+                    h('p', {}, `„${d.filename}“ endgültig aus der Bibliothek löschen? Zugehörige Zuordnungen und Set-Mitgliedschaften werden entfernt. Bereits veröffentlichte Beiträge auf X oder Fanvue bleiben bestehen.`),
+                    h('div', { class: 'row' }, deleteBtn, h('button', { onClick: closeConfirm }, 'Abbrechen')),
+                  )
+                })
+              } }, 'Löschen'),
+            ),
+            saveStatus,
           ),
-          h('div', {}, h('label', { class: 'lbl' }, 'Verwendungs-Historie'), history),
-          h('div', {}, h('label', { class: 'lbl' }, 'Zugeordnet, aber noch offen'), openChannels),
-          h('div', { class: 'warnbox' },
-            'Dieses Bild darf auf beliebig vielen Kanälen laufen. Die Sperre gilt nur pro Kanal — eine Veröffentlichung auf X blockiert Fanvue nicht.'),
-          h('div', {}, h('label', { class: 'lbl' }, 'Weitere Kanäle zuordnen'), addChips),
+          h('div', { class: 'stack' },
+            h('div', {},
+              h('label', { class: 'lbl' }, 'Status'),
+              h('span', { style: { color: LIFECYCLE[d.lifecycle].color } }, LIFECYCLE[d.lifecycle].label),
+            ),
+            h('div', {}, h('label', { class: 'lbl' }, 'Verwendungs-Historie'), history),
+            h('div', {}, h('label', { class: 'lbl' }, 'Zugeordnet, aber noch offen'), openChannels),
+            h('div', {}, h('label', { class: 'lbl' }, 'Weitere Kanäle zuordnen'), addChips),
+          ),
         ),
       )
-    }, { wide: true })
+    }
+    dialog = modal(d.filename, buildDetail, {
+      wide: true,
+      beforeClose: async () => {
+        if (busy) return false
+        if (!removed) {
+          busy = true
+          dialog.body.inert = true
+          try {
+            await saveNow()
+            await load()
+            await refreshCounts()
+          } finally {
+            busy = false
+            dialog.body.inert = false
+          }
+        }
+      },
+    })
   }
 
   // ------------------------------------------------------------ Upload

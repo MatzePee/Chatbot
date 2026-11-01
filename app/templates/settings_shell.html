@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Einstellungen · MP CreatorStudio{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/settings-hub.css?v=settings-hub-20261011">
+<link rel="stylesheet" href="/static/settings-hub.css?v=settings-navigation-20261101">
 <section class="settings-hub">
   <div class="settings-heading"><p class="settings-eyebrow">CREATOR WORKSPACE</p><h1>Einstellungen</h1><p class="muted">Alle Einstellungen an einem Ort. Jeder Bereich speichert unabhängig.</p></div>
   <nav class="settings-tabs" aria-label="Einstellungsbereiche">
-    {% for key, label in [('shared', 'Gemeinsam'), ('autochat', 'AutoChat'), ('autopost', 'AutoPost')] %}
+    {% for key, label in [('shared', 'Gemeinsam'), ('autochat', 'AutoChat'), ('autopost', 'AutoPost'), ('channels', 'Kanäle'), ('personas', 'Personas')] %}
     <a href="/settings/shared?section={{ key }}"{% if settings_section == key %} class="active" aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
   </nav>
