@@ -17,7 +17,7 @@ db.DATA_DIR=str(source/'data'); db.DB_PATH=str(source/'data/bot.db'); db._seed_f
 db.init_db(); db._conn.close()
 from autoposter.db import Base, engine, SessionLocal
 import autoposter.models
-from autoposter.models import AppSetting, Notification
+from autoposter.models import AppSetting, Notification, MediaSet, Channel
 async def seed():
     async with engine.begin() as conn: await conn.run_sync(Base.metadata.create_all)
     async with SessionLocal() as session:
@@ -25,6 +25,9 @@ async def seed():
         await get_system_user(session)
         session.add(AppSetting(key='runtime',value={'dry_run':True,'global_pause':True}))
         session.add(Notification(level='warning',title='Bildvorrat knapp: obsolete',body='preserve me',entity='channel',entity_id='missing',is_read=False))
+        if os.environ['SMOKE_MODE'] in ('legacy', 'legacy_mutation'):
+            session.add(MediaSet(name='Legacy set', nsfw_level='suggestive'))
+            session.add(Channel(platform='x', display_name='Legacy channel', nsfw_level='suggestive'))
         await session.commit()
     await engine.dispose()
 asyncio.run(seed())
@@ -50,7 +53,7 @@ mode=os.environ['SMOKE_MODE']
 original_enter=TestClient.__enter__
 def enter(self):
     from sqlalchemy import text
-    if mode=='mutation':
+    if mode in ('mutation', 'legacy_mutation'):
         from autoposter import schema_sync
         original_sync=schema_sync.sync
         async def mutate(engine):
@@ -114,7 +117,7 @@ def exercise(tmp_path, mode):
     return subprocess.run([sys.executable, '-c', VERIFY], cwd=ROOT, env=env, capture_output=True, text=True)
 
 
-@pytest.mark.parametrize('mode', ['normal', 'fresh'])
+@pytest.mark.parametrize('mode', ['normal', 'fresh', 'legacy'])
 def test_existing_autopost_survives_smoke_dashboard_probe(tmp_path, mode):
     result = exercise(tmp_path, mode)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -122,7 +125,7 @@ def test_existing_autopost_survives_smoke_dashboard_probe(tmp_path, mode):
     assert 'NORMAL_DASHBOARD_RECONCILIATION_PRESERVED' in result.stdout
 
 
-@pytest.mark.parametrize('mode', ['mutation', 'dashboard_mutation'])
+@pytest.mark.parametrize('mode', ['mutation', 'dashboard_mutation', 'legacy_mutation'])
 def test_smoke_still_rejects_preexisting_data_mutation(tmp_path, mode):
     result = exercise(tmp_path, mode)
     assert result.returncode != 0
@@ -135,3 +138,19 @@ def test_dashboard_override_is_restored_after_request_failure(tmp_path):
     assert result.returncode != 0
     assert 'synthetic dashboard error' in result.stderr
     assert 'Dashboard reconciliation was not restored' not in result.stderr
+
+
+def test_expected_migration_fingerprint_is_narrow_and_directional():
+    import sqlite3
+    from tools.release_smoke import fingerprint
+    with sqlite3.connect(':memory:') as conn:
+        for table in ('channel', 'media_asset', 'media_set', 'unrelated'):
+            conn.execute(f'CREATE TABLE {table} (nsfw_level TEXT, label TEXT)')
+            conn.execute(f"INSERT INTO {table} VALUES ('suggestive', 'keep')")
+            expected = fingerprint(conn, table, expected_migrations=True)
+            unchanged = fingerprint(conn, table)
+            assert (expected != unchanged) == (table != 'unrelated')
+            conn.execute(f"UPDATE {table} SET nsfw_level='explicit'")
+            assert (fingerprint(conn, table) == expected) == (table != 'unrelated')
+            conn.execute(f"UPDATE {table} SET label='changed'")
+            assert fingerprint(conn, table) != expected

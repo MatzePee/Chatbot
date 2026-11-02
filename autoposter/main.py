@@ -57,7 +57,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from autoposter.models import MediaAsset, MediaSet, Channel
     async with engine.begin() as conn:
         for model in (MediaAsset, MediaSet, Channel):
-            await conn.execute(update(model).where(model.nsfw_level == "suggestive").values(nsfw_level="explicit"))
+            # Preserve edit timestamps: this is a category migration, not a user edit.
+            await conn.execute(update(model).where(model.nsfw_level == "suggestive").values(
+                nsfw_level="explicit", updated_at=model.updated_at))
 
     # create_all legt nur fehlende TABELLEN an. Wächst das Modell um Spalten,
     # bleibt eine bestehende Datenbank sonst stumm veraltet und jede Abfrage

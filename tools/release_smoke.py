@@ -17,11 +17,22 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-def fingerprint(connection, table, columns=None):
+def fingerprint(connection, table, columns=None, *, expected_migrations=False):
     digest = hashlib.sha256()
     projection = ', '.join('"' + c.replace('"', '""') + '"' for c in columns) if columns else '*'
-    for row in connection.execute('SELECT ' + projection + ' FROM "' + table.replace('"', '""') + '" ORDER BY rowid'):
-        digest.update(repr(tuple(row)).encode())
+    cursor = connection.execute('SELECT ' + projection + ' FROM "' + table.replace('"', '""') + '" ORDER BY rowid')
+    names = [column[0] for column in cursor.description]
+    # Only the retired category is allowed to change, and only in the three
+    # tables migrated by AutoPost startup. Compare the result strictly against
+    # this expected state; do not normalize the actual post-startup data.
+    migrated_column = (names.index('nsfw_level') if expected_migrations
+                       and table in {'channel', 'media_asset', 'media_set'}
+                       and 'nsfw_level' in names else None)
+    for row in cursor:
+        values = list(row)
+        if migrated_column is not None and values[migrated_column] == 'suggestive':
+            values[migrated_column] = 'explicit'
+        digest.update(repr(tuple(values)).encode())
     return digest.hexdigest()
 
 
@@ -57,7 +68,7 @@ def run(source: Path):
             with sqlite3.connect(root / 'studio/autoposter.db') as conn:
                 names = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
                 studio_columns = {name: [r[1] for r in conn.execute('PRAGMA table_info("' + name.replace('"', '""') + '")')] for name in names}
-                studio_before = {name: fingerprint(conn, name, studio_columns[name]) for name in names}
+                studio_before = {name: fingerprint(conn, name, studio_columns[name], expected_migrations=True) for name in names}
                 for access, refresh in conn.execute('SELECT access_token_enc,refresh_token_enc FROM channel_credential'):
                     for value in (access, refresh):
                         if value:
@@ -124,8 +135,10 @@ def run(source: Path):
             elif studio_before:
                 with sqlite3.connect(root / 'studio/autoposter.db') as conn:
                     # Additive columns are allowed; every pre-existing cell and
-                    # row must still match, including row counts and ordering.
-                    assert all(fingerprint(conn, name, studio_columns[name]) == digest for name, digest in studio_before.items()), 'Existing AutoPost data changed.'
+                    # row must match the expected migration result, including counts and ordering.
+                    changed = [name for name, digest in studio_before.items()
+                               if fingerprint(conn, name, studio_columns[name]) != digest]
+                    assert not changed, 'Existing AutoPost data changed. Tables: ' + ', '.join(changed)
                     assert conn.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
             result = {'ok': True, 'python': sys.version.split()[0], 'existing_tables_preserved': len(before),
                       'autopost_tables_preserved': len(studio_before), 'autopost_secrets_verified': credential_count,
