@@ -41,7 +41,7 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
         <option value="chat" {% if sort=='chat' %}selected{% endif %}>Aktueller Chat</option>
       </select>
     </label>
-    <label style="flex:2">Suche
+    <label class="chat-filter-search">Suche
       <input id="chat-search" name="q" type="text"
              placeholder="🔍 Nach Anzeigename oder @username suchen…" autocomplete="off" value="{{ q }}">
     </label>
@@ -172,7 +172,7 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
     {% endif %}
   </div>
 
-  <details class="settings">
+  <details class="settings" id="settings-{{ c['uuid'] }}" {% if q == c['uuid'] %}open{% endif %}>
     <summary>⚙ Einstellungen</summary>
     <form method="post" action="/chats/{{ c['uuid'] }}/update">
       <div class="row">
@@ -415,6 +415,11 @@ Ist dein Konto berechtigt, hilft ein Neu-Verbinden (Einstellungen → trennen �
 {% endif %}
 
 <style>
+/* Never keep the desktop flex shorthand inline: it overrides the mobile row rule. */
+#chat-filter > .chat-filter-search { flex: 2 1 260px; min-width: 0; }
+@media (max-width: 900px) {
+  #chat-filter > .chat-filter-search { flex: 1 1 100%; }
+}
 #chat-search { width: 100%; }
 .chat-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .badges { display: flex; gap: 6px; }

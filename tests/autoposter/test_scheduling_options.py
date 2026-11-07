@@ -58,8 +58,9 @@ def test_ohne_eigene_fenster_gilt_das_allgemeine():
     assert planner.windows_for(p, "text") == p.allowed_time_windows
 
 
-def test_versatz_verschiebt_alle_slots():
-    """stagger_minutes sorgt dafür, dass zwei Kanäle nicht zur selben Minute posten."""
+def test_versatz_verschiebt_alle_slots(monkeypatch):
+    """With the same random draws, stagger shifts otherwise identical slots."""
+    monkeypatch.setattr(planner.random, 'random', lambda: 0.5)
     windows = policy().allowed_time_windows
     a = planner.slots_from_windows(FakeChannel(), policy(), START, 2, windows, 1)
     b = planner.slots_from_windows(

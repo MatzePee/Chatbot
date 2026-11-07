@@ -379,6 +379,7 @@ export default async function renderChannels() {
   function openPolicy(channel) {
     modal(`Einstellungen — ${channel.display_name}`, (close) => {
       const p = { ...channel.policy }
+      const name = h('input', { value: channel.display_name, maxLength: 120, autocomplete: 'off', 'aria-label': 'Anzeigename' })
       const color = h('input', { type: 'color', value: channel.color || '#6366f1' })
       const callback = channel.platform === 'x' ? callbackEditor(channel) : null
       const numField = (key, label, hint, step = '1') => {
@@ -422,6 +423,7 @@ export default async function renderChannels() {
       textWindows.value = (p.text_time_windows || []).length ? JSON.stringify(p.text_time_windows, null, 1) : ''
 
       return h('div', {},
+        field('Anzeigename', name, 'Nur die Bezeichnung in AutoPost; Handle und Konto bleiben unverändert.'),
         h('div', { class: 'grid c2' },
           field('Farbe im Kalender', color),
           field('Persona', personaSel),
@@ -486,6 +488,8 @@ export default async function renderChannels() {
         h('button', {
           class: 'primary', style: { width: '100%', justifyContent: 'center' },
           onClick: guard(async () => {
+            const displayName = name.value.trim()
+            if (!displayName) { toast.error('Anzeigename fehlt'); return }
             const parseWindows = (el, label) => {
               const raw = el.value.trim()
               if (!raw) return []
@@ -503,6 +507,7 @@ export default async function renderChannels() {
             }
             p.exclusive_pool_group = poolGroup.value || null
             await api.updateChannel(channel.id, {
+              display_name: displayName,
               policy: p,
               persona_id: personaSel.value || null,
               color: color.value,

@@ -899,6 +899,85 @@ def list_drafts(status: Optional[str] = None, limit: int = 100) -> list[sqlite3.
         ).fetchall()
 
 
+def pause_auto_draft(draft_id: int, edited_text: str = "") -> bool:
+    """Atomically pause one not-yet-claimed auto draft; preserve form edits."""
+    with _lock:
+        conn = get_conn()
+        cur = conn.execute(
+            "UPDATE drafts SET auto_send = -1, scheduled_send_at = NULL "
+            "WHERE id = ? AND status = 'pending' AND auto_send = 1 "
+            "AND scheduled_send_at IS NOT NULL", (draft_id,)
+        )
+        if not cur.rowcount:
+            conn.commit()
+            return False
+        text = (edited_text or "").strip()
+        if text:
+            row = conn.execute(
+                "SELECT generated_text, edited_text FROM drafts WHERE id = ?", (draft_id,)
+            ).fetchone()
+            previous = (row['edited_text'] or row['generated_text'] or '').strip()
+            conn.execute(
+                "UPDATE drafts SET edited_text = ?, user_edited = "
+                "CASE WHEN ? != ? THEN 1 ELSE user_edited END WHERE id = ?",
+                (text, text, previous, draft_id),
+            )
+        conn.commit()
+        return True
+
+
+def claim_due_auto_draft(draft_id: int, now: float) -> bool:
+    """Claim the send before network I/O so a concurrent pause cannot race it."""
+    with _lock:
+        conn = get_conn()
+        cur = conn.execute(
+            "UPDATE drafts SET auto_send = 2, scheduled_send_at = NULL "
+            "WHERE id = ? AND status = 'pending' AND auto_send = 1 "
+            "AND scheduled_send_at IS NOT NULL AND scheduled_send_at <= ?",
+            (draft_id, now),
+        )
+        conn.commit()
+        return bool(cur.rowcount)
+
+
+def claim_manual_draft(draft_id: int, edited_text: str = "") -> bool:
+    """Claim a manual send and its form text before an auto sender can start."""
+    with _lock:
+        conn = get_conn()
+        cur = conn.execute(
+            "UPDATE drafts SET auto_send = 2, scheduled_send_at = NULL "
+            "WHERE id = ? AND status IN ('pending', 'approved') AND COALESCE(auto_send, 0) != 2",
+            (draft_id,),
+        )
+        if not cur.rowcount:
+            conn.commit()
+            return False
+        text = (edited_text or "").strip()
+        if text:
+            row = conn.execute(
+                "SELECT generated_text, edited_text FROM drafts WHERE id = ?", (draft_id,)
+            ).fetchone()
+            previous = (row['edited_text'] or row['generated_text'] or '').strip()
+            conn.execute(
+                "UPDATE drafts SET edited_text = ?, user_edited = "
+                "CASE WHEN ? != ? THEN 1 ELSE user_edited END WHERE id = ?",
+                (text, text, previous, draft_id),
+            )
+        conn.commit()
+        return True
+
+
+def finish_auto_claim(draft_id: int) -> None:
+    """Never retry an unresolved send automatically after an interrupted claim."""
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "UPDATE drafts SET auto_send = 0 WHERE id = ? AND status = 'pending' "
+            "AND auto_send = 2", (draft_id,)
+        )
+        conn.commit()
+
+
 def due_auto_drafts(now: float) -> list[sqlite3.Row]:
     """Auto-Drafts, die gesendet werden duerfen."""
     with _lock:
@@ -1027,6 +1106,15 @@ def last_sent_at(user_uuid: str) -> Optional[float]:
             (user_uuid,),
         ).fetchone()
     return row["t"] if row and row["t"] is not None else None
+
+
+def pending_drafts_for_status() -> list[sqlite3.Row]:
+    """All pending drafts for the dashboard's stuck count (no queue page limit)."""
+    with _lock:
+        return get_conn().execute(
+            "SELECT guardrail_note, generated_text, regen_count, stale_note, user_edited "
+            "FROM drafts WHERE status = 'pending'"
+        ).fetchall()
 
 
 def count_drafts(status: str) -> int:

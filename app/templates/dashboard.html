@@ -27,7 +27,8 @@
   <div class="card">
     <h3>Status</h3>
     <table class="kv">
-      <tr><td>Wartende Freigaben</td><td><strong>{{ pending_count }}</strong></td></tr>
+      <tr><td><a href="/queue">Wartende Freigaben</a></td><td><strong>{{ pending_count }}</strong></td></tr>
+      <tr><td><a href="/queue">Hängende Freigaben</a></td><td><strong>{{ stuck_count }}</strong></td></tr>
       <tr><td>Gesendet (gesamt)</td><td>{{ sent_count }}</td></tr>
       <tr><td>Fehlgeschlagen</td><td>{{ failed_count }}</td></tr>
       <tr><td>Worker</td>

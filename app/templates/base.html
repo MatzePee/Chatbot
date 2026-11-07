@@ -142,7 +142,7 @@
 <script src="/static/live-refresh.js?v={{ css_v }}" defer></script>
 {% if preview %}<script>
 function protectPreviewForms() {
-  const allowed = path => ['/test', '/upload/publish', '/upload/settings'].includes(path) || /^\/queue\/\d+\/(regenerate|save|reject)$/.test(path);
+  const allowed = path => ['/test', '/upload/publish', '/upload/settings'].includes(path) || /^\/queue\/\d+\/(regenerate|save|reject|pause)$/.test(path);
   document.querySelectorAll('form[method="post"] button, form[method="post"] input[type="submit"]').forEach(button => {
     if (button.type === 'button') return;
     const path = new URL(button.getAttribute('formaction') || button.form.action, location.href).pathname;
@@ -154,7 +154,7 @@ document.addEventListener('creatorpilot:refresh', protectPreviewForms);
 document.addEventListener('submit', event => {
   const button = event.submitter;
   const path = new URL(button?.getAttribute('formaction') || event.target.action, location.href).pathname;
-  if (event.target.method === 'post' && !['/test', '/upload/publish', '/upload/settings'].includes(path) && !/^\/queue\/\d+\/(regenerate|save|reject)$/.test(path)) event.preventDefault();
+  if (event.target.method === 'post' && !['/test', '/upload/publish', '/upload/settings'].includes(path) && !/^\/queue\/\d+\/(regenerate|save|reject|pause)$/.test(path)) event.preventDefault();
 });
 </script>{% endif %}</body>
 </html>

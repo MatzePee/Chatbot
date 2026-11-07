@@ -240,6 +240,10 @@ def dashboard(request: Request, sys: str = "", sys_err: str = ""):
     ctx["logs"] = db.list_logs(limit=15)
     ctx["sent_count"] = db.count_drafts("sent")
     ctx["failed_count"] = db.count_drafts("failed")
+    ctx["stuck_count"] = sum(
+        poller.requires_manual_intervention(d)
+        for d in db.pending_drafts_for_status()
+    )
 
     # Zeitraeume (lokale Mitternacht)
     now = datetime.now()
@@ -859,8 +863,7 @@ def _mark_edited(draft_id: int, edited_text: str) -> None:
 
 @app.post("/queue/{draft_id}/approve")
 def approve_draft(draft_id: int, edited_text: str = Form("")):
-    _mark_edited(draft_id, edited_text)
-    ok = poller.send_draft_now(draft_id)
+    ok = poller.send_draft_now(draft_id, edited_text=edited_text)
     msg = ""
     if not ok:
         d = db.get_draft(draft_id)
@@ -872,6 +875,15 @@ def approve_draft(draft_id: int, edited_text: str = Form("")):
         else:
             msg = "Senden fehlgeschlagen – siehe Logs"
     return RedirectResponse(f"/queue?msg={_q(msg)}" if msg else "/queue", status_code=303)
+
+
+@app.post("/queue/{draft_id}/pause")
+def pause_draft(draft_id: int, edited_text: str = Form("")):
+    """Stop only this pending auto-send; if already claimed, report too late."""
+    paused = db.pause_auto_draft(draft_id, edited_text)
+    message = ("Automatischer Versand für diese Nachricht pausiert."
+               if paused else "Nicht pausiert: Versand möglicherweise bereits begonnen. Bitte Fanvue prüfen.")
+    return RedirectResponse(f"/queue?msg={_q(message)}#draft-{draft_id}", status_code=303)
 
 
 @app.post("/queue/{draft_id}/reject")
@@ -1324,7 +1336,8 @@ def chats(request: Request, view: str = "subscribers", q: str = "", msg: str = "
     such = (q or "").strip().lower()
     if such:
         members = [m for m in members
-                   if such in (m.get("display_name") or "").lower()
+                   if such == (m.get("uuid") or "").lower()
+                   or such in (m.get("display_name") or "").lower()
                    or such in (m.get("handle") or "").lower()]
 
     # --- Sortierung ---------------------------------------------------------

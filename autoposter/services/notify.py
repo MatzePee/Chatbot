@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 import smtplib
 import sqlite3
+import uuid
 from email.message import EmailMessage
 from typing import Optional
 
@@ -15,7 +16,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autoposter.config import settings
-from autoposter.models import Notification, AppSetting
+from autoposter.models import Notification, AppSetting, Post, PostStatus
 
 
 logger = logging.getLogger("autoposter.notify")
@@ -37,9 +38,17 @@ async def push(
     )
     db.add(note)
     await db.flush()
-    critical = level == "error" and entity in ("post", "channel")
-    if external and (critical or not acknowledged) and level in ("error", "warning"):
-        # Acknowledging the dashboard must not silence an ongoing outage.
+    # External messages are only for real failed posts. Keep all other events
+    # in the dashboard, including token diagnostics and scheduled retries.
+    failed_post = False
+    if external and level == "error" and entity == "post" and entity_id:
+        try:
+            post = await db.get(Post, uuid.UUID(entity_id))
+            failed_post = bool(post and post.status == PostStatus.failed.value)
+        except (ValueError, TypeError):
+            pass
+    if failed_post:
+        # Acknowledging the dashboard must not silence an ongoing failed post.
         key = "external_alert:" + hashlib.sha256(
             json.dumps([title, entity, entity_id], ensure_ascii=False).encode()
         ).hexdigest()

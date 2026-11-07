@@ -41,11 +41,15 @@ async def test_telegram_plain_text_and_delivery_confirmation(monkeypatch, ok):
 
 
 @pytest.mark.asyncio
-async def test_outage_reminder_survives_acknowledgement_and_is_throttled(db, monkeypatch):
+async def test_failed_post_reminder_survives_acknowledgement_and_is_throttled(db, monkeypatch):
+    channel = await make_channel(db, "X", "x")
+    post = Post(channel_id=channel.id, status="failed", body_text="synthetic")
+    db.add(post)
+    await db.flush()
     send = AsyncMock(return_value=True)
     monkeypatch.setattr(notify, "_fanout", send)
-    event = dict(level="error", title="Token-Problem: X", body="expired", entity="channel", entity_id="x")
-    db.add(AppSetting(key=notify.ack_key(event["title"], event["body"], "channel", "x"), value={"ack": True}))
+    event = dict(level="error", title="Veröffentlichung fehlgeschlagen: X", body="expired", entity="post", entity_id=str(post.id))
+    db.add(AppSetting(key=notify.ack_key(event["title"], event["body"], "post", str(post.id)), value={"ack": True}))
     await db.flush()
     await notify.push(db, **event)
     await notify.push(db, **event)
@@ -60,7 +64,11 @@ async def test_outage_reminder_survives_acknowledgement_and_is_throttled(db, mon
 async def test_delivery_failure_is_retried_without_breaking_notifications(db, monkeypatch):
     monkeypatch.setattr(notify, "_telegram", AsyncMock(side_effect=RuntimeError("unreachable")))
     monkeypatch.setattr(settings, "smtp_host", None)
-    event = dict(level="error", title="Token-Problem: X", entity="channel", entity_id="x")
+    channel = await make_channel(db, "X", "x")
+    post = Post(channel_id=channel.id, status="failed", body_text="synthetic")
+    db.add(post)
+    await db.flush()
+    event = dict(level="error", title="Veröffentlichung fehlgeschlagen: X", entity="post", entity_id=str(post.id))
     await notify.push(db, **event)
     await notify.push(db, **event)
     assert notify._telegram.await_count == 2
@@ -69,7 +77,7 @@ async def test_delivery_failure_is_retried_without_breaking_notifications(db, mo
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure", [AdapterError("timeout", retryable=True), RuntimeError("unexpected")])
-async def test_first_retry_and_unexpected_publish_errors_notify(db, monkeypatch, failure):
+async def test_scheduled_retry_is_quiet_but_final_publish_error_notifies(db, monkeypatch, failure):
     channel = await make_channel(db, "X", "x")
     post = Post(channel_id=channel.id, status="scheduled", body_text="hello", media_asset_ids=[])
     db.add(post)
@@ -82,5 +90,6 @@ async def test_first_retry_and_unexpected_publish_errors_notify(db, monkeypatch,
     monkeypatch.setattr(notify, "_fanout", send)
     ok, _ = await publisher.publish_post(db, post.id)
     assert not ok
-    assert send.await_count == 1
-    assert "Veröffentlichung fehlgeschlagen: X" in send.call_args.args[0]
+    assert send.await_count == (0 if isinstance(failure, AdapterError) else 1)
+    if send.await_count:
+        assert "Veröffentlichung fehlgeschlagen: X" in send.call_args.args[0]

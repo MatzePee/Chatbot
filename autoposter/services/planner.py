@@ -56,6 +56,26 @@ def windows_for(policy: PostingPolicy, kind: str) -> List[Dict[str, Any]]:
     ])
 
 
+def _random_window_moments(
+    begin: datetime, end: datetime, count: int, min_gap_minutes: int = 0,
+) -> List[datetime]:
+    """Sample across the window; keep feasible gaps and preserve local time."""
+    step = (end - begin).total_seconds() / count
+    gap = max(0, min_gap_minutes) * 60
+    feasible_gap = gap if gap * (count - 1) <= (end - begin).total_seconds() else 0
+    moments: List[datetime] = []
+    for index in range(count):
+        low = step * index
+        high = min(step * (index + 1),
+                   (end - begin).total_seconds() - (count - index - 1) * feasible_gap)
+        if moments and feasible_gap:
+            low = max(low, (moments[-1] - begin).total_seconds() + feasible_gap)
+        if low > high:
+            high = low  # move beyond this segment to respect the minimum gap
+        moments.append(begin + timedelta(seconds=low + (high - low) * random.random()))
+    return moments
+
+
 def slots_from_windows(
     channel: Channel,
     policy: PostingPolicy,
@@ -79,10 +99,7 @@ def slots_from_windows(
             end = datetime.combine(day, _parse_hhmm(window.get("to", "22:00")), tzinfo=tz)
             if end <= begin:
                 continue
-            span = (end - begin).total_seconds()
-            step = span / count
-            for index in range(count):
-                moment = begin + timedelta(seconds=step * index + step / 2)
+            for moment in _random_window_moments(begin, end, count, policy.min_gap_minutes or 0):
                 # Fester Kanal-Versatz gegen zeitgleiche Posts mehrerer Kanäle …
                 moment += timedelta(minutes=policy.stagger_minutes or 0)
                 # … plus Zufallsversatz gegen erkennbare Bot-Muster.
@@ -99,13 +116,17 @@ def candidate_slots(
     channel: Channel, policy: PostingPolicy, start: datetime, days: int
 ) -> List[datetime]:
     """Rückwärtskompatible Gesamtliste über alle Fenster."""
+    image_windows = windows_for(policy, "image")
+    text_windows = windows_for(policy, "text")
+    if image_windows == text_windows:
+        return slots_from_windows(channel, policy, start, days, image_windows, policy.posts_per_day)
     return sorted(
         set(
             slots_from_windows(
-                channel, policy, start, days, windows_for(policy, "image"), policy.posts_per_day
+                channel, policy, start, days, image_windows, policy.posts_per_day
             )
             + slots_from_windows(
-                channel, policy, start, days, windows_for(policy, "text"), policy.posts_per_day
+                channel, policy, start, days, text_windows, policy.posts_per_day
             )
         )
     )
@@ -125,12 +146,12 @@ def typed_slots(
 
     image_slots = (
         slots_from_windows(channel, policy, start, days, image_windows, policy.posts_per_day)
-        if policy.text_only_ratio < 1.0
+        if policy.text_only_ratio < 1.0 or same
         else []
     )
     text_slots = (
         slots_from_windows(channel, policy, start, days, text_windows, policy.posts_per_day)
-        if policy.text_only_ratio > 0.0
+        if policy.text_only_ratio > 0.0 and not same
         else []
     )
 
@@ -826,12 +847,9 @@ def day_slots(
     *,
     stagger_minutes: int = 0,
     jitter_minutes: int = 0,
+    min_gap_minutes: int = 0,
 ) -> List[datetime]:
-    """count Zeitpunkte gleichmäßig über ein Tagesfenster verteilen.
-
-    Die Punkte liegen jeweils in der Mitte gleich großer Abschnitte – so gibt es
-    weder eine Häufung am Rand noch zwei Posts direkt hintereinander.
-    """
+    """Sample count times across a local daily window, respecting feasible gaps."""
     if count <= 0:
         return []
     begin = datetime.combine(day, _parse_hhmm(time_from), tzinfo=tz)
@@ -845,11 +863,8 @@ def day_slots(
         moments = [begin + timedelta(minutes=index) for index in range(count)]
         return [m.astimezone(timezone.utc) for m in moments]
 
-    span = (end - begin).total_seconds()
-    step = span / count
     out: List[datetime] = []
-    for index in range(count):
-        moment = begin + timedelta(seconds=step * index + step / 2)
+    for moment in _random_window_moments(begin, end, count, min_gap_minutes):
         moment += timedelta(minutes=stagger_minutes)
         if jitter_minutes:
             moment += timedelta(minutes=random.randint(-jitter_minutes, jitter_minutes))
@@ -1017,23 +1032,21 @@ async def plan_range(
             candidates = day_slots(
                 day, tz, request.time_from, request.time_to, len(kinds),
                 stagger_minutes=policy.stagger_minutes, jitter_minutes=jitter,
+                min_gap_minutes=min_gap,
             )
             usable = free_slots(
                 candidates, taken, min_gap, blackouts,
                 foreign=foreign, cross_channel_gap_minutes=cross_gap,
             )
 
-            # Der Mindestabstand kann mehr Zeitpunkte verwerfen, als man ahnt:
-            # 5 Posts zwischen 09:00 und 22:00 liegen 156 Minuten auseinander –
-            # bei 180 Minuten Mindestabstand fällt jeder zweite weg. Das muss
-            # als Grund nachlesbar sein, nicht als stilles Weniger.
+            # Zufällige Slots über das Tagesfenster; Mindestabstand und
+            # bestehende Posts werden anschließend mit free_slots geprüft.
             if len(usable) < len(kinds) and min_gap > 0:
                 window = _window_minutes(request.time_from, request.time_to)
-                # day_slots legt die Zeitpunkte in die Mitte gleich großer
-                # Abschnitte – der Abstand ist also Fenster geteilt durch Anzahl.
-                spacing = window // max(1, len(kinds))
-                if spacing < min_gap:
-                    fits = max(1, window // min_gap)
+                # Nur wenn selbst die minimale Gesamtdauer nicht hineinpasst,
+                # ist das Fenster grundsätzlich zu klein.
+                if window < max(0, len(kinds) - 1) * min_gap:
+                    fits = max(1, 1 + window // min_gap)
                     result.gaps.append({
                         "channel_id": str(channel.id),
                         "channel_name": channel.display_name,

@@ -4,13 +4,14 @@
 <p class="muted">Vom Bot generierte Antworten. Bearbeite den Text bei Bedarf und gib ihn frei.
 Wartende Entwürfe werden im Hintergrund regelmäßig auf Aktualität geprüft; blockierte
 werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
+<a class="btn queue-reload" href="/queue">🔄 Seite neu laden</a>
 
 {% if msg %}<div class="card stale">{{ msg }}</div>{% endif %}
 
 {% for d in drafts %}
 <div id="draft-{{ d['id'] }}" class="card draft{% if d['stale_note'] %} is-stale{% endif %}">
   <div class="draft-head">
-    <strong>{{ d['display_name'] or d['handle'] or d['user_uuid'] }}</strong>
+    <strong><a href="/chats?view=all&amp;q={{ d['user_uuid'] | urlencode }}#settings-{{ d['user_uuid'] | urlencode }}">{{ d['display_name'] or d['handle'] or d['user_uuid'] }}</a></strong>
     {% if d['is_ppv'] %}<span class="tag">💰 PPV · ${{ (d['ppv_price_cents'] or 0)/100 }} · Set „{{ d['ppv_folder'] }}"</span>{% endif %}
     {% if d['regen_count'] %}
     <span class="tag regen{% if d['regen_count'] >= max_regen %} maxed{% endif %}"
@@ -48,8 +49,20 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
 
   <form method="post" action="/queue/{{ d['id'] }}/approve">
     <textarea name="edited_text" rows="7">{{ d['edited_text'] or d['generated_text'] }}</textarea>
+    {% if d['auto_send'] == 1 and d['scheduled_send_at'] %}
+    <div class="send-countdown" data-send-at="{{ d['scheduled_send_at'] }}" role="status" aria-live="off">
+      Wird gesendet in <strong class="send-seconds">…</strong> Sekunden · Zum Bearbeiten zuerst pausieren.
+    </div>
+    {% elif d['auto_send'] == -1 %}
+    <div class="send-countdown paused" role="status">Automatischer Versand pausiert – du kannst in Ruhe bearbeiten.</div>
+    {% elif d['auto_send'] == 2 %}
+    <div class="send-countdown" role="status">Versand wird bereits verarbeitet – Pausieren ist nicht mehr möglich.</div>
+    {% endif %}
     <div class="draft-actions">
       <button class="btn-primary" type="submit">✓ Freigeben &amp; Senden</button>
+      {% if d['auto_send'] == 1 and d['scheduled_send_at'] %}
+      <button class="btn" formaction="/queue/{{ d['id'] }}/pause" formmethod="post">⏸ Für diese Nachricht pausieren</button>
+      {% endif %}
       <button class="btn" formaction="/queue/{{ d['id'] }}/save" formmethod="post">💾 Speichern</button>
       <button class="btn" formaction="/queue/{{ d['id'] }}/regenerate" formmethod="post">↻ Neu generieren</button>
       <button class="btn-danger" formaction="/queue/{{ d['id'] }}/reject" formmethod="post">✗ Verwerfen</button>
@@ -59,6 +72,7 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
 {% else %}
 <div class="card muted">Keine wartenden Freigaben.</div>
 {% endfor %}
+<a class="btn queue-reload" href="/queue">🔄 Seite neu laden</a>
 
 <div id="ppv-picker" class="pk-overlay">
   <div class="pk-box">
@@ -121,7 +135,30 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
   background: rgba(217,164,65,.14); border-left: 3px solid #d9a441; }
 .tag.regen { background: rgba(127,127,127,.18); }
 .tag.regen.maxed { background: rgba(220,80,80,.20); }
+.send-countdown { margin: 10px 0 4px; padding: 9px 12px; border-radius: 8px;
+  background: rgba(30,115,210,.12); font-size: 14px; line-height: 1.4; }
+.send-countdown.paused { background: rgba(217,164,65,.14); }
 </style>
+
+<script>
+(function () {
+  function updateCountdowns() {
+    document.querySelectorAll('.send-countdown[data-send-at]').forEach(function (node) {
+      var remaining = Math.max(0, Math.ceil(Number(node.dataset.sendAt) - Date.now() / 1000));
+      var seconds = node.querySelector('.send-seconds');
+      if (!seconds) return;
+      if (remaining > 0) {
+        seconds.textContent = String(remaining);
+      } else {
+        node.textContent = 'Versandzeit erreicht – bitte neu laden. Pausieren könnte bereits zu spät sein.';
+      }
+    });
+  }
+  updateCountdowns();
+  setInterval(updateCountdowns, 1000);
+  document.addEventListener('creatorpilot:refresh', updateCountdowns);
+})();
+</script>
 
 <script>
 (function () {

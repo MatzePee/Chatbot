@@ -288,20 +288,20 @@ async def token_health() -> Dict[str, Any]:
             await db.execute(select(Channel).where(Channel.is_active.is_(True)))
         ).scalars().all()
         for channel in channels:
-            if channel.health == ChannelHealth.needs_reauth.value:
-                await notify.push(
-                    db, level="error",
-                    title=f"Token-Problem: {channel.display_name}",
-                    body=(f"{channel.platform.upper()} kann nicht posten. "
-                          "Bitte unter Einstellungen → Kanäle das Konto erneut verbinden.\n"
-                          + (channel.health_note or "Anmeldung abgelaufen.")),
-                    entity="channel", entity_id=str(channel.id),
-                )
             if not cred_service.is_connected(channel):
+                if channel.health == ChannelHealth.needs_reauth.value:
+                    await notify.push(
+                        db, level="error",
+                        title=f"Token-Problem: {channel.display_name}",
+                        body=(f"{channel.platform.upper()} kann nicht posten. "
+                              "Bitte unter Einstellungen → Kanäle das Konto erneut verbinden.\n"
+                              + (channel.health_note or "Anmeldung abgelaufen.")),
+                        entity="channel", entity_id=str(channel.id),
+                    )
                 continue
             try:
                 await cred_service.get_valid_credentials(db, channel)
-                if channel.health == ChannelHealth.error.value:
+                if channel.health in (ChannelHealth.error.value, ChannelHealth.needs_reauth.value):
                     channel.health = ChannelHealth.ok.value
                     channel.health_note = ""
                     db.add(channel)

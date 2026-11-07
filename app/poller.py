@@ -694,7 +694,12 @@ def send_due_cycle() -> None:
     if not _within_active_hours():
         return
     for draft in db.due_auto_drafts(time.time()):
-        _send_draft(draft["id"])
+        if not db.claim_due_auto_draft(draft["id"], time.time()):
+            continue  # paused, edited or claimed since the list was read
+        try:
+            _send_draft(draft["id"])
+        finally:
+            db.finish_auto_claim(draft["id"])
         time.sleep(0.5)
 
 
@@ -846,9 +851,14 @@ def _send_draft(draft_id: int) -> bool:
         return False
 
 
-def send_draft_now(draft_id: int) -> bool:
-    """Von der GUI aufgerufen: sofort senden (Freigabe)."""
-    return _send_draft(draft_id)
+def send_draft_now(draft_id: int, edited_text: str = "") -> bool:
+    """From the GUI: atomically claim the edit and send only once."""
+    if not db.claim_manual_draft(draft_id, edited_text):
+        return False
+    try:
+        return _send_draft(draft_id)
+    finally:
+        db.finish_auto_claim(draft_id)
 
 
 # --------------------------------------------------- CSV-Kauf-Import (Hintergrund)
@@ -1330,6 +1340,17 @@ def _stuck_reason(draft: Any, max_regen: int) -> Optional[str]:
     return None                          # informative Notiz oder gar keine
 
 
+def requires_manual_intervention(draft: Any) -> bool:
+    """A blocked draft or a stale reply that cannot regenerate itself."""
+    if _stuck_reason(draft, _max_regen_for(draft)):
+        return True
+    if not draft["stale_note"]:
+        return False
+    return (_draft_is_edited(draft)
+            or not db.get_setting("draft_regen_on_stale", True)
+            or (draft["regen_count"] or 0) >= int(db.get_setting("draft_max_regen", 10)))
+
+
 def _is_broken(draft: Any) -> bool:
     """Draft unsendbar, aber durch Neugenerierung reparierbar?"""
     note = (draft["guardrail_note"] or "").lower()
@@ -1512,8 +1533,12 @@ def regenerate_draft(draft_id: int, reason: str = "", interactive: bool = False)
     #     spaeter ueberrascht werden.
     escalated = any(k in (draft["guardrail_note"] or "").lower()
                     for k in _HUMAN_ONLY_NOTES)
-    if (ok and not interactive and _effective_mode(chat) == "auto"
-            and not escalated and not _draft_is_edited(draft)):
+    if draft["auto_send"] == -1:
+        # A deliberate per-message pause survives background regeneration.
+        fields["auto_send"] = -1
+        fields["scheduled_send_at"] = None
+    elif (ok and not interactive and _effective_mode(chat) == "auto"
+          and not escalated and not _draft_is_edited(draft)):
         delay_min = int(db.get_setting("send_delay_min_seconds", 20))
         delay_max = int(db.get_setting("send_delay_max_seconds", 90))
         fields["auto_send"] = 1
