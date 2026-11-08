@@ -7,7 +7,7 @@ import renderDashboard from './pages/dashboard.js?v=creatorstudio-dashboard-2026
 import renderLibrary from './pages/library.js?v=creatorstudio-library-autosave-20261101'
 import renderAssign from './pages/assign.js?v=creatorstudio-preview-bounds-20261006'
 import renderMatrix from './pages/matrix.js?v=creatorstudio-preview-bounds-20261006'
-import renderTopPostsX from './pages/top-posts-x.js?v=top-posts-50-views-20261101'
+import renderTopPostsX from './pages/top-posts-x.js?v=top-posts-manual-20261108'
 import renderCalendar from './pages/calendar.js?v=creatorstudio-translation-20260910'
 import renderSettings from './pages/settings.js?v=creatorstudio-channel-autoplan-20260910'
 

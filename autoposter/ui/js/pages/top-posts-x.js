@@ -9,9 +9,42 @@ export default async function renderTopPostsX() {
   const list = h('div', { class: 'top-x-list', 'aria-label': 'X-Posts nach Views' })
   const status = h('div', { class: 'hint', role: 'status', 'aria-live': 'polite' })
   const busy = new Set()
+  let manualBusy = false
+  let activeCollection = false
+  let pollTimer = null
+  const modes = [
+    ['all', 'Aktualisieren (Alle Daten)'],
+    ['180', 'Aktualisieren (180 Tage)'],
+    ['30', 'Aktualisieren (30 Tage)'],
+  ]
+  const controls = new Map()
+  const refreshControls = h('div', { class: 'stack', 'aria-label': 'X-Statistik manuell aktualisieren' })
+  for (const [scope, label] of modes) {
+    const last = h('span', { class: 'hint' }, 'Zuletzt ausgelöst: noch nie')
+    const button = h('button', { type: 'button', class: 'primary', onClick: async () => {
+      if (manualBusy || button.disabled) return
+      manualBusy = true
+      modes.forEach(([key]) => { controls.get(key).button.disabled = true })
+      try {
+        await api.refreshTopPostsX(scope)
+        toast.ok('X-Statistik wird aktualisiert')
+        await load()
+      } catch (error) {
+        toast.error(error.message || 'Aktualisierung konnte nicht gestartet werden')
+        try { await load() } catch { /* Keep the previous status. */ }
+      } finally {
+        manualBusy = false
+        modes.forEach(([key]) => { controls.get(key).button.disabled = activeCollection })
+      }
+    } }, label)
+    controls.set(scope, { button, last })
+    refreshControls.appendChild(h('div', { class: 'row', style: { alignItems: 'center', gap: '12px', flexWrap: 'wrap' } }, button, last))
+  }
   const page = h('div', { class: 'page stack top-x-page' },
     h('div', { class: 'page-head' }, h('h1', {}, 'Top Posts X')),
     h('p', { class: 'hint' }, 'Die 50 meistgesehenen, in AutoPost gespeicherten X-Posts über alle X-Kanäle. Sortiert nach Views, ohne Altersgrenze.'),
+    h('p', { class: 'hint' }, 'Die X-Statistik wird nur auf Knopfdruck gelesen. X kann für gelesene Posts Kosten berechnen.'),
+    refreshControls,
     h('div', { class: 'row top-x-legend', 'aria-label': 'Altersfarben' },
       h('span', { class: 'top-x-age red' }, '0–14 Tage'),
       h('span', { class: 'top-x-age yellow' }, '15–30 Tage'),
@@ -24,16 +57,36 @@ export default async function renderTopPostsX() {
     const scrolls = new Map([...list.querySelectorAll('.top-x-post')].map(node => [node.dataset.postId, node.querySelector('.top-x-channel-table')?.scrollLeft || 0]))
     const data = await api.topPostsX()
     const collection = data.collection || {}
-    clear(status).appendChild(h('span', {}, 'Aktualisierung täglich um 01:00 Uhr (Europe/Berlin). ' +
-      (collection.completed_at ? 'Letzter Lauf: ' + formatTime(collection.completed_at) + '. ' : 'Erste vollständige Messung steht noch aus. ') +
-      (collection.status === 'running' ? 'Messung läuft … ' : '') +
+    const started = Date.parse(collection.active?.started_at || '')
+    const running = !!collection.active && Number.isFinite(started) && Date.now() - started < 45 * 60 * 1000
+    const interrupted = !!collection.active && !running
+    activeCollection = running
+    for (const [scope, { button, last }] of controls) {
+      const mode = (collection.manual || {})[scope] || {}
+      button.disabled = running || manualBusy
+      clear(last).appendChild(h('span', {}, 'Zuletzt ausgelöst: ' + (mode.triggered_at ? formatTime(mode.triggered_at) : 'noch nie') +
+        (mode.status === 'running' ? (interrupted ? ' · unterbrochen' : ' · läuft …') : mode.status === 'error' ? ' · fehlgeschlagen' :
+          mode.status === 'partial' ? ' · teilweise abgeschlossen' : mode.status === 'ok' ? ' · abgeschlossen' : '')))
+    }
+    clear(status).appendChild(h('span', {}, 'Nur manuelle Aktualisierung. ' +
+      (collection.completed_at ? 'Letzter Lauf: ' + formatTime(collection.completed_at) + '. ' : 'Noch keine abgeschlossene Messung. ') +
+      (running ? 'Messung läuft … ' : '') +
       data.measured_posts + ' von ' + data.total_posts + ' Posts mit View-Daten.'))
+    if (running && !pollTimer) {
+      pollTimer = setTimeout(async () => {
+        pollTimer = null
+        if (!page.isConnected) return
+        try { await load() } catch { /* Retry on the next page refresh. */ }
+      }, 2500)
+    }
+    if (!running && pollTimer) { clearTimeout(pollTimer); pollTimer = null }
+    if (interrupted) status.appendChild(h('div', { class: 'warnbox' }, 'Der letzte Lauf wurde unterbrochen. Eine erneute manuelle Aktualisierung ist möglich.'))
     if (data.missing_views) status.appendChild(h('div', {}, data.missing_views + ' Posts ohne verfügbare View-Daten werden nicht als 0 Views gewertet.'))
     if (collection.status === 'partial' || (collection.errors || []).length) {
       status.appendChild(h('div', { class: 'warnbox' }, 'Nicht alle Konten konnten aktualisiert werden. ' + (collection.errors || []).join(' · ')))
     }
     clear(list)
-    if (!data.items.length) { list.appendChild(empty('Noch keine X-Posts mit verfügbaren View-Daten. Die nächtliche Messung lädt auch ältere Posts nach.')); return }
+    if (!data.items.length) { list.appendChild(empty('Noch keine X-Posts mit verfügbaren View-Daten. Wähle oben einen Zeitraum für die manuelle Messung.')); return }
     for (const item of data.items) {
       const pictures = h('div', { class: 'top-x-pictures' })
       for (const asset of item.media) {

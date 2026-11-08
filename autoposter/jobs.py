@@ -319,6 +319,5 @@ async def token_health() -> Dict[str, Any]:
 
 
 async def collect_x_post_metrics():
-    from autoposter.services import x_post_metrics
-    async with session_scope() as db:
-        return await x_post_metrics.collect(db)
+    # Legacy scheduled task: queued work must never run billable X reads.
+    return {"skipped": True, "reason": "manual_only"}

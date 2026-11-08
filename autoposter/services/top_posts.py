@@ -154,7 +154,7 @@ async def overview(db, now=None):
     row = await db.get(AppSetting, COLLECTION_KEY)
     return {'items':items, 'total_posts':len(posts), 'measured_posts':len(unique),
             'missing_views':len(posts)-len(measured),
-            'collection':dict(row.value or {}) if row else {}, 'timezone':'Europe/Berlin', 'refresh_time':'01:00'}
+            'collection':dict(row.value or {}) if row else {}, 'timezone':'Europe/Berlin', 'refresh_time':None}
 
 
 async def release_post(db, post_id, user, target_channel_id=None):

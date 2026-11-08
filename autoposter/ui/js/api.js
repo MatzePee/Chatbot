@@ -76,6 +76,7 @@ export const api = {
   dashboard: () => get('/dashboard'),
   xFollowers: () => get('/analytics/x-followers'),
   topPostsX: () => get('/analytics/top-posts-x'),
+  refreshTopPostsX: scope => post('/analytics/top-posts-x/collection/' + encodeURIComponent(scope)),
   reuseTopPostX: (id, channelId) => post('/analytics/top-posts-x/' + id + '/reuse' + (channelId ? '?channel_id=' + encodeURIComponent(channelId) : '')),
   telegramMembers: () => get('/analytics/telegram-members'),
   ackFailure: (id) => post('/problems/posts/' + encodeURIComponent(id) + '/ack'),
