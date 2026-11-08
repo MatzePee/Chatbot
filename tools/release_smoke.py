@@ -62,6 +62,8 @@ def run(source: Path):
         studio_before = {}
         studio_columns = {}
         credential_count = 0
+        media_before = {}
+        preexisting_media_mismatches = 0
         if (root / 'studio/autoposter.db').exists():
             from autoposter.crypto import decrypt
             from autoposter.services.appconfig import SECRET_FIELDS
@@ -86,7 +88,10 @@ def run(source: Path):
                 for path, digest in conn.execute('SELECT storage_path,sha256 FROM media_asset'):
                     media = source / 'data/autoposter/media' / path
                     assert media.is_file(), 'Existing AutoPost media missing.'
-                    assert hashlib.sha256(media.read_bytes()).hexdigest() == digest, 'AutoPost media checksum mismatch.'
+                    actual = hashlib.sha256(media.read_bytes()).hexdigest()
+                    media_before[media] = actual
+                    if actual != digest:
+                        preexisting_media_mismatches += 1
         def blocked(*args, **kwargs):
             raise RuntimeError('Network disabled during release verification')
         socket.create_connection = blocked
@@ -140,8 +145,11 @@ def run(source: Path):
                                if fingerprint(conn, name, studio_columns[name]) != digest]
                     assert not changed, 'Existing AutoPost data changed. Tables: ' + ', '.join(changed)
                     assert conn.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+            for media, digest in media_before.items():
+                assert media.is_file() and hashlib.sha256(media.read_bytes()).hexdigest() == digest, 'Existing AutoPost media changed.'
             result = {'ok': True, 'python': sys.version.split()[0], 'existing_tables_preserved': len(before),
                       'autopost_tables_preserved': len(studio_before), 'autopost_secrets_verified': credential_count,
+                      'preexisting_media_mismatches': preexisting_media_mismatches,
                       'autochat_running_preserved': db.get_setting('bot_running'), 'workers_and_network': 'disabled for verification'}
         if db._conn:
             db._conn.close()

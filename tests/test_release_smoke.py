@@ -9,7 +9,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 SEED = '''
-import asyncio, os
+import asyncio, hashlib, os
 from pathlib import Path
 from app import db
 source=Path(os.environ['SMOKE_SOURCE'])
@@ -17,7 +17,7 @@ db.DATA_DIR=str(source/'data'); db.DB_PATH=str(source/'data/bot.db'); db._seed_f
 db.init_db(); db._conn.close()
 from autoposter.db import Base, engine, SessionLocal
 import autoposter.models
-from autoposter.models import AppSetting, Notification, MediaSet, Channel
+from autoposter.models import AppSetting, Notification, MediaSet, Channel, MediaAsset
 async def seed():
     async with engine.begin() as conn: await conn.run_sync(Base.metadata.create_all)
     async with SessionLocal() as session:
@@ -28,6 +28,13 @@ async def seed():
         if os.environ['SMOKE_MODE'] in ('legacy', 'legacy_mutation'):
             session.add(MediaSet(name='Legacy set', nsfw_level='suggestive'))
             session.add(Channel(platform='x', display_name='Legacy channel', nsfw_level='suggestive'))
+        if os.environ['SMOKE_MODE'] in ('media_mismatch', 'media_mutation', 'media_missing', 'media_match'):
+            original=source/'data/autoposter/media/synthetic/original.jpg'
+            original.parent.mkdir(parents=True,exist_ok=True)
+            if os.environ['SMOKE_MODE']!='media_missing':
+                original.write_bytes(b'pre-existing media with stale stored digest')
+            digest=hashlib.sha256(original.read_bytes()).hexdigest() if os.environ['SMOKE_MODE']=='media_match' else '0'*64
+            session.add(MediaAsset(filename='historical.jpg',storage_path='synthetic/original.jpg',sha256=digest,bytes=43))
         await session.commit()
     await engine.dispose()
 asyncio.run(seed())
@@ -47,7 +54,11 @@ def get(self,path,*args,**kwargs):
     if not saved: saved.append(problems.check_if_due)
     if os.environ['SMOKE_MODE']=='route_error' and path=='/api/v1/dashboard':
         raise RuntimeError('synthetic dashboard error')
-    return original_get(self,path,*args,**kwargs)
+    result=original_get(self,path,*args,**kwargs)
+    if os.environ['SMOKE_MODE']=='media_mutation' and path=='/api/v1/dashboard':
+        media=Path(os.environ['SMOKE_SOURCE'])/'data/autoposter/media/synthetic/original.jpg'
+        media.write_bytes(b'media changed during update verification')
+    return result
 TestClient.get=get
 mode=os.environ['SMOKE_MODE']
 original_enter=TestClient.__enter__
@@ -123,6 +134,25 @@ def test_existing_autopost_survives_smoke_dashboard_probe(tmp_path, mode):
     assert result.returncode == 0, result.stdout + result.stderr
     assert '"ok": true' in result.stdout
     assert 'NORMAL_DASHBOARD_RECONCILIATION_PRESERVED' in result.stdout
+
+
+@pytest.mark.parametrize('mode,expected', [('media_match', 0), ('media_mismatch', 1)])
+def test_existing_media_is_reported_without_blocking_update(tmp_path, mode, expected):
+    result = exercise(tmp_path, mode)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f'"preexisting_media_mismatches": {expected}' in result.stdout
+
+
+def test_smoke_still_rejects_missing_media(tmp_path):
+    result = exercise(tmp_path, 'media_missing')
+    assert result.returncode != 0
+    assert 'Existing AutoPost media missing.' in result.stderr
+
+
+def test_smoke_rejects_media_changed_during_verification(tmp_path):
+    result = exercise(tmp_path, 'media_mutation')
+    assert result.returncode != 0
+    assert 'Existing AutoPost media changed.' in result.stderr, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize('mode', ['mutation', 'dashboard_mutation', 'legacy_mutation'])
