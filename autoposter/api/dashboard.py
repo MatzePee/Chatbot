@@ -362,6 +362,62 @@ async def visibility_aging_run(background: BackgroundTasks, _: User = Depends(re
     return {'status':'accepted', 'message':'Prüfung im Hintergrund angefordert; Status aktualisieren. Gespeichertes Alter wird verwendet.'}
 
 
+@router.post('/settings/ppv-restore/preview')
+async def ppv_restore_preview(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    from autoposter.services import ppv_restore
+    return await ppv_restore.preview(db)
+
+
+@router.get('/settings/ppv-restore')
+async def ppv_restore_status(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    from autoposter.services import ppv_restore
+    return await ppv_restore.status(db)
+
+
+@router.post('/settings/ppv-restore/run', status_code=202)
+async def ppv_restore_run(payload: Dict[str, Any], background: BackgroundTasks, _: User = Depends(require_admin)):
+    if settings.global_pause or settings.dry_run:
+        raise HTTPException(409, 'Notfall-Stopp oder Trockenlauf aktiv')
+    if payload.get('confirm') != 'PPV_FOLLOWER_SICHTBAR':
+        raise HTTPException(422, 'Explizite PPV-Bestätigung fehlt')
+    from autoposter import jobs
+    background.add_task(jobs.restore_fanvue_ppv_followers)
+    return {'status':'accepted','message':'PPV-Lauf angefordert; Status aktualisieren. Bereits für Follower sichtbare Posts bleiben unverändert.'}
+
+
+@router.get('/settings/post-retention')
+async def post_retention_status(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    from autoposter.services import post_retention
+    return await post_retention.status(db)
+
+
+@router.post('/settings/post-retention/preview')
+async def post_retention_preview(payload: Dict[str, Any], db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    from autoposter.services import post_retention
+    try:
+        return await post_retention.preview(db, days=payload.get('days'), delete_ppv=payload.get('delete_ppv'))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.post('/settings/post-retention/run', status_code=202)
+async def post_retention_run(payload: Dict[str, Any], background: BackgroundTasks,
+                             db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    if not settings.post_retention_active:
+        raise HTTPException(409, 'Fanvue-Löschfunktion noch nicht aktiviert')
+    if settings.global_pause or settings.dry_run:
+        raise HTTPException(409, 'Notfall-Stopp oder Trockenlauf aktiv')
+    if payload.get('confirm') != 'FANVUE_POSTS_LOESCHEN':
+        raise HTTPException(422, 'Explizite Löschbestätigung fehlt')
+    values = await appconfig.get_all(db, use_cache=False)
+    days, delete_ppv = values['post_retention_days'], values['post_retention_delete_ppv']
+    if payload.get('days') != days or type(payload.get('days')) is not int or payload.get('delete_ppv') is not delete_ppv:
+        raise HTTPException(409, 'Einstellungen geändert; Vorschau erneut laden')
+    from autoposter import jobs
+    background.add_task(jobs.delete_old_fanvue_posts, manual=True, days=days, delete_ppv=delete_ppv)
+    return {'status':'accepted','message':'Löschlauf angefordert; Status aktualisieren.'}
+
+
 @router.post("/settings/integrations")
 async def save_integrations(
     payload: Dict[str, Any],

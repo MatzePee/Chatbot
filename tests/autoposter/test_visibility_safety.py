@@ -79,8 +79,8 @@ async def test_failure_retry_scope_isolation_readback_and_cursor_cycle(db, setup
     async def request(self,cred,method,path,**kw):
         calls.append((method,path))
         if path=='/users/me':return {'uuid':'a'}
-        if path=='/v1/posts':return {'data':[{'uuid':POST,'audience':'followers-and-subscribers','publishedAt':'2020-01-01T00:00:00Z','publishAt':None}], 'nextCursor':'cycle'}
-        return {'uuid':POST,'audience':'followers-and-subscribers','publishedAt':'2020-01-01T00:00:00Z','publishAt':None}
+        if path=='/v1/posts':return {'data':[{'uuid':POST,'audience':'followers-and-subscribers','price':None,'publishedAt':'2020-01-01T00:00:00Z','publishAt':None}], 'nextCursor':'cycle'}
+        return {'uuid':POST,'audience':'followers-and-subscribers','price':None,'publishedAt':'2020-01-01T00:00:00Z','publishAt':None}
     monkeypatch.setattr(FanvueAdapter,'visibility_request',request)
     result=await aging.run(db,now=NOW,manual=True)
     assert len(result['accounts'])==2
@@ -100,8 +100,8 @@ async def test_pause_during_walk_prevents_next_mutation(db, setup, monkeypatch):
         if path=='/users/me':return {'uuid':'a'}
         if path=='/v1/posts':
             monkeypatch.setattr(settings,'global_pause',True)
-            return {'data':[{'uuid':POST,'audience':'followers-and-subscribers','publishedAt':'2020-01-01T00:00:00Z'}],'nextCursor':None}
-        return {'uuid':POST,'audience':'followers-and-subscribers','publishedAt':'2020-01-01T00:00:00Z'}
+            return {'data':[{'uuid':POST,'audience':'followers-and-subscribers','price':None,'publishedAt':'2020-01-01T00:00:00Z'}],'nextCursor':None}
+        return {'uuid':POST,'audience':'followers-and-subscribers','price':None,'publishedAt':'2020-01-01T00:00:00Z'}
     monkeypatch.setattr(FanvueAdapter,'visibility_request',request)
     await aging.run(db,now=NOW,manual=True)
     assert 'PATCH' not in calls
@@ -151,4 +151,4 @@ def test_expired_post_is_not_currently_published():
  ('2020-01-01T00:00:00Z',None,'subscribers',False),
 ])
 def test_actual_publication_required(published,scheduled,audience,expected):
-    assert aging.eligible({'publishedAt':published,'publishAt':scheduled,'audience':audience,'createdAt':'2000-01-01T00:00:00Z'},NOW,7) is expected
+    assert aging.eligible({'publishedAt':published,'publishAt':scheduled,'audience':audience,'price':None,'createdAt':'2000-01-01T00:00:00Z'},NOW,7) is expected

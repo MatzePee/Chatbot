@@ -41,6 +41,7 @@ def default_jobs() -> List[Job]:
         Job("generate_plan", lambda: jobs.generate_plan(14), 3600, 60),
         Job("refresh_metrics", lambda: jobs.refresh_metrics(72), 1800, 300),
         Job("age_fanvue_visibility", jobs.age_fanvue_visibility, 60, 5),
+        Job("delete_old_fanvue_posts", jobs.delete_old_fanvue_posts, 3600, 120),
         Job("collect_daily_followers", jobs.collect_daily_followers, 60, 5),
         Job("describe_assets", lambda: jobs.describe_assets(10), 900, 120),
         Job("inventory_check", lambda: jobs.inventory_check(), 3600, 180),

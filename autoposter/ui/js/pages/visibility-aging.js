@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=visibility-aging-1'
-import { h, clear, card } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { api } from '../api.js?v=ppv-restore-1'
+import { h, clear, card, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 export async function visibilityAgingCard(values) {
   const enabled = h('input', {type:'checkbox', checked:values.visibility_aging_enabled === true})
@@ -66,15 +66,46 @@ export async function visibilityAgingCard(values) {
     } catch(e) { message.textContent = 'Prüfung fehlgeschlagen: ' + e.message }
     finally { run.disabled = false }
   }}, 'Jetzt prüfen und umstellen')
+  const ppvStatus = h('div', {role:'status', style:{overflowWrap:'anywhere'}})
+  let ppvReady = false
+  try { await api.ppvRestoreStatus(); ppvReady = true }
+  catch(e) { ppvStatus.textContent = 'PPV-Wiederherstellung erst nach dem Backend-Neustart verfügbar.' }
+  const ppvButton = h('button', {type:'button', disabled:!ppvReady, onClick:async () => {
+    ppvButton.disabled = true
+    ppvStatus.textContent = 'PPV-Posts werden ohne Änderung geprüft …'
+    try {
+      const preview = await api.ppvRestorePreview()
+      const count = (preview.accounts || []).reduce((n, a) => n + (a.candidates || 0), 0)
+      const errors = (preview.accounts || []).filter(a => a.status === 'error')
+      if (errors.length) { ppvStatus.textContent = 'Vorschau unvollständig – keine Änderung gestartet. Fanvue-Verbindung prüfen.'; return }
+      if (!count) { ppvStatus.textContent = 'Keine veröffentlichten PPV-Posts mit Sichtbarkeit nur für Subscriber gefunden.'; return }
+      ppvStatus.textContent = `${count} PPV-Posts in ${(preview.accounts || []).length} Konto/Konten gefunden.`
+      const confirmed = await confirmDialog('PPV-Posts für Follower sichtbar machen',
+        `${count} veröffentlichte PPV-Posts, die derzeit nur für Subscriber sichtbar sind, für Follower und Subscriber sichtbar machen? Auch manuell erstellte Posts sind enthalten. Preis, Inhalt und Medien bleiben unverändert. Jeder Post wird unmittelbar vor der Änderung erneut geprüft.`,
+        {okLabel:'PPVs für Follower sichtbar machen'})
+      if (!confirmed) { ppvStatus.textContent = 'Abgebrochen – nichts geändert.'; return }
+      const response = await api.runPpvRestore()
+      ppvStatus.textContent = response.message
+    } catch(e) { ppvStatus.textContent = 'PPV-Prüfung oder Start fehlgeschlagen: ' + e.message }
+    finally { ppvButton.disabled = false }
+  }}, 'Bestehende PPVs für Follower sichtbar machen')
+  const ppvRefresh = async () => {
+    try {
+      const response = await api.ppvRestoreStatus()
+      ppvReady = true; ppvButton.disabled = false
+      ppvStatus.textContent = (response.accounts || []).map(a => `${a.account_id}: ${a.status} · ${a.changed || 0} für Follower sichtbar gemacht · ${a.skipped || 0} übersprungen · ${(a.errors || []).length} Fehler`).join(' · ') || 'Noch kein PPV-Lauf.'
+    } catch(e) { ppvStatus.textContent = 'PPV-Laufstatus nicht verfügbar: ' + e.message }
+  }
   await refresh()
   return card('Fanvue-Sichtbarkeit nach Alter',
-    h('p', {class:'hint'}, 'Veröffentlichte Follower-und-Abonnenten-Posts ab X × 24 Stunden nur noch für Abonnenten. Inhalt, Medien und Preise bleiben unverändert. Alle Posts der aktiv verbundenen Fanvue-Konten werden geprüft, nicht nur der lokale Kalender.'),
+    h('p', {class:'hint'}, 'Nur kostenlose veröffentlichte Follower-und-Abonnenten-Posts ab X × 24 Stunden werden auf Abonnenten umgestellt. PPV-Posts (Preis > 0) und Posts ohne eindeutig erkennbaren Preis bleiben unverändert. Inhalt, Medien und Preise bleiben unverändert. Alle Posts der aktiv verbundenen Fanvue-Konten werden geprüft, nicht nur der lokale Kalender.'),
     h('label', {}, enabled, 'Nachts automatisch umstellen'),
     h('p', {class:'hint'}, '00:00 Europe/Berlin (Sommerzeit-sicher), bei Ausfall Nachholung am selben Tag. Standard: aus, 7 Tage.'),
     h('label', {}, 'Alter in Tagen', days),
     h('div', {class:'row', style:{display:'flex',flexWrap:'wrap',gap:'8px'}}, save),
     message,
     h('p', {class:'hint'}, 'Manueller Lauf verwendet ausschließlich das gespeicherte Alter, auch wenn die Nacht-Automatik aus ist. Trockenlauf und Notfall-Stopp verhindern jede Änderung. Laufende Kontoläufe werden nicht doppelt gestartet.'),
-    h('div', {class:'row', style:{display:'flex',flexWrap:'wrap',gap:'8px'}}, run, h('button', {type:'button', onClick:refresh}, 'Status aktualisieren')),
+    h('div', {class:'row', style:{display:'flex',flexWrap:'wrap',gap:'8px'}}, run, h('button', {type:'button', onClick:async () => { await refresh(); await ppvRefresh() }}, 'Status aktualisieren'), ppvButton),
+    ppvStatus,
     results)
 }

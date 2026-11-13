@@ -47,6 +47,11 @@ def refresh_metrics(hours: int = 72) -> Dict[str, Any]:
     return run_async(jobs.refresh_metrics(hours))
 
 
+@shared_task(name="autoposter.delete_old_fanvue_posts")
+def delete_old_fanvue_posts() -> Dict[str, Any]:
+    return run_async(jobs.delete_old_fanvue_posts())
+
+
 @shared_task(name="autoposter.age_fanvue_visibility")
 def age_fanvue_visibility() -> Dict[str, Any]:
     return run_async(jobs.age_fanvue_visibility())

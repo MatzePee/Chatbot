@@ -25,6 +25,13 @@ def timestamp(raw):
 
 
 def eligible(post, now, days):
+    # Fanvue uses null for free posts. Missing/ambiguous prices are never safe
+    # to reclassify; PPV (price > 0) must retain its audience and price.
+    if 'price' not in post:
+        return False
+    price = post['price']
+    if price is not None and (type(price) not in (int, float) or price != 0):
+        return False
     published = timestamp(post.get('publishedAt'))
     scheduled = post.get('publishAt')
     expires = post.get('expiresAt')

@@ -1,5 +1,6 @@
-import { visibilityAgingCard } from './visibility-aging.js?v=visibility-aging-1'
-import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
+import { postRetentionCard } from './post-retention.js?v=post-retention-limits-1'
+import { visibilityAgingCard } from './visibility-aging.js?v=ppv-restore-1'
+import { api } from '../api.js?v=post-retention-1'
 import { h, clear, card, field, empty, toast, guard, spinner, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 const MODEL_TASKS = [
@@ -47,6 +48,7 @@ export default async function renderSettings({ user }) {
 
   page.appendChild(await imageCommentCard())
   page.appendChild(await visibilityAgingCard(integrations))
+  page.appendChild(await postRetentionCard(integrations))
 
   // ------------------------------------------------------------ OpenRouter
   page.appendChild(await openrouterCard(integrations))

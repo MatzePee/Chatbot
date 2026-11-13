@@ -40,7 +40,7 @@ from autoposter.services import visibility_aging as aging
 ])
 async def test_missing_resource_stage_continues_without_false_success(db,setup,monkeypatch,stage,methods,state):
     import autoposter.adapters.fanvue as module
-    posts=[dict(uuid=f'123e4567-e89b-12d3-a456-{i:012d}',audience='followers-and-subscribers',publishedAt='2020-01-01T00:00:00Z') for i in range(1,5)]
+    posts=[dict(uuid=f'123e4567-e89b-12d3-a456-{i:012d}',audience='followers-and-subscribers',price=None,publishedAt='2020-01-01T00:00:00Z') for i in range(1,5)]
     posts[-1]['audience']='subscribers'
     calls=[]; counts={}; updated=set()
     def handler(req):
@@ -83,7 +83,7 @@ async def test_missing_resource_stage_continues_without_false_success(db,setup,m
 @pytest.mark.parametrize('status',[401,403])
 async def test_auth_failure_aborts_further_posts(db,setup,monkeypatch,status):
     calls=[]
-    posts=[dict(uuid=f'123e4567-e89b-12d3-a456-{i:012d}',audience='followers-and-subscribers',publishedAt='2020-01-01T00:00:00Z') for i in [1,2]]
+    posts=[dict(uuid=f'123e4567-e89b-12d3-a456-{i:012d}',audience='followers-and-subscribers',price=None,publishedAt='2020-01-01T00:00:00Z') for i in [1,2]]
     async def request(self,cred,method,path,**kw):
         calls.append((method,path))
         if path=='/users/me':return {'uuid':'a'}

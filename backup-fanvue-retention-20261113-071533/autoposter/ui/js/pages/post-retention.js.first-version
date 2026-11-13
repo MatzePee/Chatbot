@@ -1,0 +1,58 @@
+import { api } from '../api.js?v=post-retention-1'
+import { h, card, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+
+export async function postRetentionCard(values) {
+  const status = await api.postRetentionStatus()
+  const days = h('input', {type:'number', min:1, max:36500, step:1, value:values.post_retention_days ?? 30})
+  const ppv = h('input', {type:'checkbox', checked:values.post_retention_delete_ppv === true})
+  const automatic = h('input', {type:'checkbox', checked:values.post_retention_automatic === true})
+  const note = h('p', {role:'status'}, status.active ? 'Löschfunktion freigegeben.' : 'Noch nicht aktiviert – Löschen ist serverseitig gesperrt.')
+  const results = h('div', {role:'status', style:{overflowWrap:'anywhere'}})
+  const valid = () => {
+    const n = Number(days.value)
+    if (!days.value.trim() || !Number.isInteger(n) || n < 1 || n > 36500) throw new Error('Bitte 1–36500 ganze Tage eingeben.')
+    return n
+  }
+  let preview = null
+  const invalidate = () => { preview=null; run.disabled=true; results.textContent='Einstellungen geändert – Vorschau erneut laden.' }
+  days.addEventListener('input',invalidate); ppv.addEventListener('change',invalidate); automatic.addEventListener('change',invalidate)
+  const save = h('button', {type:'button', onClick:async () => {
+    try {
+      const n=valid()
+      Object.assign(values, await api.saveIntegrations({post_retention_days:n,post_retention_delete_ppv:ppv.checked,post_retention_automatic:automatic.checked}))
+      invalidate(); note.textContent='Gespeichert. ' + (status.active ? '' : 'Löschen bleibt gesperrt.')
+    } catch(e) { note.textContent='Speichern fehlgeschlagen: '+e.message }
+  }}, 'Einstellungen speichern')
+  const show = h('button', {type:'button', onClick:async () => {
+    try {
+      const n=valid()
+      results.textContent='Fanvue-Posts werden ohne Änderung geprüft …'
+      const response=await api.postRetentionPreview({days:n,delete_ppv:ppv.checked})
+      preview={days:n,delete_ppv:ppv.checked}
+      results.textContent=(response.accounts || []).map(a => a.error
+        ? `Konto: ${a.error}` : `${a.account_id}: ${a.candidates.length} Kandidaten von ${a.scanned} Posts (${a.status})`).join(' · ') || 'Keine verbundenen Fanvue-Konten.'
+      run.disabled=!status.active || response.status!=='ok' || !(response.accounts || []).some(a=>a.candidates.length)
+    } catch(e) { preview=null; run.disabled=true; results.textContent='Vorschau fehlgeschlagen: '+e.message }
+  }}, 'Vorschau (nichts löschen)')
+  const run = h('button', {type:'button', class:'danger', disabled:true, onClick:async () => {
+    if (!preview || !status.active) return
+    const count = (await api.postRetentionPreview(preview)).accounts.reduce((n,a)=>n+(a.candidates?.length || 0),0)
+    if (!count) { invalidate(); return }
+    if (!await confirmDialog('Fanvue-Posts löschen', `${count} veröffentlichte Posts älter als ${preview.days} Tage auf Fanvue löschen? PPV ${preview.delete_ppv ? 'einschließen' : 'behalten'}. AutoPost-Verlauf bleibt erhalten.`, {okLabel:'Auf Fanvue löschen',danger:true})) return
+    run.disabled=true
+    try { const r=await api.runPostRetention({...preview,confirm:'FANVUE_POSTS_LOESCHEN'}); results.textContent=r.message }
+    catch(e) { results.textContent='Start fehlgeschlagen: '+e.message }
+  }}, 'Jetzt auf Fanvue löschen')
+  const refresh = h('button', {type:'button', onClick:async () => {
+    try {
+      const r=await api.postRetentionStatus()
+      results.textContent=(r.accounts || []).map(a=>`${a.account_id}: ${a.status} · ${a.deleted || 0} gelöscht · ${a.skipped || 0} übersprungen · ${(a.errors || []).length} Fehler`).join(' · ') || 'Noch kein Löschlauf.'
+    } catch(e) { results.textContent=e.message }
+  }}, 'Laufstatus aktualisieren')
+  return card('Fanvue-Posts nach Alter löschen',
+    h('p', {class:'hint'}, 'Alle veröffentlichten Feedposts der verbundenen Fanvue-Konten, auch manuell erstellte. Alter ab tatsächlicher Veröffentlichung. Unklarer Preis wird immer behalten. Keine lokalen Posts oder Medien werden gelöscht.'),
+    note, h('label',{},'Älter als (Tage)',days),
+    h('label',{},ppv,'Auch PPV-Posts löschen (Preis > 0)'),
+    h('label',{},automatic,'Täglich automatisch löschen (erst nach separater Freigabe wirksam)'),
+    h('div',{class:'row',style:{display:'flex',flexWrap:'wrap',gap:'8px'}},save,show,run,refresh),results)
+}

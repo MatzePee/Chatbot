@@ -35,6 +35,37 @@ logger = logging.getLogger("autoposter.jobs")
 # --------------------------------------------------------------------------- #
 # Veröffentlichung
 # --------------------------------------------------------------------------- #
+async def delete_old_fanvue_posts(*, manual=False, days=None, delete_ppv=None):
+    from autoposter.services import post_retention
+
+    async with session_scope() as db:
+        if not settings.post_retention_active:
+            return {'status':'disabled'}
+        if manual:
+            result = await post_retention.run(db, days=days, delete_ppv=delete_ppv, manual=True)
+        else:
+            result = await post_retention.scheduled(db)
+        if result.get('status') not in {'disabled','paused','dry_run'}:
+            from autoposter.models import AppSetting
+            if db.bind.dialect.name == 'sqlite':
+                from sqlalchemy.dialects.sqlite import insert
+            else:
+                from sqlalchemy.dialects.postgresql import insert
+            value={**result,'recorded_at':datetime.now(timezone.utc).isoformat()}
+            stmt=insert(AppSetting).values(key='fanvue_retention_last_run',value=value)
+            await db.execute(stmt.on_conflict_do_update(index_elements=['key'],set_={'value':value}))
+            await db.commit()
+        return result
+
+
+async def restore_fanvue_ppv_followers():
+    """Manual only; never registered with either scheduler."""
+    from autoposter.services import ppv_restore
+
+    async with session_scope() as db:
+        return await ppv_restore.run(db)
+
+
 async def age_fanvue_visibility(*, manual=False, now=None):
     from autoposter.services import visibility_aging
     async with session_scope() as db:

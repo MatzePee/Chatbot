@@ -7,6 +7,16 @@ from autoposter.adapters.base import Credentials, AdapterError
 from contextlib import asynccontextmanager
 import json
 
+def test_ppv_and_unknown_price_are_never_eligible():
+    from autoposter.services.visibility_aging import eligible
+    now = datetime(2026, 11, 13, 12, tzinfo=timezone.utc)
+    base = dict(audience='followers-and-subscribers',
+                publishedAt=(now-timedelta(days=7)).isoformat(), publishAt=None)
+    assert eligible({**base, 'price':300}, now, 3) is False
+    assert eligible(base, now, 3) is False
+    assert eligible({**base, 'price':None}, now, 3) is True
+    assert eligible({**base, 'price':0}, now, 3) is True
+
 @pytest.mark.asyncio
 async def test_official_visibility_adapter_cursor_get_patch_and_retry(monkeypatch):
     requests = []
@@ -69,14 +79,16 @@ async def test_published_cutoff_uses_actual_timestamp_and_rechecks(db, monkeypat
     async def creds(db, ch): return Credentials('synthetic', external_user_id='account-a', scopes=['read:post','write:post'])
     monkeypatch.setattr(credentials, 'get_valid_credentials', creds)
     def post(i, **kw):
-        return dict(uuid=f'123e4567-e89b-12d3-a456-{i:012d}', audience='followers-and-subscribers', createdAt='2020-01-01T00:00:00Z', publishedAt=(now-timedelta(days=7)).isoformat(), publishAt=None, **kw)
-    rows = [post(i) for i in range(1,8)]
+        return dict(uuid=f'123e4567-e89b-12d3-a456-{i:012d}', audience='followers-and-subscribers', price=None, createdAt='2020-01-01T00:00:00Z', publishedAt=(now-timedelta(days=7)).isoformat(), publishAt=None, **kw)
+    rows = [post(i) for i in range(1,10)]
     rows[1]['publishedAt'] = (now-timedelta(days=7)+timedelta(seconds=1)).isoformat()
     rows[2]['publishedAt'] = None
     rows[3]['publishedAt'] = (now+timedelta(days=1)).isoformat()
     rows[4]['publishAt'] = (now+timedelta(days=1)).isoformat()
     rows[5]['audience'] = 'subscribers'
     rows[6]['publishedAt'] = 'invalid'
+    rows[7]['price'] = 300  # PPV in list: never GET/PATCH for audience change.
+    rows[8]['price'] = 0  # Free in list, switched to PPV before precheck.
     calls=[]; updated=set()
     async def request(self, cred, method, path, **kw):
         calls.append((method,path,kw))
@@ -90,11 +102,13 @@ async def test_published_cutoff_uses_actual_timestamp_and_rechecks(db, monkeypat
         if method == 'PATCH':
             assert kw == {'json':{'audience':'subscribers'}}
             updated.add(item['uuid'])
-        return dict(item, audience='subscribers' if item['uuid'] in updated else item['audience'])
+        return dict(item, price=300 if item['uuid'] == rows[8]['uuid'] else item['price'], audience='subscribers' if item['uuid'] in updated else item['audience'])
     monkeypatch.setattr(FanvueAdapter, 'visibility_request', request)
     result = await aging.run(db, now=now, manual=True)
     assert result['accounts'][0]['changed'] == 1
     assert len([c for c in calls if c[0]=='PATCH']) == 1
+    assert not any(c[1].endswith(rows[7]['uuid']) for c in calls)
+    assert not any(c[0]=='PATCH' and c[1].endswith(rows[8]['uuid']) for c in calls)
     assert len([c for c in calls if c[1].endswith(rows[0]['uuid']) and c[0]=='GET']) == 2
     assert (await aging.run(db, now=now))['accounts'][0]['status'] == 'already_done'
 

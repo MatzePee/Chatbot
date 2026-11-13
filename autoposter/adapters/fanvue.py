@@ -69,6 +69,51 @@ class FanvueAdapter:
         self.base = settings.fanvue_api_base.rstrip("/")
 
     # ------------------------------------------------------------------ #
+    async def retention_request(self, cred, method, path, **kwargs):
+        """Restricted official v1 feed API; 404 on a single GET means gone.
+
+        DELETE is never retried automatically: a lost response has unknown state
+        and must be resolved with a fresh GET rather than another DELETE.
+        """
+        import re
+        allowed_post = re.fullmatch(r'/v1/posts/[0-9a-fA-F-]{36}', path)
+        if not ((method == 'GET' and (path in {'/users/me', '/v1/posts'} or allowed_post))
+                or (method == 'DELETE' and allowed_post)):
+            raise AdapterError('Ungültige Löschoperation')
+        if method == 'DELETE' and kwargs:
+            raise AdapterError('Löschanfrage darf keine Zusatzfelder enthalten')
+        async with http_client(timeout=30.0) as client:
+            for attempt in range(3 if method == 'GET' else 1):
+                try:
+                    response = await client.request(method, self.base + path, headers=self._headers(cred), **kwargs)
+                except httpx.TransportError:
+                    raise AdapterError('Fanvue Netzwerkfehler; Löschzustand unbestätigt', retryable=True) from None
+                if response.status_code == 429:
+                    try:
+                        retry_after = max(1, int(float(response.headers.get('Retry-After', '60'))))
+                    except (TypeError, ValueError, OverflowError):
+                        retry_after = 60
+                    # GET is safe to retry. Never retry DELETE, even after 429.
+                    if method == 'GET' and attempt < 2 and retry_after <= 120:
+                        await asyncio.sleep(retry_after)
+                        continue
+                else:
+                    retry_after = None
+                if response.status_code == 404 and method == 'GET' and allowed_post:
+                    return None
+                if response.status_code >= 400:
+                    raise AdapterError(f'Fanvue Löschprüfung: HTTP {response.status_code} bei {method}', status=response.status_code,
+                                       retryable=response.status_code in {429, 500, 502, 503, 504}, retry_after=retry_after)
+                if method == 'DELETE':
+                    return None
+                try:
+                    data = response.json()
+                except ValueError:
+                    raise AdapterError('Fanvue lieferte ungültige JSON-Daten') from None
+                if not isinstance(data, dict):
+                    raise AdapterError('Fanvue lieferte ein ungültiges Objekt')
+                return data
+
     async def visibility_request(self, cred, method, path, **kwargs):
         """Official v1 post API; bounded retry, never persist response bodies.
 
@@ -79,8 +124,9 @@ class FanvueAdapter:
         allowed = path == '/v1/posts' or path == '/users/me' or re.fullmatch(r'/v1/posts/[0-9a-fA-F-]{36}', path)
         if not allowed or method not in {'GET', 'PATCH'}:
             raise AdapterError('Ungültige Sichtbarkeitsoperation')
-        if method == 'PATCH' and (path in {'/v1/posts', '/users/me'} or kwargs.get('json') != {'audience':'subscribers'}):
-            raise AdapterError('Nur audience=subscribers ist erlaubt')
+        if method == 'PATCH' and (path in {'/v1/posts', '/users/me'} or kwargs not in (
+                {'json':{'audience':'subscribers'}}, {'json':{'audience':'followers-and-subscribers'}})):
+            raise AdapterError('Nur audience-only subscribers oder followers-and-subscribers ist erlaubt')
         async with http_client(timeout=30.0) as client:
             for attempt in range(3):
                 try:

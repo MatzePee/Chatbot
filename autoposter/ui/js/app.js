@@ -9,7 +9,7 @@ import renderAssign from './pages/assign.js?v=creatorstudio-preview-bounds-20261
 import renderMatrix from './pages/matrix.js?v=creatorstudio-preview-bounds-20261006'
 import renderTopPostsX from './pages/top-posts-x.js?v=top-posts-manual-20261108'
 import renderCalendar from './pages/calendar.js?v=creatorstudio-translation-20260910'
-import renderSettings from './pages/settings.js?v=creatorstudio-channel-autoplan-20260910'
+import renderSettings from './pages/settings.js?v=post-retention-limits-1'
 
 
 const ROUTES = [

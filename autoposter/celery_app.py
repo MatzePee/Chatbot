@@ -24,6 +24,10 @@ celery_app.conf.update(
 )
 
 celery_app.conf.beat_schedule = {
+    "delete-old-fanvue-posts": {
+        "task": "autoposter.delete_old_fanvue_posts",
+        "schedule": crontab(minute=20, hour=3),
+    },
     "age-fanvue-visibility": {
         "task": "autoposter.age_fanvue_visibility",
         "schedule": 60.0,

@@ -131,6 +131,10 @@ class Settings(BaseSettings):
     dry_run: bool = True
     #: Kill-Switch. Wenn True, wird nichts publiziert und nichts geplant.
     global_pause: bool = False
+    # Deployment gate: manual deletion requires separate approval.
+    post_retention_active: bool = False
+    # Independent gate: approving manual deletion never enables automatic deletion.
+    post_retention_automatic_active: bool = False
     inventory_warn_days: int = 14
 
     smtp_host: Optional[str] = None

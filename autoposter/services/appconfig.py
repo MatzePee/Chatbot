@@ -53,6 +53,9 @@ FIELDS: Dict[str, str] = {
     #: Kalender selbst plant, will keine Posts, die von allein dazukommen.
     "visibility_aging_enabled": None,
     "visibility_aging_days": None,
+    "post_retention_days": None,
+    "post_retention_delete_ppv": None,
+    "post_retention_automatic": None,
     "auto_plan_enabled": None,
     "auto_plan_days": None,
     "auto_plan_interval_hours": None,
@@ -81,6 +84,9 @@ DEFAULTS: Dict[str, Any] = {
     "cross_channel_min_gap_minutes": 0,
     "visibility_aging_enabled": False,
     "visibility_aging_days": 7,
+    "post_retention_days": 30,
+    "post_retention_delete_ppv": False,
+    "post_retention_automatic": False,
     "auto_plan_enabled": False,
     "auto_plan_days": 14,
     "auto_plan_interval_hours": 24,
@@ -173,6 +179,13 @@ async def get(db: AsyncSession, field: str, default: Any = None) -> Any:
 async def set_many(db: AsyncSession, values: Dict[str, Any]) -> Dict[str, Any]:
     """Speichert nur bekannte Felder. Leere Geheimnisse lassen den alten Wert stehen,
     damit ein maskiert angezeigtes Feld beim Speichern nichts überschreibt."""
+    if 'post_retention_days' in values:
+        days = values['post_retention_days']
+        if type(days) is not int or not 1 <= days <= 36500:
+            raise ValueError('Löschalter muss eine ganze Zahl von 1 bis 36500 Tagen sein.')
+    for field in ('post_retention_delete_ppv', 'post_retention_automatic'):
+        if field in values and type(values[field]) is not bool:
+            raise ValueError(f'{field} muss ein boolescher Wert sein.')
     if 'visibility_aging_days' in values:
         days = values['visibility_aging_days']
         if type(days) is not int or not 1 <= days <= 36500:
