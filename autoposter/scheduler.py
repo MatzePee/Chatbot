@@ -38,7 +38,7 @@ class Job:
 def default_jobs() -> List[Job]:
     return [
         Job("dispatch_due_posts", lambda: jobs.dispatch_due_posts(inline=True), 60, 10),
-        Job("generate_plan", lambda: jobs.generate_plan(14), 3600, 60),
+        Job("generate_plan", lambda: jobs.generate_plan(14), 60, 60),
         Job("refresh_metrics", lambda: jobs.refresh_metrics(72), 1800, 300),
         Job("age_fanvue_visibility", jobs.age_fanvue_visibility, 60, 5),
         Job("delete_old_fanvue_posts", jobs.delete_old_fanvue_posts, 3600, 120),

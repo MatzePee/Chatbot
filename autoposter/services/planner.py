@@ -7,7 +7,7 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autoposter.adapters import get_adapter
@@ -468,10 +468,16 @@ async def fill_calendar(
     stmt = select(Channel).where(Channel.is_active.is_(True))
     if channel_ids:
         stmt = stmt.where(Channel.id.in_(list(channel_ids)))
-    channels = (await db.execute(stmt)).scalars().all()
+    channels = (await db.execute(stmt.order_by(Channel.id))).scalars().all()
     now = datetime.now(timezone.utc)
 
     for channel in channels:
+        if not dry_run:
+            # Shared by manual and automatic fill. Hold through the caller's
+            # commit so the next writer counts these newly persisted posts.
+            # SQLite ignores FOR UPDATE; its no-op write acquires the writer lock.
+            await db.execute(update(Channel).where(Channel.id == channel.id)
+                .values(id=Channel.id, updated_at=Channel.updated_at).execution_options(synchronize_session=False))
         tz = ZoneInfo(channel.timezone or "UTC")
         policy = channel.policy or PostingPolicy()
         plan = (
@@ -484,6 +490,17 @@ async def fill_calendar(
         horizon = min(days, plan.horizon_days if plan else days)
 
         taken = await existing_times(db, channel.id)
+        daily_counts: Dict[object, int] = {}
+        quota_rows = (await db.execute(select(Post.status, Post.scheduled_at, Post.published_at).where(
+            Post.channel_id == channel.id,
+            Post.status.in_(lifecycle.ACTIVE_SCHEDULE_STATES + (PostStatus.published.value,)),
+        ))).all()
+        for status, scheduled, published in quota_rows:
+            occupied = (published or scheduled) if status == PostStatus.published.value else scheduled
+            if occupied is not None:
+                day = occupied.astimezone(tz).date()
+                daily_counts[day] = daily_counts.get(day, 0) + 1
+        daily_limit = max(1, int(round(policy.posts_per_day)))
         blackouts = await _blackouts(db, channel.id)
         foreign = await other_channel_times(db, channel.id)
         cross_gap = int(await appconfig.get(db, "cross_channel_min_gap_minutes", 0) or 0)
@@ -517,6 +534,9 @@ async def fill_calendar(
         planned_count = 0
 
         for slot, kind in open_slots:
+            local_day = slot.astimezone(tz).date()
+            if daily_counts.get(local_day, 0) >= daily_limit:
+                continue  # No media or LLM work for a full channel-local day.
             weekday = slot.astimezone(tz).weekday()
             theme = (plan.themes or {}).get(str(weekday), "") if plan else ""
 
@@ -578,6 +598,7 @@ async def fill_calendar(
                 )
             )
 
+            daily_counts[local_day] = daily_counts.get(local_day, 0) + 1
             if dry_run:
                 continue
 

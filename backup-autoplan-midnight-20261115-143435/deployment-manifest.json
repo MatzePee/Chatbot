@@ -1,0 +1,125 @@
+{
+  "remote_root": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot",
+  "backup_dir": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\backup-autoplan-midnight-20261115-143435",
+  "source_only": false,
+  "source_files_only_uploaded": true,
+  "activation_authorized": true,
+  "live_jobs_triggered_manually": false,
+  "natural_scheduler_poll_observed": true,
+  "database_backup": false,
+  "runtime_restarted": true,
+  "live_jobs_run": true,
+  "live_settings_changed": false,
+  "tests": {
+    "baseline-full.log": {
+      "summary": "6 failed, 618 passed in 70.84s (0:01:10)",
+      "failures": [
+        "tests/autoposter/test_top_posts_x.py::test_berlin_calendar_boundaries_and_dst_schedule",
+        "tests/autoposter/test_top_posts_x.py::test_daily_collector_uses_old_posts_and_persistent_claim",
+        "tests/autoposter/test_top_posts_x.py::test_collector_rejects_metrics_from_wrong_post_author",
+        "tests/test_repair_update.py::test_discovers_custom_user_path_and_port",
+        "tests/test_repair_update.py::test_ambiguous_installations_are_not_guessed",
+        "tests/test_settings_hub.py::test_manifest_controls_actions_are_all_preserved"
+      ]
+    },
+    "full-final.log": {
+      "summary": "6 failed, 650 passed in 72.24s (0:01:12)",
+      "failures": [
+        "tests/autoposter/test_top_posts_x.py::test_berlin_calendar_boundaries_and_dst_schedule",
+        "tests/autoposter/test_top_posts_x.py::test_daily_collector_uses_old_posts_and_persistent_claim",
+        "tests/autoposter/test_top_posts_x.py::test_collector_rejects_metrics_from_wrong_post_author",
+        "tests/test_repair_update.py::test_discovers_custom_user_path_and_port",
+        "tests/test_repair_update.py::test_ambiguous_installations_are_not_guessed",
+        "tests/test_settings_hub.py::test_manifest_controls_actions_are_all_preserved"
+      ]
+    },
+    "new_failures": []
+  },
+  "targeted": "49 passed",
+  "ui": {
+    "autopost_controls_actions": 48,
+    "mutations_on_load": 0,
+    "synthetic_save_checks": 5,
+    "screenshots": 15,
+    "errors": [],
+    "unexpected": []
+  },
+  "files": [
+    {
+      "path": "autoposter/services/planner.py",
+      "remote_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\autoposter\\services\\planner.py",
+      "local_path": "/root/autoplan-fix/source/autoposter/services/planner.py",
+      "original_sha256": "ccfcee24c0116474b01836bd3250ec1bbf9c592578376f44ef84fe06eaad6c5c",
+      "sha256": "59ecaf26d9d9c3a8e69d6d7f1d47ffce0a152afdb14b84a58fa9b9cf5eb7e129",
+      "backup_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\backup-autoplan-midnight-20261115-143435\\autoposter\\services\\planner.py",
+      "readback_verified": true
+    },
+    {
+      "path": "autoposter/jobs.py",
+      "remote_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\autoposter\\jobs.py",
+      "local_path": "/root/autoplan-fix/source/autoposter/jobs.py",
+      "original_sha256": "6696d13e553404de394585643a16327f74f19f8094a69686b93b684874780d4b",
+      "sha256": "f16f76a82a7d216e1b9f7a5cff38a8608af0540e19bc20fd10cc56d72b68a1b7",
+      "backup_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\backup-autoplan-midnight-20261115-143435\\autoposter\\jobs.py",
+      "readback_verified": true
+    },
+    {
+      "path": "autoposter/scheduler.py",
+      "remote_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\autoposter\\scheduler.py",
+      "local_path": "/root/autoplan-fix/source/autoposter/scheduler.py",
+      "original_sha256": "a4a0188ef4eaddbbb81de0cc0de4d62052fef12d5c4d23407d3551651fe25b7f",
+      "sha256": "b90406bd21b5f7f19f08d5bc639a217dbae57e18416906441e20cbafd22cfd20",
+      "backup_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\backup-autoplan-midnight-20261115-143435\\autoposter\\scheduler.py",
+      "readback_verified": true
+    },
+    {
+      "path": "autoposter/celery_app.py",
+      "remote_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\autoposter\\celery_app.py",
+      "local_path": "/root/autoplan-fix/source/autoposter/celery_app.py",
+      "original_sha256": "8c629b68f34b1e8fc9fc65034786b6698ffefb3431ce764abe2f070093f40b8a",
+      "sha256": "0aa3e4b8eb1b1983cdd3935d5f50be3916fcf9ed339a8d011d93bdbd6049840f",
+      "backup_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\backup-autoplan-midnight-20261115-143435\\autoposter\\celery_app.py",
+      "readback_verified": true
+    },
+    {
+      "path": "autoposter/ui/js/pages/settings.js",
+      "remote_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\autoposter\\ui\\js\\pages\\settings.js",
+      "local_path": "/root/autoplan-fix/source/autoposter/ui/js/pages/settings.js",
+      "original_sha256": "4fb79cd6e7042936c5291a498fa69676b0ab5ff6587e9e417e1dbf5c999dae0e",
+      "sha256": "81330713be1d352f12bbb26a81652a0dd63ace96d9083fba30cf5f3dba2e0bb4",
+      "backup_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\backup-autoplan-midnight-20261115-143435\\autoposter\\ui\\js\\pages\\settings.js",
+      "readback_verified": true
+    },
+    {
+      "path": "tests/autoposter/test_planner_daily_quota.py",
+      "remote_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\tests\\autoposter\\test_planner_daily_quota.py",
+      "local_path": "/root/autoplan-fix/source/tests/autoposter/test_planner_daily_quota.py",
+      "original_sha256": null,
+      "sha256": "1006dc00dd891daf680db1201fbd92dddfa586d9271c9ac808c91df1db9d834f",
+      "backup_path": null,
+      "readback_verified": true
+    },
+    {
+      "path": "tests/autoposter/test_nightly_planning.py",
+      "remote_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\tests\\autoposter\\test_nightly_planning.py",
+      "local_path": "/root/autoplan-fix/source/tests/autoposter/test_nightly_planning.py",
+      "original_sha256": null,
+      "sha256": "a74123579504b0d9a4c20de388e6d1e664e81930b59732b31f9b59f622947233",
+      "backup_path": null,
+      "readback_verified": true
+    },
+    {
+      "path": "tests/settings_hub_ui.cjs",
+      "remote_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\tests\\settings_hub_ui.cjs",
+      "local_path": "/root/autoplan-fix/source/tests/settings_hub_ui.cjs",
+      "original_sha256": "f119a583e1073ba661c10fa04eae2d04995e6c5e7488ff98289f48f74a039161",
+      "sha256": "685d45cf104f77324ae5b8b312f1390002bc984461391735c48b5005ea67aae1",
+      "backup_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\backup-autoplan-midnight-20261115-143435\\tests\\settings_hub_ui.cjs",
+      "readback_verified": true
+    }
+  ],
+  "complete": true,
+  "activation_verification": "/root/autoplan-fix/activation-verification.json",
+  "runtime_verified": true,
+  "remote_manifest_path": "\\\\192.168.20.16\\fanvue\\Fanvue_Chatbot\\backup-autoplan-midnight-20261115-143435\\deployment-manifest.json"
+}

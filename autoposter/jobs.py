@@ -150,30 +150,48 @@ async def retry_failed(hours: int = 2) -> Dict[str, Any]:
 # Planung
 # --------------------------------------------------------------------------- #
 async def generate_plan(days: int = 14) -> Dict[str, Any]:
-    """Kalenderlücken nach den Kanal-Regeln schließen.
+    """Kalenderlücken einmal je Berliner Kalendertag ab Mitternacht schließen.
 
-    Standardmäßig abgeschaltet. Wer seinen Kalender selbst plant, wird sonst
-    davon überrascht, dass stündlich Posts über zwei Wochen hinweg von allein
-    dazukommen – und zwar nach den Kanal-Regeln, nicht nach den Vorgaben, die
-    er im Planungsdialog gemacht hat.
+    Standardmäßig abgeschaltet; Hauptschalter, Kanalschalter und gespeicherter
+    Planungshorizont bleiben maßgeblich. Nach Ausfall wird am selben Tag
+    nachgeholt. Posts und Tagesmarke werden in einer Transaktion gespeichert.
     """
     if settings.global_pause:
         return {"paused": True}
     async with session_scope() as db:
-        if not await appconfig.get(db, "auto_plan_enabled", False):
+        # A transaction-owned lock serializes both scheduler backends. The day
+        # marker commits together with the posts; rollback/crash permits retry.
+        from autoposter.models import AppSetting
+        from sqlalchemy import update
+        if db.bind.dialect.name == 'sqlite':
+            from sqlalchemy.dialects.sqlite import insert
+        else:
+            from sqlalchemy.dialects.postgresql import insert
+        key = 'auto_plan_daily_gate'
+        await db.execute(insert(AppSetting).values(key=key, value={}).on_conflict_do_nothing(index_elements=['key']))
+        if db.bind.dialect.name == 'sqlite':
+            await db.execute(update(AppSetting).where(AppSetting.key == key).values(key=key))
+        gate = (await db.execute(select(AppSetting).where(AppSetting.key == key).with_for_update()
+            .execution_options(populate_existing=True))).scalar_one()
+        values = await appconfig.get_all(db, use_cache=False)
+        if not values.get("auto_plan_enabled", False):
             return {"skipped": "automatisches Nachplanen ist ausgeschaltet"}
 
-        # Der Scheduler ruft stündlich auf, die eigentliche Taktung steht hier.
-        # So lässt sie sich zur Laufzeit ändern, ohne den Dienst neu zu starten.
-        hours = int(await appconfig.get(db, "auto_plan_interval_hours", 24) or 24)
-        last_raw = str(await appconfig.get(db, "auto_plan_last_run", "") or "")
+        # Poll each minute; the calendar date, not elapsed hours, is the gate.
+        # Same-day catch-up after downtime is intentional. Europe/Berlin handles DST.
+        from zoneinfo import ZoneInfo
+        now = datetime.now(timezone.utc)
+        today = now.astimezone(ZoneInfo("Europe/Berlin")).date()
+        if (gate.value or {}).get('completed_day', '') >= today.isoformat():
+            return {"skipped": "heutiger Mitternachtslauf bereits erledigt"}
+        last_raw = str(values.get("auto_plan_last_run") or "")
         if last_raw:
             try:
                 last = datetime.fromisoformat(last_raw)
                 if last.tzinfo is None:
                     last = last.replace(tzinfo=timezone.utc)
-                if datetime.now(timezone.utc) - last < timedelta(hours=max(1, hours)):
-                    return {"skipped": f"nächster Lauf frühestens {hours} h nach dem letzten"}
+                if last.astimezone(ZoneInfo("Europe/Berlin")).date() >= today:
+                    return {"skipped": "heutiger Mitternachtslauf bereits erledigt"}
             except (ValueError, TypeError):
                 pass  # unlesbarer Zeitstempel -> jetzt laufen und neu setzen
 
@@ -186,11 +204,10 @@ async def generate_plan(days: int = 14) -> Dict[str, Any]:
         if not channel_ids:
             return {"skipped": "kein Kanal für automatisches Nachplanen eingeschaltet"}
 
-        await appconfig.set_many(
-            db, {"auto_plan_last_run": datetime.now(timezone.utc).isoformat()}
-        )
-        days = int(await appconfig.get(db, "auto_plan_days", days) or days)
+        days = int(values.get("auto_plan_days") or days)
         result = await planner.fill_calendar(db, channel_ids=channel_ids, days=days, dry_run=False)
+        gate.value = {'completed_day': today.isoformat(), 'started_at': now.isoformat()}
+        await appconfig.set_many(db, {"auto_plan_last_run": now.isoformat()})
         for gap in result.gaps[:10]:
             await notify.push(
                 db,

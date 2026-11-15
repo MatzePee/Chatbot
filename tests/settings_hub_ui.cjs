@@ -21,6 +21,8 @@ const fixtures = {
  '/api/v1/settings/image-comment':{enabled:true,text:'Fixture comment',url:'https://fixture.test'},
  '/api/v1/settings/openrouter/models':{models:Object.values(integrations).filter(v => typeof v==='string' && v.startsWith('fixture/')).map(id=>({id,vision:true,free:true})),cached:true},
  '/api/v1/settings/visibility-aging': {enabled:false,days:7,active:false,status:'idle',channels:[]},
+ '/api/v1/settings/post-retention': {active:false,automatic_active:false,accounts:[]},
+ '/api/v1/settings/ppv-restore': {active:false,accounts:[]},
  '/api/deployment-status': {},
  '/api/update-check': {latest:null,update_available:false},
  '/settings/time-preview': {block:'Synthetic time preview'},
@@ -71,8 +73,21 @@ async function main(){
  assert.equal(Object.hasOwn(writes.at(-1).payload,'openrouter_api_key'),false,'Blank secret must be omitted')
  assert.equal(writes.at(-1).payload.openrouter_model_text,'fixture/text')
  const planning=page.locator('#autopost-settings section').filter({has:page.getByRole('heading',{name:'Planung',exact:true})})
+ assert.match(await planning.innerText(), /00:00.*Europe\/Berlin/)
+ assert.equal(await planning.locator('input[max="168"]').count(),0,'No rolling-hour input')
  await planning.getByRole('button',{name:'Speichern',exact:true}).click()
- assert.deepEqual(writes.at(-1).payload,{cross_channel_min_gap_minutes:7,inventory_warn_days:14,auto_plan_enabled:false,auto_plan_days:19,auto_plan_interval_hours:26})
+ assert.deepEqual(writes.at(-1).payload,{cross_channel_min_gap_minutes:7,inventory_warn_days:14,auto_plan_enabled:false,auto_plan_days:19})
+ const master = planning.getByRole('checkbox', {name:'Automatisch nachplanen'})
+ const horizon = planning.locator('input[max="90"]')
+ assert.equal(await horizon.isDisabled(),true)
+ await master.check()
+ assert.equal(await horizon.isDisabled(),false)
+ await horizon.fill('4')
+ await planning.getByRole('button',{name:'Speichern',exact:true}).click()
+ assert.deepEqual(writes.at(-1).payload,{cross_channel_min_gap_minutes:7,inventory_warn_days:14,auto_plan_enabled:true,auto_plan_days:4})
+ await planning.getByRole('checkbox',{name:'Autobefüllen für Testkanal'}).uncheck()
+ await page.waitForFunction(() => !document.querySelector('input[aria-label="Autobefüllen für Testkanal"]').disabled)
+ assert.deepEqual(writes.at(-1),{path:'/api/v1/channels/1',method:'PATCH',payload:{auto_plan_enabled:false}})
  await openrouter.getByRole('button',{name:'Schlüssel entfernen'}).click()
  await page.locator('#modals .modal').waitFor()
  await page.getByRole('button',{name:'Abbrechen',exact:true}).click()
@@ -104,10 +119,14 @@ async function main(){
   assert.equal(await page.locator('[data-settings-nav] a.active').getAttribute('href'),'/settings/shared?section='+section,'Sidebar must select actual settings category')
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'No mobile horizontal overflow: '+section)
   await page.screenshot({path:path.join(render,section+'-'+width+'.png'),fullPage:false})
+  if(section==='autopost'){
+   const planningCard=page.locator('#autopost-settings section').filter({has:page.getByRole('heading',{name:'Planung',exact:true})})
+   await planningCard.screenshot({path:path.join(render,'planning-'+width+'.png')})
+  }
  }
  }
  assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[])
- console.log(JSON.stringify({autopost_controls_actions:baseline.length,mutations_on_load:0,synthetic_save_checks:writes.length,screenshots:12,errors,unexpected},null,2))
+ console.log(JSON.stringify({autopost_controls_actions:baseline.length,mutations_on_load:0,synthetic_save_checks:writes.length,screenshots:15,errors,unexpected},null,2))
  await browser.close()
 }
 main().catch(error=>{console.error(error);process.exit(1)})

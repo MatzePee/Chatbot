@@ -43,10 +43,10 @@ celery_app.conf.beat_schedule = {
         "task": "autoposter.dispatch_due_posts",
         "schedule": 60.0,
     },
-    # Stündlich: Kalenderlücken schließen.
+    # Minütlich prüfen; tägliche Mitternachtssperre in Europe/Berlin im Job.
     "generate-plan": {
         "task": "autoposter.generate_plan",
-        "schedule": crontab(minute=7),
+        "schedule": 60.0,
     },
     # Alle 30 Minuten: Kennzahlen der letzten Posts nachziehen.
     "refresh-metrics": {

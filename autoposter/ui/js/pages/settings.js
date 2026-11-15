@@ -440,14 +440,8 @@ function planningCard(integrations, channels) {
     value: integrations.auto_plan_days ?? 14,
     disabled: !integrations.auto_plan_enabled,
   })
-  const autoEvery = h('input', {
-    type: 'number', min: '1', max: '168',
-    value: integrations.auto_plan_interval_hours ?? 24,
-    disabled: !integrations.auto_plan_enabled,
-  })
   autoPlan.addEventListener('change', () => {
     autoDays.disabled = !autoPlan.checked
-    autoEvery.disabled = !autoPlan.checked
   })
 
   const channelToggles = channels.map((channel) => {
@@ -479,7 +473,6 @@ function planningCard(integrations, channels) {
       inventory_warn_days: Number(warn.value),
       auto_plan_enabled: autoPlan.checked,
       auto_plan_days: Number(autoDays.value) || 14,
-      auto_plan_interval_hours: Number(autoEvery.value) || 24,
     })
     Object.assign(integrations, updated)
     toast.ok('Gespeichert')
@@ -494,9 +487,7 @@ function planningCard(integrations, channels) {
         'nach den Regeln des Kanals, nicht nach den Vorgaben aus dem Planungsdialog. ',
         'Wer seinen Kalender selbst plant, lässt das aus.'),
       h('div', { class: 'row', style: { marginTop: '8px', alignItems: 'center', gap: '8px' } },
-        h('span', { class: 'hint' }, 'Läuft alle'),
-        h('div', { style: { width: '80px' } }, autoEvery),
-        h('span', { class: 'hint' }, 'Stunden · plant voraus für'),
+        h('span', { class: 'hint' }, 'Täglich um 00:00 Uhr (Europe/Berlin, Sommer-/Winterzeit) · plant voraus für'),
         h('div', { style: { width: '80px' } }, autoDays),
         h('span', { class: 'hint' }, 'Tage')),
     ),
