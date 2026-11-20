@@ -192,6 +192,39 @@ class AssignmentSource(str, enum.Enum):
 # --------------------------------------------------------------------------- #
 # Benutzer & Persona
 # --------------------------------------------------------------------------- #
+# The legacy ID is an installation-neutral compatibility identity, not a persona.
+# Activating multi-character operation still requires the explicit offline migration.
+LEGACY_CHARACTER_ID = uuid.UUID('00000000-0000-0000-0000-000000000001')
+
+
+class Character(Base, TimestampMixin):
+    __tablename__ = "character"
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    planning_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    chat_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+from sqlalchemy import event as _model_event
+
+
+@_model_event.listens_for(Character.__table__, 'after_create')
+def _fresh_legacy_workspace(_table, connection, **_kwargs):
+    # Fresh schemas remain usable by the old single-character entry points.
+    # Existing databases are assigned explicitly by the offline migration tool.
+    connection.execute(Character.__table__.insert().values(
+        id=LEGACY_CHARACTER_ID, name='Existing workspace',
+        planning_enabled=False, chat_enabled=False, is_archived=False))
+
+
+class CharacterOwned:
+    """Mandatory persisted ownership. Scoped sessions override the legacy default."""
+    character_id: Mapped[uuid.UUID] = mapped_column(
+        GUID, ForeignKey('character.id', ondelete='RESTRICT'),
+        nullable=False, index=True, default=lambda: LEGACY_CHARACTER_ID)
+
+
 class User(Base, TimestampMixin):
     __tablename__ = "app_user"
 
@@ -207,12 +240,13 @@ class User(Base, TimestampMixin):
     locked_until: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
 
-class Persona(Base, TimestampMixin):
+class Persona(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "persona"
+    __table_args__ = (UniqueConstraint('character_id', 'slug', name='uq_character_persona_slug'),)
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
     name: Mapped[str] = mapped_column(String(120))
-    slug: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    slug: Mapped[str] = mapped_column(String(120), index=True)
     bio: Mapped[str] = mapped_column(Text, default="")
     tone_guidelines: Mapped[str] = mapped_column(Text, default="")
     system_prompt: Mapped[str] = mapped_column(Text, default="")
@@ -237,7 +271,7 @@ class Persona(Base, TimestampMixin):
     )
 
 
-class PersonaExample(Base, TimestampMixin):
+class PersonaExample(Base, CharacterOwned, TimestampMixin):
     """Bewertete Generierungen — die besten fließen als Few-Shot zurück in den Prompt."""
 
     __tablename__ = "persona_example"
@@ -257,7 +291,7 @@ class PersonaExample(Base, TimestampMixin):
 # --------------------------------------------------------------------------- #
 # Kanäle
 # --------------------------------------------------------------------------- #
-class PostingPolicy(Base, TimestampMixin):
+class PostingPolicy(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "posting_policy"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -301,7 +335,7 @@ class PostingPolicy(Base, TimestampMixin):
     exclusive_pool_group: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
 
 
-class ChannelCredential(Base, TimestampMixin):
+class ChannelCredential(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "channel_credential"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -314,7 +348,7 @@ class ChannelCredential(Base, TimestampMixin):
     raw_meta: Mapped[Dict[str, Any]] = mapped_column(JSONB_, default=dict)
 
 
-class Channel(Base, TimestampMixin):
+class Channel(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "channel"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -402,13 +436,13 @@ class Channel(Base, TimestampMixin):
 # --------------------------------------------------------------------------- #
 # Medien
 # --------------------------------------------------------------------------- #
-class MediaAsset(Base, TimestampMixin):
+class MediaAsset(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "media_asset"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
     filename: Mapped[str] = mapped_column(String(255))
     storage_path: Mapped[str] = mapped_column(String(500))
-    sha256: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
     phash: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
     width: Mapped[int] = mapped_column(Integer, default=0)
     height: Mapped[int] = mapped_column(Integer, default=0)
@@ -437,12 +471,13 @@ class MediaAsset(Base, TimestampMixin):
     archived_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
     __table_args__ = (
+        UniqueConstraint("character_id", "sha256", name="uq_character_media_sha256"),
         Index("ix_media_lifecycle_created", "lifecycle", "created_at"),
         Index("ix_media_status_lifecycle", "status", "lifecycle"),
     )
 
 
-class MediaSet(Base, TimestampMixin):
+class MediaSet(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "media_set"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -460,7 +495,7 @@ class MediaSet(Base, TimestampMixin):
     )
 
 
-class MediaSetItem(Base):
+class MediaSetItem(Base, CharacterOwned):
     __tablename__ = "media_set_item"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -478,7 +513,7 @@ class MediaSetItem(Base):
     __table_args__ = (UniqueConstraint("media_set_id", "media_asset_id", name="uq_set_asset"),)
 
 
-class MediaAssignment(Base, TimestampMixin):
+class MediaAssignment(Base, CharacterOwned, TimestampMixin):
     """Vom Nutzer per Drag & Drop gesetzte Zuordnung Bild/Set -> Kanal.
 
     Ein Asset darf beliebig vielen Kanälen zugeordnet sein — plattformübergreifende
@@ -509,7 +544,7 @@ class MediaAssignment(Base, TimestampMixin):
     )
 
 
-class MediaChannelUsage(Base):
+class MediaChannelUsage(Base, CharacterOwned):
     """Verwendungs-Historie. Duplikat-Prüfung läuft AUSSCHLIESSLICH gegen diese Tabelle
     gefiltert nach channel_id — nie bestandsweit."""
 
@@ -528,7 +563,7 @@ class MediaChannelUsage(Base):
     __table_args__ = (Index("ix_usage_asset_channel", "media_asset_id", "channel_id"),)
 
 
-class AssignmentRule(Base, TimestampMixin):
+class AssignmentRule(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "assignment_rule"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -542,7 +577,7 @@ class AssignmentRule(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class SavedView(Base, TimestampMixin):
+class SavedView(Base, CharacterOwned, TimestampMixin):
     """Smart Collection: gespeicherte Filterkombination für die Bibliothek."""
 
     __tablename__ = "saved_view"
@@ -559,7 +594,7 @@ class SavedView(Base, TimestampMixin):
 # --------------------------------------------------------------------------- #
 # Posts
 # --------------------------------------------------------------------------- #
-class ContentPlan(Base, TimestampMixin):
+class ContentPlan(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "content_plan"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -574,7 +609,7 @@ class ContentPlan(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class Post(Base, TimestampMixin):
+class Post(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "post"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -635,7 +670,7 @@ class Post(Base, TimestampMixin):
     __table_args__ = (Index("ix_post_due", "status", "scheduled_at"),)
 
 
-class XImageComment(Base):
+class XImageComment(Base, CharacterOwned):
     __tablename__ = "x_image_comment"
     post_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("post.id", ondelete="CASCADE"), primary_key=True)
     text: Mapped[str] = mapped_column(Text)
@@ -645,7 +680,7 @@ class XImageComment(Base):
     attempted_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
 
-class PostRevision(Base):
+class PostRevision(Base, CharacterOwned):
     __tablename__ = "post_revision"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -657,7 +692,7 @@ class PostRevision(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
-class PublishAttempt(Base):
+class PublishAttempt(Base, CharacterOwned):
     __tablename__ = "publish_attempt"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -675,7 +710,7 @@ class PublishAttempt(Base):
     dry_run: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
-class ExternalMediaRef(Base):
+class ExternalMediaRef(Base, CharacterOwned):
     """Gecachte Plattform-Media-ID, damit ein Bild pro Kanal nur einmal hochgeladen wird."""
 
     __tablename__ = "external_media_ref"
@@ -694,7 +729,7 @@ class ExternalMediaRef(Base):
     __table_args__ = (UniqueConstraint("media_asset_id", "channel_id", name="uq_extmedia"),)
 
 
-class BlackoutPeriod(Base, TimestampMixin):
+class BlackoutPeriod(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "blackout_period"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -709,7 +744,7 @@ class BlackoutPeriod(Base, TimestampMixin):
 # --------------------------------------------------------------------------- #
 # Betrieb
 # --------------------------------------------------------------------------- #
-class AuditLog(Base):
+class AuditLog(Base, CharacterOwned):
     __tablename__ = "audit_log"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -722,14 +757,31 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
 
 
+class CharacterSettingKey(TypeDecorator):
+    """Keep the legacy single-key API while physically namespacing workspace state."""
+    impl = String(200)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        from autoposter.workspaces import current_character
+        owner = current_character()
+        return f'{owner}:{value}' if owner is not None and value is not None else value
+
+    def process_result_value(self, value, dialect):
+        from autoposter.workspaces import current_character
+        owner = current_character()
+        prefix = f'{owner}:'
+        return value[len(prefix):] if owner is not None and value.startswith(prefix) else value
+
+
 class AppSetting(Base, TimestampMixin):
     __tablename__ = "app_setting"
 
-    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    key: Mapped[str] = mapped_column(CharacterSettingKey(), primary_key=True)
     value: Mapped[Dict[str, Any]] = mapped_column(JSONB_, default=dict)
 
 
-class Notification(Base):
+class Notification(Base, CharacterOwned):
     __tablename__ = "notification"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -742,7 +794,7 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
 
 
-class LlmUsage(Base):
+class LlmUsage(Base, CharacterOwned):
     __tablename__ = "llm_usage"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
@@ -754,7 +806,7 @@ class LlmUsage(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
 
 
-class OAuthState(Base):
+class OAuthState(Base, CharacterOwned):
     """PKCE-State, kurzlebig."""
 
     __tablename__ = "oauth_state"

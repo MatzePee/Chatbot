@@ -1,0 +1,2029 @@
+{
+  "schema_version": 1,
+  "coverage": "All declared AutoChat defaults, AutoPost integration fields and environment fields; literal AutoChat reads/writes audited. This is NOT the complete route/form/dynamic-key acceptance map.",
+  "unknown_field_policy": "Tests reject added/removed declarations and unknown literal AutoChat keys; no automatic classification during tests.",
+  "technical_allowlist": [
+    "app_base_url",
+    "classifier_model",
+    "doku_markdown",
+    "generation_retries",
+    "generation_retry_delay",
+    "git_branch",
+    "git_commit_default",
+    "git_remote_url",
+    "git_user_email",
+    "git_user_name",
+    "github_token",
+    "max_tokens",
+    "memory_model",
+    "openrouter_api_key",
+    "openrouter_model",
+    "openrouter_model_caption",
+    "openrouter_model_fallback",
+    "openrouter_model_text",
+    "openrouter_model_vision",
+    "openrouter_monthly_budget_usd",
+    "ppv_caption_model",
+    "public_base_url",
+    "reasoning_mode",
+    "telegram_bot_token",
+    "telegram_chat_id",
+    "telegram_enabled",
+    "temperature",
+    "update_check_enabled",
+    "update_check_interval_hours",
+    "update_notify_telegram",
+    "update_state",
+    "vision_api_key",
+    "vision_model"
+  ],
+  "stores": {
+    "autochat": {
+      "active_hour_end": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "active_hour_start": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "active_hours_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "alert_keywords": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "alert_keywords_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "anti_ai_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "anti_ai_petnames": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "anti_ai_rules": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "app_base_url": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "banned_words": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "bot_running": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "bracket_max_regen": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "chat_custom_list_id": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "chat_custom_list_name": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "chat_filter": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "chats_cache_seconds": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "classifier_model": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped settings_consolidate preflight/apply required for already-active installs; preserve owner originals and fail closed on conflicts"
+      },
+      "draft_max_regen": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "draft_recheck_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "draft_recheck_interval_seconds": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "draft_regen_on_stale": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "escalation_keywords": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "fanvue_api_version": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "fanvue_client_id": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "fanvue_client_secret": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": true,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "fanvue_redirect_uri": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "generation_retries": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped settings_consolidate preflight/apply required for already-active installs; preserve owner originals and fail closed on conflicts"
+      },
+      "generation_retry_delay": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped settings_consolidate preflight/apply required for already-active installs; preserve owner originals and fail closed on conflicts"
+      },
+      "git_branch": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "git_commit_default": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "git_remote_url": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "git_user_email": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "git_user_name": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "github_token": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": true,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "history_messages": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "incoming_image_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "incoming_image_react_prompt": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "incoming_image_woman_prompt": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "max_chats_per_cycle": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "max_reply_chars": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "max_tokens": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped settings_consolidate preflight/apply required for already-active installs; preserve owner originals and fail closed on conflicts"
+      },
+      "memory_backfill_auto": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_backfill_chunk": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_backfill_delay": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_backfill_max_messages": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_backfill_max_pages": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_backfill_per_hour": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_consolidate_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_loop_max_age_days": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_max_chars": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_max_long": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_max_loops": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_max_notes": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_max_per_cycle": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_max_profile": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_max_short": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_min_fan_messages": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_min_interval_hours": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_model": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped AI consolidation, preserving original owner values"
+      },
+      "memory_quiet_hours": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_reactivation_use_loops": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_short_max_age_days": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_sweep_hour": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "memory_trigger_messages": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "messages_retention_days": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "messages_store_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "mode": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "openrouter_api_key": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": true,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "openrouter_model": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped settings_consolidate preflight/apply required for already-active installs; preserve owner originals and fail closed on conflicts"
+      },
+      "persona_schedule": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "persona_timezone": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "poll_interval_seconds": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_block_on_distress": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_bodyparts_keywords": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_caption_model": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped settings_consolidate preflight/apply required for already-active installs; preserve owner originals and fail closed on conflicts"
+      },
+      "ppv_caption_use_vision": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_confirm_context_messages": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_confirm_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_confirm_fail_open": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_cooldown_long_minutes": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_cooldown_minutes": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_cooldown_outbound": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_freecontent_keywords": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_freecontent_prompt": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_intent_threshold": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_keyword_exceptions": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_keywords": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_max_media_per_set": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_min_fan_messages": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_no_match_prompt": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_offer_reset_days": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_photo_keywords": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_pic_request_keywords": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_sales_prompt": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_sexual_streak_trigger": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_thumb_cache_hours": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_unpurchased_threshold": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_use_llm_classifier": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "ppv_video_keywords": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "prio2_custom_list_id": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "prio2_custom_list_name": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "prio2_interval_minutes": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "prio2_jitter_minutes": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "queue_context_messages": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_cooldown_days": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_delay_max_minutes": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_delay_min_minutes": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_folder": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_inactive_hours": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_max_attempts": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_max_per_cycle": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_max_silence_days": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reactivation_prompt": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "reasoning_mode": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped settings_consolidate preflight/apply required for already-active installs; preserve owner originals and fail closed on conflicts"
+      },
+      "reply_cooldown_seconds": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "send_delay_max_seconds": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "send_delay_min_seconds": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "system_prompt": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "telegram_bot_token": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": true,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "telegram_chat_id": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "telegram_enabled": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "temperature": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped settings_consolidate preflight/apply required for already-active installs; preserve owner originals and fail closed on conflicts"
+      },
+      "time_context_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "time_guard_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "timestamps_in_history": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "tip_thanks_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "tip_thanks_folder": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "tip_thanks_prompt": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "update_check_enabled": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "update_check_interval_hours": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "update_notify_telegram": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "update_state": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "vision_api_key": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": true,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "vision_model": {
+        "scope": "installation",
+        "destination": "canonical bot.db/settings",
+        "secret": false,
+        "migration": "Explicit stopped settings_consolidate preflight/apply required for already-active installs; preserve owner originals and fail closed on conflicts"
+      },
+      "vision_prompt": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      }
+    },
+    "autopost_integrations": {
+      "auto_plan_days": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "auto_plan_enabled": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "auto_plan_interval_hours": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "auto_plan_last_run": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "cross_channel_min_gap_minutes": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "fanvue_api_version": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings (authoritative AutoChat connection)",
+        "secret": false,
+        "migration": "retain authoritative AutoChat account configuration; never inherit another account"
+      },
+      "fanvue_client_id": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings (authoritative AutoChat connection)",
+        "secret": false,
+        "migration": "retain authoritative AutoChat account configuration; never inherit another account"
+      },
+      "fanvue_client_secret": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings (authoritative AutoChat connection)",
+        "secret": true,
+        "migration": "retain authoritative AutoChat account configuration; never inherit another account"
+      },
+      "git_branch": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "git_commit_default": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "git_remote_url": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "git_user_email": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "git_user_name": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "github_token": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": true,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "inventory_warn_days": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "openrouter_api_key": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": true,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "openrouter_model_caption": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "openrouter_model_fallback": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "openrouter_model_text": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "openrouter_model_vision": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "openrouter_monthly_budget_usd": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "post_retention_automatic": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "post_retention_days": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "post_retention_delete_ppv": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "public_base_url": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "update_check_enabled": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "update_check_interval_hours": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "update_state": {
+        "scope": "installation",
+        "destination": "bot.db/settings",
+        "secret": false,
+        "migration": "move to canonical technical store; conflicts require explicit source selection; secrets encrypted"
+      },
+      "visibility_aging_days": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "visibility_aging_enabled": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "x_api_tier": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "x_client_id": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "x_client_secret": {
+        "scope": "character",
+        "destination": "autoposter.db/app_setting/<immutable-id>:integrations",
+        "secret": true,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      }
+    },
+    "environment": {
+      "access_token_ttl_minutes": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "admin_email": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "admin_password": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "allowed_mimes": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "api_host": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "api_port": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "app_name": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "auth_enabled": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "cookie_name": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "cookie_secure": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "cors_origins": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "data_dir": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "database_url": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "debug": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "dry_run": {
+        "scope": "legacy_character_bootstrap",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment; owner runtime/account values require explicit migration"
+      },
+      "encryption_key": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "environment": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "fanvue_api_base": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "fanvue_api_version": {
+        "scope": "legacy_character_bootstrap",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment; owner runtime/account values require explicit migration"
+      },
+      "fanvue_client_id": {
+        "scope": "legacy_character_bootstrap",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment; owner runtime/account values require explicit migration"
+      },
+      "fanvue_client_secret": {
+        "scope": "legacy_character_bootstrap",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment; owner runtime/account values require explicit migration"
+      },
+      "fanvue_oauth_authorize_url": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "fanvue_oauth_token_url": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "global_pause": {
+        "scope": "legacy_character_bootstrap",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment; owner runtime/account values require explicit migration"
+      },
+      "inventory_warn_days": {
+        "scope": "legacy_character_bootstrap",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment; owner runtime/account values require explicit migration"
+      },
+      "llm_timeout_seconds": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "max_upload_mb": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "media_root": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "notify_email_to": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "openrouter_api_key": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "openrouter_base_url": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "openrouter_model_caption": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "openrouter_model_fallback": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "openrouter_model_text": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "openrouter_model_vision": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "openrouter_monthly_budget_usd": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "post_retention_active": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "post_retention_automatic_active": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "public_base_url": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "redis_url": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "refresh_token_ttl_days": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "scheduler_mode": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "secret_key": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "smtp_from": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "smtp_host": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "smtp_password": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "smtp_port": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "smtp_user": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "system_user_email": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "telegram_bot_token": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "telegram_chat_id": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "thumbnail_sizes": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "tz": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "ui_mode": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "x_api_base": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "x_api_tier": {
+        "scope": "legacy_character_bootstrap",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment; owner runtime/account values require explicit migration"
+      },
+      "x_client_id": {
+        "scope": "legacy_character_bootstrap",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment; owner runtime/account values require explicit migration"
+      },
+      "x_client_secret": {
+        "scope": "legacy_character_bootstrap",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": true,
+        "migration": "preserve installation environment; owner runtime/account values require explicit migration"
+      },
+      "x_oauth_authorize_url": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      },
+      "x_oauth_token_url": {
+        "scope": "installation",
+        "destination": "deployment environment (not copied to newly created characters)",
+        "secret": false,
+        "migration": "preserve installation environment and encryption key unchanged"
+      }
+    }
+  },
+  "autochat_additional_keys": {
+    "doku_markdown": {
+      "scope": "installation",
+      "references": [
+        "app/main.py:777",
+        "app/main.py:784",
+        "app/main.py:756"
+      ]
+    },
+    "openrouter_monthly_budget_usd": {
+      "scope": "installation",
+      "references": [
+        "app/main.py:1869"
+      ]
+    }
+  },
+  "literal_read_write_references": {
+    "fanvue_client_id": [
+      "app/fanvue.py:91",
+      "app/fanvue.py:134",
+      "app/main.py:2372"
+    ],
+    "fanvue_client_secret": [
+      "app/fanvue.py:92",
+      "app/fanvue.py:135"
+    ],
+    "fanvue_redirect_uri": [
+      "app/fanvue.py:93",
+      "app/main.py:2373",
+      "autoposter/services/chatbot_fanvue.py:13"
+    ],
+    "fanvue_api_version": [
+      "app/fanvue.py:177"
+    ],
+    "max_reply_chars": [
+      "app/guardrails.py:514"
+    ],
+    "time_guard_enabled": [
+      "app/guardrails.py:175"
+    ],
+    "alert_keywords": [
+      "app/guardrails.py:595"
+    ],
+    "persona_schedule": [
+      "app/guardrails.py:181",
+      "app/persona_context.py:257"
+    ],
+    "system_prompt": [
+      "app/main.py:324",
+      "app/poller.py:260",
+      "app/poller.py:1463",
+      "app/poller.py:1164"
+    ],
+    "ppv_enabled": [
+      "app/main.py:325",
+      "app/main.py:1439",
+      "app/poller.py:327"
+    ],
+    "chat_custom_list_id": [
+      "app/main.py:601",
+      "app/main.py:1282",
+      "app/main.py:2077",
+      "app/poller.py:93"
+    ],
+    "bot_running": [
+      "app/main.py:676",
+      "app/main.py:675",
+      "app/main.py:119",
+      "app/main.py:2455",
+      "app/poller.py:1709"
+    ],
+    "doku_markdown": [
+      "app/main.py:777",
+      "app/main.py:784",
+      "app/main.py:756"
+    ],
+    "prio2_custom_list_id": [
+      "app/main.py:1283",
+      "app/main.py:2089",
+      "app/poller.py:1261"
+    ],
+    "update_check_interval_hours": [
+      "app/main.py:1870",
+      "app/updater.py:186"
+    ],
+    "chat_custom_list_name": [
+      "app/main.py:2087",
+      "app/main.py:1284"
+    ],
+    "prio2_custom_list_name": [
+      "app/main.py:2099",
+      "app/main.py:1285"
+    ],
+    "ppv_thumb_cache_hours": [
+      "app/main.py:2120"
+    ],
+    "github_token": [
+      "app/main.py:173",
+      "app/main.py:175",
+      "app/publisher.py:68",
+      "app/publisher.py:233",
+      "app/publisher.py:167"
+    ],
+    "git_commit_default": [
+      "app/main.py:185"
+    ],
+    "ppv_use_llm_classifier": [
+      "app/main.py:329",
+      "app/poller.py:333"
+    ],
+    "anti_ai_enabled": [
+      "app/main.py:410",
+      "app/main.py:400",
+      "app/poller.py:272",
+      "app/poller.py:572",
+      "app/poller.py:1215",
+      "app/poller.py:1471"
+    ],
+    "draft_max_regen": [
+      "app/main.py:859",
+      "app/poller.py:739",
+      "app/poller.py:1308",
+      "app/poller.py:1580",
+      "app/poller.py:1363"
+    ],
+    "queue_context_messages": [
+      "app/main.py:860"
+    ],
+    "memory_enabled": [
+      "app/main.py:1403",
+      "app/memory.py:201",
+      "app/poller.py:546"
+    ],
+    "memory_consolidate_enabled": [
+      "app/main.py:1441",
+      "app/memory.py:646"
+    ],
+    "telegram_bot_token": [
+      "app/main.py:1907",
+      "app/main.py:1927",
+      "app/notify.py:45",
+      "app/notify.py:39",
+      "autoposter/services/notify.py:89"
+    ],
+    "mode": [
+      "app/main.py:122",
+      "app/poller.py:68"
+    ],
+    "memory_max_chars": [
+      "app/main.py:1442",
+      "app/memory.py:444"
+    ],
+    "memory_max_short": [
+      "app/main.py:1444",
+      "app/memory.py:176"
+    ],
+    "memory_short_max_age_days": [
+      "app/main.py:1445",
+      "app/memory.py:507"
+    ],
+    "ppv_offer_reset_days": [
+      "app/main.py:1473",
+      "app/main.py:295",
+      "app/main.py:937",
+      "app/ppv_engine.py:297"
+    ],
+    "telegram_chat_id": [
+      "app/main.py:1908",
+      "app/notify.py:79",
+      "app/notify.py:40",
+      "autoposter/services/notify.py:90"
+    ],
+    "incoming_image_woman_prompt": [
+      "app/main.py:340",
+      "app/poller.py:408"
+    ],
+    "ppv_confirm_enabled": [
+      "app/main.py:372",
+      "app/poller.py:352"
+    ],
+    "ppv_sales_prompt": [
+      "app/main.py:381",
+      "app/poller.py:618",
+      "app/poller.py:1483"
+    ],
+    "anti_ai_rules": [
+      "app/main.py:411",
+      "app/main.py:401",
+      "app/poller.py:573"
+    ],
+    "chats_cache_seconds": [
+      "app/main.py:1143"
+    ],
+    "reactivation_folder": [
+      "app/main.py:1794",
+      "app/poller.py:1080"
+    ],
+    "incoming_image_react_prompt": [
+      "app/main.py:341",
+      "app/poller.py:413"
+    ],
+    "ppv_freecontent_prompt": [
+      "app/main.py:403",
+      "app/poller.py:397"
+    ],
+    "chat_filter": [
+      "app/main.py:606",
+      "app/main.py:1336",
+      "app/poller.py:91"
+    ],
+    "ppv_cooldown_outbound": [
+      "app/main.py:1584",
+      "app/main.py:1524",
+      "app/main.py:1563",
+      "app/poller.py:926",
+      "app/poller.py:699",
+      "app/ppv_engine.py:80",
+      "app/ppv_engine.py:226"
+    ],
+    "messages_store_enabled": [
+      "app/memory.py:223",
+      "app/memory.py:809"
+    ],
+    "memory_model": [
+      "app/memory.py:572",
+      "app/memory.py:1005",
+      "app/openrouter.py:102"
+    ],
+    "openrouter_model": [
+      "app/memory.py:572",
+      "app/openrouter.py:96",
+      "app/openrouter.py:133",
+      "app/openrouter.py:474",
+      "app/poller.py:479",
+      "app/poller.py:1247"
+    ],
+    "openrouter_api_key": [
+      "app/memory.py:811",
+      "app/openrouter.py:95",
+      "app/openrouter.py:469",
+      "app/openrouter.py:132",
+      "app/openrouter.py:267",
+      "app/openrouter.py:309"
+    ],
+    "memory_trigger_messages": [
+      "app/memory.py:531"
+    ],
+    "memory_quiet_hours": [
+      "app/memory.py:534"
+    ],
+    "memory_sweep_hour": [
+      "app/memory.py:538"
+    ],
+    "memory_min_fan_messages": [
+      "app/memory.py:551",
+      "app/memory.py:918"
+    ],
+    "memory_max_per_cycle": [
+      "app/memory.py:661"
+    ],
+    "memory_backfill_max_pages": [
+      "app/memory.py:870"
+    ],
+    "memory_backfill_max_messages": [
+      "app/memory.py:874",
+      "app/memory.py:943"
+    ],
+    "memory_max_long": [
+      "app/memory.py:175"
+    ],
+    "memory_min_interval_hours": [
+      "app/memory.py:660"
+    ],
+    "memory_backfill_auto": [
+      "app/memory.py:780"
+    ],
+    "memory_backfill_per_hour": [
+      "app/memory.py:818"
+    ],
+    "memory_backfill_delay": [
+      "app/memory.py:929"
+    ],
+    "memory_backfill_chunk": [
+      "app/memory.py:928"
+    ],
+    "messages_retention_days": [
+      "app/memory.py:654"
+    ],
+    "anti_ai_petnames": [
+      "app/namefilter.py:15"
+    ],
+    "telegram_enabled": [
+      "app/notify.py:153",
+      "app/notify.py:178"
+    ],
+    "app_base_url": [
+      "app/notify.py:119",
+      "app/notify.py:133"
+    ],
+    "vision_model": [
+      "app/openrouter.py:270",
+      "app/openrouter.py:312",
+      "app/openrouter.py:113",
+      "app/openrouter.py:109"
+    ],
+    "timestamps_in_history": [
+      "app/openrouter.py:46"
+    ],
+    "ppv_caption_model": [
+      "app/openrouter.py:104"
+    ],
+    "ppv_caption_use_vision": [
+      "app/openrouter.py:108"
+    ],
+    "vision_api_key": [
+      "app/openrouter.py:267",
+      "app/openrouter.py:309",
+      "app/openrouter.py:114",
+      "app/openrouter.py:110"
+    ],
+    "vision_prompt": [
+      "app/openrouter.py:271"
+    ],
+    "classifier_model": [
+      "app/openrouter.py:474",
+      "app/openrouter.py:98"
+    ],
+    "temperature": [
+      "app/openrouter.py:139"
+    ],
+    "max_tokens": [
+      "app/openrouter.py:140",
+      "app/openrouter.py:208"
+    ],
+    "ppv_confirm_context_messages": [
+      "app/openrouter.py:478"
+    ],
+    "reasoning_mode": [
+      "app/openrouter.py:147"
+    ],
+    "time_context_enabled": [
+      "app/persona_context.py:243"
+    ],
+    "persona_timezone": [
+      "app/persona_context.py:97"
+    ],
+    "active_hours_enabled": [
+      "app/poller.py:51"
+    ],
+    "active_hour_start": [
+      "app/poller.py:53"
+    ],
+    "active_hour_end": [
+      "app/poller.py:54"
+    ],
+    "max_chats_per_cycle": [
+      "app/poller.py:94"
+    ],
+    "alert_keywords_enabled": [
+      "app/poller.py:130",
+      "app/poller.py:153"
+    ],
+    "reply_cooldown_seconds": [
+      "app/poller.py:174"
+    ],
+    "history_messages": [
+      "app/poller.py:179",
+      "app/poller.py:1388",
+      "app/poller.py:1184"
+    ],
+    "incoming_image_enabled": [
+      "app/poller.py:284"
+    ],
+    "tip_thanks_enabled": [
+      "app/poller.py:291"
+    ],
+    "tip_thanks_prompt": [
+      "app/poller.py:292"
+    ],
+    "generation_retries": [
+      "app/poller.py:568"
+    ],
+    "draft_regen_on_stale": [
+      "app/poller.py:745",
+      "app/poller.py:1581",
+      "app/poller.py:1362"
+    ],
+    "draft_recheck_enabled": [
+      "app/poller.py:777",
+      "app/poller.py:1574"
+    ],
+    "reactivation_enabled": [
+      "app/poller.py:1065"
+    ],
+    "reactivation_max_per_cycle": [
+      "app/poller.py:1072"
+    ],
+    "memory_reactivation_use_loops": [
+      "app/poller.py:1139"
+    ],
+    "prio2_jitter_minutes": [
+      "app/poller.py:1269"
+    ],
+    "draft_recheck_interval_seconds": [
+      "app/poller.py:1579"
+    ],
+    "send_delay_min_seconds": [
+      "app/poller.py:463",
+      "app/poller.py:650",
+      "app/poller.py:1554"
+    ],
+    "send_delay_max_seconds": [
+      "app/poller.py:464",
+      "app/poller.py:651",
+      "app/poller.py:1555"
+    ],
+    "generation_retry_delay": [
+      "app/poller.py:570"
+    ],
+    "reactivation_inactive_hours": [
+      "app/poller.py:1070"
+    ],
+    "reactivation_cooldown_days": [
+      "app/poller.py:1071"
+    ],
+    "reactivation_max_attempts": [
+      "app/poller.py:1073"
+    ],
+    "reactivation_delay_min_minutes": [
+      "app/poller.py:1236"
+    ],
+    "reactivation_delay_max_minutes": [
+      "app/poller.py:1237"
+    ],
+    "prio2_interval_minutes": [
+      "app/poller.py:1268"
+    ],
+    "update_notify_telegram": [
+      "app/poller.py:1672"
+    ],
+    "reactivation_max_silence_days": [
+      "app/poller.py:1074"
+    ],
+    "tip_thanks_folder": [
+      "app/poller.py:296"
+    ],
+    "ppv_no_match_prompt": [
+      "app/poller.py:392"
+    ],
+    "reactivation_prompt": [
+      "app/poller.py:1212"
+    ],
+    "poll_interval_seconds": [
+      "app/poller.py:1737",
+      "app/preview.py:141"
+    ],
+    "ppv_confirm_fail_open": [
+      "app/poller.py:359"
+    ],
+    "ppv_unpurchased_threshold": [
+      "app/ppv_engine.py:77"
+    ],
+    "ppv_intent_threshold": [
+      "app/ppv_engine.py:119"
+    ],
+    "ppv_sexual_streak_trigger": [
+      "app/ppv_engine.py:137"
+    ],
+    "ppv_min_fan_messages": [
+      "app/ppv_engine.py:150"
+    ],
+    "ppv_block_on_distress": [
+      "app/ppv_engine.py:174"
+    ],
+    "ppv_max_media_per_set": [
+      "app/ppv_engine.py:321"
+    ],
+    "ppv_cooldown_minutes": [
+      "app/ppv_engine.py:78"
+    ],
+    "ppv_cooldown_long_minutes": [
+      "app/ppv_engine.py:79"
+    ],
+    "ppv_keyword_exceptions": [
+      "app/ppv_engine.py:49"
+    ],
+    "git_remote_url": [
+      "app/publisher.py:305"
+    ],
+    "git_branch": [
+      "app/publisher.py:354"
+    ],
+    "git_user_name": [
+      "app/publisher.py:236"
+    ],
+    "update_state": [
+      "app/updater.py:173",
+      "app/updater.py:166",
+      "app/updater.py:208"
+    ],
+    "update_check_enabled": [
+      "app/updater.py:184"
+    ]
+  },
+  "dynamic_calls_requiring_route_review": [
+    {
+      "location": "app/guardrails.py:431",
+      "expression": "setting_key"
+    },
+    {
+      "location": "app/main.py:1869",
+      "expression": "key"
+    },
+    {
+      "location": "app/main.py:2047",
+      "expression": "key"
+    },
+    {
+      "location": "app/main.py:2075",
+      "expression": "key"
+    },
+    {
+      "location": "app/main.py:168",
+      "expression": "key"
+    },
+    {
+      "location": "app/main.py:1832",
+      "expression": "key"
+    },
+    {
+      "location": "app/main.py:1838",
+      "expression": "key"
+    },
+    {
+      "location": "app/main.py:1848",
+      "expression": "key"
+    },
+    {
+      "location": "app/main.py:1854",
+      "expression": "key"
+    },
+    {
+      "location": "app/main.py:2055",
+      "expression": "key"
+    },
+    {
+      "location": "app/main.py:2058",
+      "expression": "key"
+    },
+    {
+      "location": "app/poller.py:1307",
+      "expression": "setting"
+    },
+    {
+      "location": "app/ppv_engine.py:22",
+      "expression": "setting_key"
+    },
+    {
+      "location": "app/publisher.py:317",
+      "expression": "key"
+    },
+    {
+      "location": "autoposter/services/chatbot_fanvue.py:17",
+      "expression": "key"
+    }
+  ],
+  "notification_boundary": "telegram_bot_token and telegram_chat_id here are installation notifications, never Telegram publication credentials; publication bot credentials live in owner-scoped encrypted ChannelCredential.",
+  "ui_inventory": "docs/settings-completeness.json (existing legacy UI inventory; not full two-character acceptance)",
+  "reorganization": {
+    "common_label": "Gilt für alle Charaktere",
+    "owner_label": "Gilt für: NAME",
+    "distinct_image_tasks": [
+      "vision_model",
+      "openrouter_model_vision"
+    ],
+    "permissions": {
+      "common_ai": "admin; preview writes denied; optional existing LAN auth retained",
+      "owner_forms": "existing editor/admin boundary; no installation AI writes"
+    },
+    "promotion_fields": [
+      "openrouter_model",
+      "classifier_model",
+      "ppv_caption_model",
+      "vision_model",
+      "temperature",
+      "max_tokens",
+      "reasoning_mode",
+      "generation_retries",
+      "generation_retry_delay",
+      "memory_model"
+    ]
+  },
+  "ui_only_controls": {
+    "telegram_enabled_present": "Shared Telegram form sentinel; never persisted"
+  }
+}

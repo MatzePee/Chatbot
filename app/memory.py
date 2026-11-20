@@ -632,7 +632,8 @@ def _merge(old: dict[str, Any], new: dict[str, Any],
     return out
 
 
-_last_purge_at = 0.0
+from .character_state import CharacterDict
+_purge_clock = CharacterDict({'last_at':0.0})
 
 
 def cycle() -> int:
@@ -642,14 +643,13 @@ def cycle() -> int:
     Mindestabstand je Fan. Der eigentliche Kostenhebel ist der Mindestabstand,
     nicht die Zahl pro Durchlauf - der Loop laeuft jede Minute.
     """
-    global _last_purge_at
     if not db.get_setting("memory_consolidate_enabled", False):
         return 0
     now = time.time()
 
     # Aufraeumen einmal taeglich, nicht bei jedem Durchlauf
-    if now - _last_purge_at > 86400:
-        _last_purge_at = now
+    if now - _purge_clock['last_at'] > 86400:
+        _purge_clock['last_at'] = now
         try:
             removed = db.purge_old_messages(int(db.get_setting("messages_retention_days", 90) or 0))
             if removed:
@@ -715,17 +715,27 @@ def cycle() -> int:
 # das weiter vorne aufkam. Umgekehrt wuerde das Gedaechtnis mit veralteten
 # Angaben enden.
 
-_backfill_lock = threading.Lock()
-_backfill_queue: list[dict[str, str]] = []
-_backfill_thread: Optional[threading.Thread] = None
-_backfill_state: dict[str, Any] = {
+from dataclasses import dataclass, field
+from .character_state import CharacterDict, CharacterLocal
+from .character_tasks import CharacterThread
+
+
+@dataclass
+class BackfillWorker:
+    lock: Any = field(default_factory=threading.RLock)
+    queue: list = field(default_factory=list)
+    thread: Optional[threading.Thread] = None
+
+
+_backfill_workers = CharacterLocal(BackfillWorker)
+_backfill_state = CharacterDict({
     "running": False, "user_uuid": "", "name": "", "phase": "", "fetched": 0,
     "pages": 0, "chunks_done": 0, "chunks_total": 0, "queued": 0, "queue_names": [],
     "error": None, "note": "", "cost": 0.0, "finished_at": 0.0,
     # Der letzte Fehlschlag bleibt sichtbar, auch wenn danach ein anderer Fan
     # erfolgreich durchlaeuft - sonst geht die Meldung lautlos verloren.
     "last_error": None, "last_error_name": "",
-}
+})
 
 
 def _set_backfill_state(user_uuid: str, state: str, note: str = "") -> None:
@@ -780,9 +790,9 @@ def maybe_auto_backfill(user_uuid: str, name: str = "") -> None:
 
 def backfill_status() -> dict[str, Any]:
     st = dict(_backfill_state)
-    with _backfill_lock:
-        st["queued"] = len(_backfill_queue)
-        st["queue_names"] = [e.get("name") or e["user_uuid"][:8] for e in _backfill_queue]
+    with _backfill_workers.get().lock:
+        st["queued"] = len(_backfill_workers.get().queue)
+        st["queue_names"] = [e.get("name") or e["user_uuid"][:8] for e in _backfill_workers.get().queue]
     return st
 
 
@@ -795,7 +805,7 @@ def start_backfill(user_uuid: str, name: str = "", auto: bool = False) -> tuple[
     Gibt (gestartet, Klartext) zurueck. Der Klartext landet als Meldung auf der
     Seite - jede Absage muss also von sich aus erklaeren, woran es lag.
     """
-    global _backfill_thread
+    worker = _backfill_workers.get()
     if not db.get_setting("messages_store_enabled", True):
         return (False, "Einstellung 'Chatverlauf lokal mitschreiben' ist ausgeschaltet")
     if not db.get_setting("openrouter_api_key", ""):
@@ -808,14 +818,14 @@ def start_backfill(user_uuid: str, name: str = "", auto: bool = False) -> tuple[
         grenze = int(db.get_setting("memory_backfill_per_hour", 10) or 0)
         if grenze and db.backfills_since(time.time() - 3600) >= grenze:
             return (False, f"Stundengrenze erreicht ({grenze})")
-    with _backfill_lock:
+    with _backfill_workers.get().lock:
         if _backfill_state.get("user_uuid") == user_uuid and _backfill_state.get("running"):
             return (False, "läuft bereits für diesen Fan")
-        if any(e["user_uuid"] == user_uuid for e in _backfill_queue):
+        if any(e["user_uuid"] == user_uuid for e in _backfill_workers.get().queue):
             return (False, "steht bereits in der Warteschlange")
-        _backfill_queue.append({"user_uuid": user_uuid, "name": name, "auto": auto})
-        position = len(_backfill_queue)
-        frisch = _backfill_thread is None or not _backfill_thread.is_alive()
+        _backfill_workers.get().queue.append({"user_uuid": user_uuid, "name": name, "auto": auto})
+        position = len(_backfill_workers.get().queue)
+        frisch = worker.thread is None or not worker.thread.is_alive()
         if frisch:
             # Zustand sofort setzen, nicht erst im Thread: sonst zeigt die
             # Seite direkt nach dem Klick noch "nichts laeuft".
@@ -823,9 +833,9 @@ def start_backfill(user_uuid: str, name: str = "", auto: bool = False) -> tuple[
                                    name=name or user_uuid[:8], phase="start",
                                    fetched=0, pages=0, chunks_done=0, chunks_total=0,
                                    error=None, note="", cost=0.0, finished_at=0.0)
-            _backfill_thread = threading.Thread(target=_backfill_worker, daemon=True,
+            worker.thread = CharacterThread(target=_backfill_worker, daemon=True,
                                                 name="memory-backfill")
-            _backfill_thread.start()
+            worker.thread.start()
     _set_backfill_state(user_uuid, "queued")
     db.log("info", "memory", f"Chat einlesen angestoßen: {name or user_uuid[:8]}",
            "sofort" if position == 1 else f"Warteschlange Platz {position}")
@@ -835,10 +845,10 @@ def start_backfill(user_uuid: str, name: str = "", auto: bool = False) -> tuple[
 
 def _backfill_worker() -> None:
     while True:
-        with _backfill_lock:
-            if not _backfill_queue:
+        with _backfill_workers.get().lock:
+            if not _backfill_workers.get().queue:
                 return
-            auftrag = _backfill_queue.pop(0)
+            auftrag = _backfill_workers.get().queue.pop(0)
         try:
             _backfill_one(auftrag["user_uuid"], auftrag.get("name", ""),
                           auto=bool(auftrag.get("auto")))

@@ -376,32 +376,38 @@ async def detail(
 
 
 @router.get("/{asset_id}/file")
-async def file(asset_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> FileResponse:
+async def file(asset_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(current_user)) -> FileResponse:
     asset = (
         await db.execute(select(MediaAsset).where(MediaAsset.id == asset_id))
     ).scalar_one_or_none()
     if not asset:
         raise HTTPException(404, "Bild nicht gefunden")
-    path = media_service.media_root() / asset.storage_path
-    if not path.exists():
+    try:
+        path = media_service.original_path(asset)
+    except ValueError:
+        raise HTTPException(404, "Datei nicht im Character-Arbeitsbereich")
+    if not path.is_file():
         raise HTTPException(404, "Datei fehlt auf der Platte")
-    return FileResponse(path, media_type=asset.mime, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    return FileResponse(path, media_type=asset.mime, headers={"Cache-Control": "private, no-store"})
 
 
 @router.get("/{asset_id}/thumb")
 async def thumb(
-    asset_id: uuid.UUID, size: int = 256, db: AsyncSession = Depends(get_db)
+    asset_id: uuid.UUID, size: int = 256, db: AsyncSession = Depends(get_db), _: User = Depends(current_user)
 ) -> FileResponse:
     asset = (
         await db.execute(select(MediaAsset).where(MediaAsset.id == asset_id))
     ).scalar_one_or_none()
     if not asset:
         raise HTTPException(404, "Bild nicht gefunden")
-    path = media_service.thumb_path(asset, size) or media_service.thumb_path(asset, 256)
+    try:
+        path = media_service.thumb_path(asset, size) or media_service.thumb_path(asset, 256)
+    except ValueError:
+        raise HTTPException(404, "Vorschaubild nicht im Character-Arbeitsbereich")
     if not path:
         return await file(asset_id, db)
     return FileResponse(
-        path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000, immutable"}
+        path, media_type="image/jpeg", headers={"Cache-Control": "private, no-store"}
     )
 
 
@@ -658,7 +664,9 @@ async def delete_view(
     view = (
         await db.execute(select(SavedView).where(SavedView.id == view_id))
     ).scalar_one_or_none()
-    if view and not view.is_system:
+    if view is None:
+        raise HTTPException(404, 'Ansicht nicht gefunden')
+    if not view.is_system:
         await db.delete(view)
 
 

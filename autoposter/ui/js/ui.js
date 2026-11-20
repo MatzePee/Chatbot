@@ -10,6 +10,7 @@ export function h(tag, props, ...children) {
     else if (k === 'html') el.innerHTML = v
     else if (k === 'dataset') Object.assign(el.dataset, v)
     else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v)
+    else if ((k === 'src' || k === 'poster') && typeof v === 'string' && v) el.setAttribute(k, globalThis.CreatorStudioCharacters?.url(v) || v)
     else if (k in el && k !== 'list' && k !== 'form') el[k] = v
     else el.setAttribute(k, v)
   }
@@ -203,6 +204,7 @@ function hidePreview() {
  */
 export function attachPreview(el, src, { delay = 260, size = 340 } = {}) {
   if (!src) return el
+  src = globalThis.CreatorStudioCharacters?.url(src) || src
   let timer = null
 
   let pointer = null

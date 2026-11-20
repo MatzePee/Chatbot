@@ -1,7 +1,7 @@
 """Version, Update und Veröffentlichen nach GitHub."""
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,64 @@ from autoposter.schemas import GitSettingsIn, PublishRequest
 from autoposter.services import appconfig, gitops, gitpublish, updater
 
 router = APIRouter(prefix="/system", tags=["system"])
+# Only workspace activation belongs in the assembled app. The older standalone
+# update/publish endpoints remain intentionally unmounted.
+character_upgrade_router = APIRouter(prefix="/system", tags=["system"])
+
+
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
+
+
+class CharacterUpgradeRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    name: str = Field(min_length=1, max_length=120)
+    confirmed: StrictBool = False
+    technical_source: Literal['autochat', 'autopost'] | None = None
+
+
+@character_upgrade_router.get('/character-upgrade')
+@router.get('/character-upgrade')
+async def character_upgrade_status(_: User = Depends(require_admin)):
+    from app import character_upgrade
+    from app.helper_readiness import readiness
+    return {**character_upgrade.status(character_upgrade.ROOT), 'helper': readiness(character_upgrade.ROOT)}
+
+
+@character_upgrade_router.post('/character-upgrade')
+@router.post('/character-upgrade')
+async def character_upgrade_stage(payload: CharacterUpgradeRequest, _: User = Depends(require_admin)):
+    from app import character_upgrade
+    from app.preview import enabled
+    if enabled():
+        raise HTTPException(403, 'Migration ist im Mitlesemodus gesperrt')
+    from app.helper_readiness import readiness
+    helper = readiness(character_upgrade.ROOT)
+    if not helper['ready']:
+        raise HTTPException(409, helper['message'])
+    try:
+        from app.setting_scope import GLOBAL_TECHNICAL_KEYS
+        sources = ({key: payload.technical_source for key in GLOBAL_TECHNICAL_KEYS}
+                   if payload.technical_source is not None else {})
+        return {**character_upgrade.stage(character_upgrade.ROOT, name=payload.name, confirmed=payload.confirmed,
+                                         technical_sources=sources),
+                'helper': helper}
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+
+
+@character_upgrade_router.delete('/character-upgrade')
+@router.delete('/character-upgrade')
+async def character_upgrade_cancel(_: User = Depends(require_admin)):
+    from app import character_upgrade
+    from app.preview import enabled
+    if enabled():
+        raise HTTPException(403, 'Migration ist im Mitlesemodus gesperrt')
+    try:
+        character_upgrade.cancel(character_upgrade.ROOT)
+        from app.helper_readiness import readiness
+        return {**character_upgrade.status(character_upgrade.ROOT), 'helper': readiness(character_upgrade.ROOT)}
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
 
 
 # --------------------------------------------------------------------------- #
@@ -99,7 +157,11 @@ async def save_git_settings(
     elif payload.clear_token:
         values["github_token"] = ""
 
-    await appconfig.set_many(db, values)
+    from autoposter.services.settings_transaction import SettingsTransactionUnsupported
+    try:
+        await appconfig.set_many(db, values)
+    except SettingsTransactionUnsupported as exc:
+        raise HTTPException(409, str(exc)) from exc
     return await gitpublish.status(db)
 
 

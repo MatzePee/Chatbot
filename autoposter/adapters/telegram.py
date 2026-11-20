@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 import httpx
 from PIL import Image
-from .base import AccountInfo, AdapterError, ChannelLimits, MediaRef, PublishResult, http_client
+from .base import AccountInfo, AdapterError, ExternalActionBlocked, ChannelLimits, MediaRef, PublishResult, http_client
 
 import logging
 import re
@@ -72,6 +72,8 @@ class TelegramAdapter:
             body = response.json()
             if not isinstance(body,dict):
                 raise ValueError()
+        except ExternalActionBlocked:
+            raise  # The request hook rejected this before transmission.
         except Exception:  # Provider/transport exceptions may embed the secret URL.
             error = TelegramUncertain if sending else AdapterError
             raise error('Telegram: Versand unklar; keine automatische Wiederholung. Zielkanal vor weiteren Aktionen manuell prüfen.' if sending else 'Telegram: keine eindeutige API-Antwort.') from None

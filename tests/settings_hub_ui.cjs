@@ -2,7 +2,7 @@
 // Run after SETTINGS_RENDER_OUTPUT=<dir> pytest tests/test_settings_hub.py.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict')
-const repo = path.resolve(__dirname, '..'), render = process.env.SETTINGS_RENDER_OUTPUT
+const repo = path.resolve(__dirname, '..'), render = process.env.SETTINGS_RENDER_OUTPUT, originalRepo = process.env.ORIGINAL_SETTINGS_ROOT || repo
 if (!render) throw Error('SETTINGS_RENDER_OUTPUT is required; never use production HTML/data')
 const integrations = { openrouter_api_key_set: true, openrouter_ready: true,
   openrouter_model_caption:'fixture/caption', openrouter_model_text:'fixture/text',
@@ -12,11 +12,13 @@ const integrations = { openrouter_api_key_set: true, openrouter_ready: true,
   auto_plan_enabled:false, auto_plan_days:19, auto_plan_interval_hours:26 }
 const channels = [{id:1,display_name:'Testkanal',platform:'x',auto_plan_enabled:true,is_active:true,is_connected:true,color:'#0071e3'}]
 const fixtures = {
+ '/api/v1/system/character-upgrade': {phase:'legacy'},
+ '/api/v1/characters/mode': {enabled:false},
  '/api/v1/auth/me': {role:'admin',email:'fixture@test.invalid'},
  '/api/v1/settings': {dry_run:true,global_pause:true,port:8000,database:'synthetic.db',scheduler_mode:'off'},
  '/api/v1/settings/integrations': integrations,
  '/api/v1/maintenance/report': {unassigned:0,untagged:0,archive_candidates:0,failed_assets:0,orphan_set_items:0,near_duplicates:[]},
- '/api/v1/llm/usage': {total_usd:2,budget_usd:30,by_task:[]},
+ '/settings/shared/ai-usage': {total_usd:0,budget_usd:100,by_task:[]}, '/api/v1/llm/usage': {total_usd:2,budget_usd:30,by_task:[]},
  '/api/v1/channels': channels,
  '/api/v1/settings/image-comment':{enabled:true,text:'Fixture comment',url:'https://fixture.test'},
  '/api/v1/settings/openrouter/models':{models:Object.values(integrations).filter(v => typeof v==='string' && v.startsWith('fixture/')).map(id=>({id,vision:true,free:true})),cached:true},
@@ -50,10 +52,11 @@ async function main(){
    const section=p==='/settings'?'autochat':url.searchParams.get('section')||'shared'
    body=fs.readFileSync(path.join(render,section+'.html'));contentType='text/html'
   }else if(p==='/baseline'){
-   body=`<html><body><div id="toasts"></div><div id="modals"></div><div id="baseline"></div><script type="module">import render from '/autoposter/js/pages/settings.js';document.getElementById('baseline').appendChild(await render({user:{role:'admin',email:'fixture@test.invalid'}}));</script></body></html>`;contentType='text/html'
+   body=`<html><body><div id="toasts"></div><div id="modals"></div><div id="baseline"></div><script type="module">import render from '/original-autoposter/js/pages/settings.js';document.getElementById('baseline').appendChild(await render({user:{role:'admin',email:'fixture@test.invalid'}}));</script></body></html>`;contentType='text/html'
   }else{
    let f
-   if(p.startsWith('/static/'))f=path.join(repo,'app',p)
+   if(p.startsWith('/original-autoposter/js/'))f=path.join(originalRepo,'autoposter/ui',p.slice('/original-autoposter/'.length))
+   else if(p.startsWith('/static/'))f=path.join(repo,'app',p)
    else if(p.startsWith('/autoposter/js/'))f=path.join(repo,'autoposter/ui',p.slice('/autoposter/'.length))
    if(f && fs.existsSync(f) && ['.js','.css','.svg'].includes(path.extname(f))){body=fs.readFileSync(f);contentType=({'.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml'})[path.extname(f)]}
    else {unexpected.push(p);return route.abort()}
@@ -66,12 +69,8 @@ async function main(){
  await page.goto('http://settings.test/settings/shared?section=autopost');await page.locator('#autopost-settings section').last().waitFor()
  assert.deepEqual(await inventory('#autopost-settings'),baseline,'Every old AutoPost control/action and prepopulation must survive')
  assert.equal(writes.length,0,'Loading settings must never save')
- assert.equal(await page.locator('#autopost-settings a[href="/settings/shared?section=channels"]').count(),2)
- const openrouter=page.locator('#autopost-settings section').filter({has:page.getByRole('heading',{name:'OpenRouter verbinden',exact:true})})
- await openrouter.getByRole('button',{name:'Speichern',exact:true}).click()
- assert.equal(writes.at(-1).path,'/api/v1/settings/integrations')
- assert.equal(Object.hasOwn(writes.at(-1).payload,'openrouter_api_key'),false,'Blank secret must be omitted')
- assert.equal(writes.at(-1).payload.openrouter_model_text,'fixture/text')
+ assert.equal(await page.locator('#autopost-settings a[href="/settings/shared#ai"]').count(),1)
+ assert.equal(await page.getByRole('heading',{name:'OpenRouter verbinden',exact:true}).count(),0,'Common AI editing must not be duplicated')
  const planning=page.locator('#autopost-settings section').filter({has:page.getByRole('heading',{name:'Planung',exact:true})})
  assert.match(await planning.innerText(), /00:00.*Europe\/Berlin/)
  assert.equal(await planning.locator('input[max="168"]').count(),0,'No rolling-hour input')
@@ -88,10 +87,6 @@ async function main(){
  await planning.getByRole('checkbox',{name:'Autobefüllen für Testkanal'}).uncheck()
  await page.waitForFunction(() => !document.querySelector('input[aria-label="Autobefüllen für Testkanal"]').disabled)
  assert.deepEqual(writes.at(-1),{path:'/api/v1/channels/1',method:'PATCH',payload:{auto_plan_enabled:false}})
- await openrouter.getByRole('button',{name:'Schlüssel entfernen'}).click()
- await page.locator('#modals .modal').waitFor()
- await page.getByRole('button',{name:'Abbrechen',exact:true}).click()
- assert.equal(writes.filter(w=>w.path.endsWith('/clear')).length,0,'Cancelling removal must not change any secret')
  const calendar=page.locator('#autopost-settings section').filter({has:page.getByRole('heading',{name:'Kalender leeren',exact:true})})
  await calendar.getByRole('button',{name:'Alle geplanten Posts löschen'}).click()
  await page.locator('#modals .modal').waitFor()

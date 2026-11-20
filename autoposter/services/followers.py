@@ -89,14 +89,8 @@ async def collect(db, now=None, *, daily_only=False, platform='x', force=False):
         # Atomic account lock in both supported DBs. SQLite's no-op write takes
         # its writer lock; PostgreSQL uses a row lock. Read only AFTER locking.
         from sqlalchemy import update
-        if db.bind.dialect.name == 'sqlite':
-            from sqlalchemy.dialects.sqlite import insert
-        else:
-            from sqlalchemy.dialects.postgresql import insert
-        await db.execute(insert(AppSetting).values(key=key, value={}).on_conflict_do_nothing(index_elements=['key']))
-        if db.bind.dialect.name == 'sqlite':
-            await db.execute(update(AppSetting).where(AppSetting.key == key).values(key=key))
-        row = (await db.execute(select(AppSetting).where(AppSetting.key == key).with_for_update().execution_options(populate_existing=True))).scalar_one()
+        from autoposter.services.owned_settings import locked_setting, compare_and_set
+        row = await locked_setting(db, key)
         value = dict(row.value or {})
         local = now.astimezone(ZONE)
         slot = local.date().isoformat()
@@ -140,10 +134,7 @@ async def collect(db, now=None, *, daily_only=False, platform='x', force=False):
                 if type(code) is int and 100 <= code <= 599:
                     value['status'] += f' (API {code})'
         # A slow pre-06:00 response must not erase a newer daily claim/result.
-        await db.execute(update(AppSetting).where(
-            AppSetting.key == key,
-            AppSetting.value['attempted_at'].as_string() == now.isoformat(),
-        ).values(value=value).execution_options(synchronize_session=False))
+        await compare_and_set(db, key, 'attempted_at', now.isoformat(), value)
         db.expire(row)
         await db.flush()
     return done

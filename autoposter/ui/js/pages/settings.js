@@ -3,230 +3,68 @@ import { visibilityAgingCard } from './visibility-aging.js?v=ppv-restore-1'
 import { api } from '../api.js?v=post-retention-1'
 import { h, clear, card, field, empty, toast, guard, spinner, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
-const MODEL_TASKS = [
-  ['openrouter_model_caption', 'Bildunterschriften', 'Texte zu Bildern'],
-  ['openrouter_model_text', 'Reine Textposts', 'Posts ohne Bild'],
-  ['openrouter_model_vision', 'Bildbeschreibung', 'Muss Bilder verstehen können'],
-  ['openrouter_model_fallback', 'Ausweichmodell', 'Wird genutzt, wenn das erste scheitert'],
-]
+export async function commonOverview() {
+  const response = await fetch(window.CreatorStudioCharacters.url('/settings/shared/ai-usage'))
+  if (!response.ok) throw new Error('Kostenübersicht nicht verfügbar')
+  const usage = await response.json()
+  const page = h('div', {class:'stack'})
+  page.appendChild(card('Erfasste AutoPost-Kosten · laufender Monat',
+    h('div', {class:'big num'}, Number(usage.total_usd).toFixed(2) + ' USD'),
+    h('p', {class:'hint'}, 'Gesamtverbrauch aller Charaktere. Erfasst sind AutoPost-Aufrufe.'),
+    h('p', {class:'hint'}, 'AutoPost-Budget je Charakter: ' + Number(usage.budget_usd).toFixed(2) + ' USD'),
+    h('div', {}, ...(usage.by_character || []).map(row => h('p', {}, row.name + ': ' + Number(row.cost_usd).toFixed(2) + ' USD'))),
+    h('div', {class:'hint'}, ...(usage.by_task || []).map(row => h('p', {}, row.task + ': ' + row.calls + ' Aufrufe · ' + Number(row.cost_usd).toFixed(4) + ' USD')))))
+  return page
+}
+
+export async function systemOverview() {
+  const [settings, integrations, user] = await Promise.all([api.settings(), api.integrations(), api.me()])
+  const rows = [
+    ['Port', settings.port], ['Datenbank', settings.database], ['Hintergrundjobs', settings.scheduler_mode],
+    ['Anmeldung', user.email === 'system@local' ? 'Internes Netz' : 'Aktiv'], ['Basis-URL', integrations.public_base_url],
+  ].map(([key,value]) => h('tr', {}, h('td', {class:'hint'}, key), h('td', {}, String(value ?? '—'))))
+  return card('Installation', h('table', {}, h('tbody', {}, ...rows)))
+}
 
 export default async function renderSettings({ user }) {
-  const [settings, integrations, report, usage, channels] = await Promise.all([
-    api.settings(), api.integrations(), api.maintenanceReport(), api.llmUsage(), api.channels(),
-  ])
+  const [integrations, channels] = await Promise.all([api.integrations(), api.channels()])
 
   const page = h('div', { class: 'page stack' },
     h('h1', {}, 'AutoPost-Einstellungen'),
   )
 
   // ------------------------------------------------------------ Betrieb
-  const dryBtn = h('button', {})
-  const pauseBtn = h('button', {})
-  const paint = () => {
-    clear(dryBtn).appendChild(document.createTextNode('Trockenlauf ' + (settings.dry_run ? 'AN' : 'AUS')))
-    dryBtn.className = settings.dry_run ? 'primary' : ''
-    clear(pauseBtn).appendChild(document.createTextNode('⛔ Notfall-Stopp ' + (settings.global_pause ? 'AKTIV' : 'aus')))
-    pauseBtn.className = settings.global_pause ? 'danger' : ''
-  }
-  paint()
-  dryBtn.addEventListener('click', guard(async () => {
-    Object.assign(settings, await api.setRuntime({ dry_run: !settings.dry_run })); paint()
-    toast.ok(settings.dry_run ? 'Trockenlauf aktiv – es wird nichts gesendet' : 'Trockenlauf aus – Posts gehen wirklich raus')
-  }))
-  pauseBtn.addEventListener('click', guard(async () => {
-    Object.assign(settings, await api.setRuntime({ global_pause: !settings.global_pause })); paint()
-  }))
+  page.appendChild(h('a', {class:'btn', href:'/autoposter/'}, 'Betriebssteuerung im Dashboard öffnen'))
 
-  page.appendChild(card('Betrieb',
-    h('div', { class: 'col' },
-      h('div', { class: 'row' }, dryBtn, h('span', { class: 'hint' },
-        'Im Trockenlauf wird alles verarbeitet, aber nichts an X oder Fanvue gesendet.')),
-      h('div', { class: 'row' }, pauseBtn, h('span', { class: 'hint' },
-        'Stoppt sofort jede Veröffentlichung und jede automatische Planung.')),
-    ),
-  ))
-
-  page.appendChild(await imageCommentCard())
-  page.appendChild(await visibilityAgingCard(integrations))
-  page.appendChild(await postRetentionCard(integrations))
+  const group = (title, ...children) => h('section', {class:'settings-subsection'}, h('h2', {}, title), ...children)
+  page.appendChild(group('Automatische Planung', planningCard(integrations, channels)))
+  page.appendChild(group('Veröffentlichung & Kommentare', await imageCommentCard()))
+  page.appendChild(group('Sichtbarkeit & Aufbewahrung', await visibilityAgingCard(integrations), await postRetentionCard(integrations)))
+  page.appendChild(group('Erweiterte Vorgaben', platformDefaultsCard(integrations)))
 
   // ------------------------------------------------------------ OpenRouter
-  page.appendChild(await openrouterCard(integrations))
+  page.appendChild(h('a', { href: '/settings/shared?view=ai' }, 'KI-Zugang, Aufgabenmodelle und Budget öffnen'))
 
   // ------------------------------------------------------------ Plattformen
   // Zugangsdaten (Client-ID/Secret) werden bewusst NUR unter „Kanäle" gepflegt.
   // Hier stehen nur Werte, die für alle Kanäle einer Plattform gleich sind.
-  page.appendChild(platformDefaultsCard(integrations))
+
 
   // ------------------------------------------------------------ Verbindungen prüfen
-  page.appendChild(await connectionCard(channels))
+
 
   // ------------------------------------------------------------ Planung
-  page.appendChild(planningCard(integrations, channels))
 
-  // ------------------------------------------------------------ Kosten
-  const pct = usage.budget_usd ? Math.min(100, (usage.total_usd / usage.budget_usd) * 100) : 0
-  page.appendChild(card('KI-Kosten (laufender Monat)',
-    h('div', { class: 'row', style: { alignItems: 'baseline' } },
-      h('span', { class: 'big num' }, Number(usage.total_usd).toFixed(2)),
-      h('span', { class: 'hint' }, `von ${Number(usage.budget_usd).toFixed(2)} USD Budget`)),
-    h('div', { class: 'bar', style: { margin: '8px 0' } }, h('i', { style: { width: pct + '%' } })),
-    h('div', { class: 'hint' }, ...(usage.by_task || []).map((t) =>
-      h('div', {}, `${t.task}: ${t.calls} Aufrufe · ${Number(t.cost_usd).toFixed(4)} USD`))),
-  ))
 
   // ------------------------------------------------------------ Wartung
-  const stats = [
-    ['Nicht zugeordnet', report.unassigned],
-    ['Ohne Tags', report.untagged],
-    ['Archiv-Kandidaten', report.archive_candidates],
-    ['Fehlerhaft', report.failed_assets],
-    ['Verwaiste Set-Einträge', report.orphan_set_items],
-    ['Fast identische Paare', (report.near_duplicates || []).length],
-  ]
-  page.appendChild(card('Bibliothek aufräumen',
-    h('div', { class: 'grid c3' }, ...stats.map(([label, value]) =>
-      h('div', { class: 'card pad' }, h('div', { class: 'hint' }, label), h('div', { class: 'big num' }, value)))),
-    h('div', { class: 'row', style: { marginTop: '12px' } },
-      h('button', { onClick: guard(async () => {
-        const r = await api.archiveUsed(30); toast.ok(`${r.archived} Bilder archiviert`); location.reload()
-      }) }, 'Verbrauchte (>30 Tage) archivieren'),
-      h('button', { onClick: guard(async () => {
-        const r = await api.rebuildCounters(); toast.ok(`${r.refreshed} Zähler neu berechnet`); location.reload()
-      }) }, 'Zähler neu berechnen'),
-    ),
-  ))
 
-  // ------------------------------------------------------------ Kalender leeren
-  page.appendChild(plannedPostsCard())
-
-  // ------------------------------------------------------------ System
-  page.appendChild(card('System',
-    h('table', {}, h('tbody', {}, ...[
-      ['Port', settings.port],
-      ['Datenbank', settings.database],
-      ['Hintergrundjobs', settings.scheduler_mode],
-      ['Anmeldung', user.role === 'admin' && user.email === 'system@local' ? 'deaktiviert (internes Netz)' : 'aktiv'],
-      ['Basis-URL', integrations.public_base_url],
-    ].map(([k, v]) => h('tr', {},
-      h('td', { class: 'hint', style: { width: '40%' } }, k),
-      h('td', {}, String(v ?? '—'))))))))
 
   return page
 }
 
 
 // --------------------------------------------------------------------------- //
-async function openrouterCard(integrations) {
-  const keyInput = h('input', {
-    type: 'password',
-    placeholder: integrations.openrouter_api_key_set ? '•••••••• (gespeichert)' : 'sk-or-v1-…',
-    autocomplete: 'off',
-  })
-  const status = h('div', {})
-  const modelSelects = {}
-  const filterFree = h('input', { type: 'checkbox' })
-  let allModels = []
-
-  const paintStatus = (ok, text) => {
-    clear(status).appendChild(h('div', { class: ok ? 'okbox' : 'warnbox' }, text))
-  }
-  paintStatus(
-    integrations.openrouter_ready,
-    integrations.openrouter_ready
-      ? 'Verbunden. Schlüssel ist hinterlegt.'
-      : 'Noch kein API-Schlüssel hinterlegt – Textgenerierung ist deaktiviert.',
-  )
-
-  // ---- Modellliste ----
-  const modelBox = h('div', { class: 'grid c2' })
-  const fillSelects = () => {
-    const visible = filterFree.checked ? allModels.filter((m) => m.free) : allModels
-    for (const [key, label, hint] of MODEL_TASKS) {
-      const sel = modelSelects[key]
-      const chosen = sel.value || integrations[key] || ''
-      clear(sel)
-      // Aktuellen Wert immer anbieten, auch wenn er im Filter fehlt.
-      if (chosen && !visible.some((m) => m.id === chosen)) {
-        sel.appendChild(h('option', { value: chosen, selected: true }, chosen + ' (aktuell)'))
-      }
-      const pool = key === 'openrouter_model_vision' ? visible.filter((m) => m.vision) : visible
-      for (const m of pool) {
-        const price = m.prompt_price && Number(m.prompt_price) > 0
-          ? ` · ${(Number(m.prompt_price) * 1e6).toFixed(2)} $/M`
-          : m.free ? ' · kostenlos' : ''
-        sel.appendChild(h('option', { value: m.id, selected: m.id === chosen }, m.id + price))
-      }
-      if (!pool.length && !chosen) sel.appendChild(h('option', { value: '' }, '(keine Modelle geladen)'))
-    }
-  }
-
-  for (const [key, label, hint] of MODEL_TASKS) {
-    modelSelects[key] = h('select', {})
-    modelBox.appendChild(field(label, modelSelects[key], hint))
-  }
-
-  const loadModels = guard(async (refresh = false) => {
-    const r = await api.openrouterModels(refresh)
-    if (r.error) { toast.error(r.error); return }
-    allModels = r.models || []
-    fillSelects()
-    toast.info(`${allModels.length} Modelle geladen${r.cached ? ' (zwischengespeichert)' : ''}`)
-  })
-  filterFree.addEventListener('change', fillSelects)
-
-  // Beim Aufbau einmal ohne Meldung laden
-  try {
-    const r = await api.openrouterModels(false)
-    allModels = r.models || []
-  } catch { /* egal */ }
-  fillSelects()
-
-  const budget = h('input', { type: 'number', step: '1', value: integrations.openrouter_monthly_budget_usd })
-
-  const save = guard(async () => {
-    const payload = { openrouter_monthly_budget_usd: Number(budget.value) }
-    if (keyInput.value.trim()) payload.openrouter_api_key = keyInput.value.trim()
-    for (const [key] of MODEL_TASKS) payload[key] = modelSelects[key].value
-    const updated = await api.saveIntegrations(payload)
-    Object.assign(integrations, updated)
-    keyInput.value = ''
-    keyInput.placeholder = '•••••••• (gespeichert)'
-    toast.ok('OpenRouter gespeichert')
-    paintStatus(true, 'Gespeichert. Mit „Verbindung testen" prüfen, ob alles passt.')
-  })
-
-  const test = guard(async () => {
-    const r = await api.openrouterTest(modelSelects.openrouter_model_text.value)
-    paintStatus(r.ok, r.message)
-    r.ok ? toast.ok(r.message) : toast.error(r.message)
-  })
-
-  return card('OpenRouter verbinden',
-    status,
-    h('div', { style: { height: '10px' } }),
-    field('API-Schlüssel', keyInput,
-      'Zu finden unter openrouter.ai → Keys. Wird verschlüsselt gespeichert und nie wieder angezeigt.'),
-    h('div', { class: 'row', style: { marginBottom: '12px' } },
-      h('button', { class: 'primary', onClick: save }, 'Speichern'),
-      h('button', { onClick: test }, 'Verbindung testen'),
-      h('button', { onClick: () => loadModels(true) }, 'Modellliste aktualisieren'),
-      integrations.openrouter_api_key_set
-        ? h('button', { class: 'danger', onClick: guard(async () => {
-            if (!(await confirmDialog('Schlüssel entfernen', 'API-Schlüssel wirklich löschen?', { okLabel: 'Löschen', danger: true }))) return
-            await api.clearSecret('openrouter_api_key')
-            toast.ok('Schlüssel entfernt'); location.reload()
-          }) }, 'Schlüssel entfernen')
-        : null,
-    ),
-    h('label', { class: 'inline', style: { marginBottom: '10px' } }, filterFree, 'Nur kostenlose Modelle anzeigen'),
-    modelBox,
-    field('Monatsbudget (USD)', budget, 'Ist es aufgebraucht, stoppt die Textgenerierung automatisch.'),
-  )
-}
-
-// --------------------------------------------------------------------------- //
-async function connectionCard(channels) {
+export async function connectionCard(channels) {
   const results = h('div', { class: 'col' })
 
   /** Eine Zeile je Kanal. Jede Zeile hält ihren eigenen Container, damit ein
@@ -274,7 +112,7 @@ async function connectionCard(channels) {
       btn,
     ))
     container.appendChild(h('div', { class: 'hint', style: { fontSize: '11px', marginTop: '4px' } },
-      channel.platform === 'telegram' ? 'Eigener Telegram-Publikationsbot' : channel.platform === 'fanvue' ? 'Gemeinsame Verbindung · AutoChat' : channel.uses_own_app
+      channel.platform === 'telegram' ? 'Eigener Telegram-Publikationsbot' : channel.platform === 'fanvue' ? 'Verbindung dieses Charakters · AutoChat' : channel.uses_own_app
         ? 'eigene App' + (channel.oauth_app_name ? ` „${channel.oauth_app_name}"` : '')
         : 'globale App',
       channel.oauth_client_id ? ` · ${channel.oauth_client_id.slice(0, 14)}…` : '',
@@ -335,7 +173,7 @@ async function connectionCard(channels) {
  * der konkreten Zahl im Rückfragedialog bestätigen. Veröffentlichte Posts sind
  * ausgenommen – sie sind die Grundlage der Verbrauchsrechnung.
  */
-function plannedPostsCard() {
+export function plannedPostsCard() {
   const onlyFuture = h('input', { type: 'checkbox' })
   const info = h('div', { class: 'col', style: { gap: '6px' } })
 
@@ -391,8 +229,7 @@ function plannedPostsCard() {
   )
 }
 
-function platformDefaultsCard(integrations) {
-  const baseUrl = h('input', { type: 'url', value: integrations.public_base_url || '' })
+export function platformDefaultsCard(integrations) {
   const fanvueVersion = h('code', {}, integrations.fanvue_api_version || '—')
   const xTier = h('select', {}, ...['free', 'basic', 'pro'].map((t) =>
     h('option', { value: t, selected: t === integrations.x_api_tier }, t)))
@@ -400,26 +237,19 @@ function platformDefaultsCard(integrations) {
   const save = guard(async () => {
     const updated = await api.saveIntegrations({
       x_api_tier: xTier.value,
-      public_base_url: baseUrl.value.trim(),
     })
     Object.assign(integrations, updated)
+    window.CreatorStudioLive?.saved(xTier)
     toast.ok('Gespeichert')
   })
 
   return card('Plattform-Vorgaben',
     h('div', { class: 'okbox', style: { marginBottom: '12px' } },
-      'Fanvue verwendet automatisch die gemeinsame Verbindung von MP CreatorStudio. ' +
+      'Fanvue verwendet das verbundene Konto dieses Charakters für AutoChat und AutoPost. ' +
       'Nur X benötigt weiterhin eigene Zugangsdaten pro Kanal.'),
     h('div', { class: 'grid c2' },
-      h('div', {}, h('div', { class: 'hint' }, 'Fanvue · gemeinsame Verbindung'), fanvueVersion, h('p', {}, h('a', { href: '/settings/shared#fanvue' }, 'Gemeinsame Fanvue-Verbindung →'))),
+      h('div', {}, h('div', { class: 'hint' }, 'Fanvue · Konto dieses Charakters'), fanvueVersion, h('p', {}, h('a', { href: '/settings/shared?section=channels&view=accounts#fanvue' }, 'Fanvue-Konto verwalten →'))),
       field('X API-Tarif', xTier, 'Steuert das voreingestellte Tageskontingent neuer Kanäle.'),
-    ),
-    h('details', { style: { marginBottom: '12px' } },
-      h('summary', {}, 'Erweitert: Standardadresse für Verbindungen'),
-      field('Öffentliche Basis-URL', baseUrl,
-        'Rückfalladresse für Kanäle ohne eigene Callback-Adresse. Eine unter Kanäle eingetragene ' +
-        'Callback-Adresse hat Vorrang. Fanvue verwendet die gemeinsame Verbindung. ' +
-        'Diese Adresse beeinflusst die Planung nicht.'),
     ),
     h('div', { class: 'row' },
       h('button', { class: 'primary', onClick: save }, 'Speichern'),
@@ -458,6 +288,7 @@ function planningCard(integrations, channels) {
       } finally {
         toggle.checked = channel.auto_plan_enabled !== false
         toggle.disabled = false
+        window.CreatorStudioLive?.saved(toggle)
       }
     }))
     return h('label', { class: 'inline', style: { padding: '10px 0', alignItems: 'center' } }, toggle,
@@ -475,6 +306,7 @@ function planningCard(integrations, channels) {
       auto_plan_days: Number(autoDays.value) || 14,
     })
     Object.assign(integrations, updated)
+    for(const control of [gap,warn,autoPlan,autoDays])window.CreatorStudioLive?.saved(control)
     toast.ok('Gespeichert')
   })
 
@@ -533,4 +365,58 @@ async function imageCommentCard() {
     }) }, 'Kommentar speichern'),
   )
   return box
+}
+
+export async function runtimeCard() {
+  const settings = await api.settings()
+  const dryBtn = h('button', {})
+  const pauseBtn = h('button', {})
+  const paint = () => {
+    clear(dryBtn).appendChild(document.createTextNode('Trockenlauf ' + (settings.dry_run ? 'AN' : 'AUS')))
+    dryBtn.className = settings.dry_run ? 'primary' : ''
+    clear(pauseBtn).appendChild(document.createTextNode('⛔ Notfall-Stopp ' + (settings.global_pause ? 'AKTIV' : 'aus')))
+    pauseBtn.className = settings.global_pause ? 'danger' : ''
+  }
+  paint()
+  dryBtn.addEventListener('click', guard(async () => {
+    Object.assign(settings, await api.setRuntime({ dry_run: !settings.dry_run })); paint()
+    toast.ok(settings.dry_run ? 'Trockenlauf aktiv – es wird nichts gesendet' : 'Trockenlauf aus – Posts gehen wirklich raus')
+  }))
+  pauseBtn.addEventListener('click', guard(async () => {
+    Object.assign(settings, await api.setRuntime({ global_pause: !settings.global_pause })); paint()
+  }))
+
+  return card('Veröffentlichung',
+    h('div', { class: 'col' },
+      h('div', { class: 'row' }, dryBtn, h('span', { class: 'hint' },
+        'Im Trockenlauf wird alles verarbeitet, aber nichts an X oder Fanvue gesendet.')),
+      h('div', { class: 'row' }, pauseBtn, h('span', { class: 'hint' },
+        'Stoppt sofort jede Veröffentlichung und jede automatische Planung.')),
+    ),
+  )
+
+}
+
+export async function libraryCleanupCard() {
+  const report = await api.maintenanceReport()
+  const stats = [
+    ['Nicht zugeordnet', report.unassigned],
+    ['Ohne Tags', report.untagged],
+    ['Archiv-Kandidaten', report.archive_candidates],
+    ['Fehlerhaft', report.failed_assets],
+    ['Verwaiste Set-Einträge', report.orphan_set_items],
+    ['Fast identische Paare', (report.near_duplicates || []).length],
+  ]
+  return card('Bibliothek aufräumen',
+    h('div', { class: 'grid c3' }, ...stats.map(([label, value]) =>
+      h('div', { class: 'card pad' }, h('div', { class: 'hint' }, label), h('div', { class: 'big num' }, value)))),
+    h('div', { class: 'row', style: { marginTop: '12px' } },
+      h('button', { onClick: guard(async () => {
+        const r = await api.archiveUsed(30); toast.ok(`${r.archived} Bilder archiviert`); location.reload()
+      }) }, 'Verbrauchte (>30 Tage) archivieren'),
+      h('button', { onClick: guard(async () => {
+        const r = await api.rebuildCounters(); toast.ok(`${r.refreshed} Zähler neu berechnet`); location.reload()
+      }) }, 'Zähler neu berechnen'),
+    ),
+  )
 }

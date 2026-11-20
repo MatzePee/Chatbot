@@ -12,7 +12,7 @@ import threading
 import time
 from typing import Any, Optional
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+DATA_DIR = os.environ.get('MP_AUTOCHAT_DATA_DIR') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 DB_PATH = os.path.join(DATA_DIR, "bot.db")
 
 _lock = threading.RLock()
@@ -23,13 +23,62 @@ def _connect() -> sqlite3.Connection:
     os.makedirs(DATA_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA foreign_keys=ON;")
-    return conn
+    from .sqlite_layout import configure
+    try:
+        configure(conn.cursor())
+        conn.execute("PRAGMA foreign_keys=ON;")
+        return conn
+    except BaseException:
+        conn.close()
+        raise
+
+
+_character_connections: dict[tuple[str, str], sqlite3.Connection] = {}
+
+
+def _character_owner():
+    from autoposter.workspaces import current_character
+    return current_character()
 
 
 def get_conn() -> sqlite3.Connection:
     global _conn
+    owner = _character_owner()
+    if owner is None and os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+        from autoposter.workspaces import is_control_context, CharacterBoundaryError
+        if not is_control_context():
+            raise CharacterBoundaryError('Character context required for AutoChat database access')
+    if owner is not None:
+        # Storage-level ownership also scopes raw SQL used by memory and PPV.
+        # The absolute root is part of the cache key (tests / restore / profiles).
+        root = os.path.abspath(DATA_DIR)
+        key = (root, str(owner))
+        with _lock:
+            if key not in _character_connections:
+                directory = os.path.join(root, 'characters', str(owner))
+                os.makedirs(directory, mode=0o700, exist_ok=True)
+                path = os.path.join(directory, 'bot.db')
+                conn = sqlite3.connect(path, check_same_thread=False)
+                os.chmod(path, 0o600)
+                conn.row_factory = sqlite3.Row
+                from .sqlite_layout import configure
+                try:
+                    configure(conn.cursor())
+                except BaseException:
+                    conn.close()
+                    raise
+                conn.execute('PRAGMA foreign_keys=ON')
+                conn.execute('CREATE TABLE IF NOT EXISTS workspace_owner (id TEXT PRIMARY KEY)')
+                rows = conn.execute('SELECT id FROM workspace_owner').fetchall()
+                if rows and (len(rows) != 1 or rows[0]['id'] != str(owner)):
+                    conn.close()
+                    raise ValueError('AutoChat database ownership mismatch')
+                if not rows:
+                    conn.execute('INSERT INTO workspace_owner(id) VALUES (?)', (str(owner),))
+                    conn.commit()
+                _character_connections[key] = conn
+                init_db()
+            return _character_connections[key]
     if _conn is None:
         _conn = _connect()
     return _conn
@@ -670,7 +719,8 @@ def init_db() -> None:
                     (key, json.dumps(value)),
                 )
         conn.commit()
-        _seed_from_env()
+        if _character_owner() is None:
+            _seed_from_env()
 
 
 def _seed_from_env() -> None:
@@ -689,20 +739,85 @@ def _seed_from_env() -> None:
 
 
 # ---------------------------------------------------------------- Settings API
+# Only these narrow helpers may access the canonical installation settings from
+# inside a character request. Never use this connection for tokens/chat content.
+def _technical_settings_conn():
+    global _conn
+    if _conn is None:
+        _conn = _connect()
+    from .technical_store import initialize
+    initialize(_conn)
+    return _conn
+
+
+def _settings_conn(key):
+    from .setting_scope import is_global_technical
+    return _technical_settings_conn() if is_global_technical(key) else get_conn()
+
+
+def technical_setting(key):
+    """Presence is separate from value: an explicit clear must suppress fallback."""
+    from .setting_scope import is_global_technical
+    if not is_global_technical(key):
+        raise ValueError('Not an installation-technical setting')
+    with _lock:
+        conn = _technical_settings_conn()
+        row = conn.execute('SELECT value FROM settings WHERE key=?', (key,)).fetchone()
+        cleared = conn.execute('SELECT value FROM settings WHERE key=?',
+                               ('__technical_cleared__:' + key,)).fetchone()
+    if not row:
+        return False, None
+    from .setting_scope import decode_technical_value
+    value = decode_technical_value(key, json.loads(row['value']))
+    # Old databases seed blank secret defaults. They must not mask a preserved
+    # AutoPost technical value, whereas a deliberate removal must mask it.
+    present = value not in (None, '') or bool(cleared and json.loads(cleared['value']))
+    return present, value
+
+
+def set_technical_settings(values, *, audit=None):
+    """One locked SQLite transaction for a global infrastructure save payload."""
+    from .setting_scope import is_global_technical
+    if not all(is_global_technical(key) for key in values):
+        raise ValueError('Not an installation-technical setting')
+    from .setting_scope import encode_technical_value
+    rows = [(key, json.dumps(encode_technical_value(key, value))) for key, value in values.items()]
+    with _lock:
+        conn = _technical_settings_conn()
+        with conn:
+            conn.executemany('INSERT INTO settings(key,value) VALUES(?,?) '
+                             'ON CONFLICT(key) DO UPDATE SET value=excluded.value', rows)
+            for key, value in values.items():
+                marker = '__technical_cleared__:' + key
+                if value in (None, ''):
+                    conn.execute('INSERT INTO settings(key,value) VALUES(?,?) '
+                                 'ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+                                 (marker, 'true'))
+                else:
+                    conn.execute('DELETE FROM settings WHERE key=?', (marker,))
+            if audit is not None:
+                _insert_log(conn, *audit)
+
+
 def get_setting(key: str, default: Any = None) -> Any:
     with _lock:
-        row = get_conn().execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        row = _settings_conn(key).execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
     if row is None:
         return DEFAULT_SETTINGS.get(key, default)
     try:
-        return json.loads(row["value"])
+        from .setting_scope import decode_technical_value
+        return decode_technical_value(key, json.loads(row["value"]))
     except (json.JSONDecodeError, TypeError):
         return default
 
 
 def set_setting(key: str, value: Any) -> None:
+    from .setting_scope import is_global_technical
+    if is_global_technical(key):
+        set_technical_settings({key: value})
+        return
     with _lock:
-        conn = get_conn()
+        conn = _settings_conn(key)
         conn.execute(
             "INSERT INTO settings(key, value) VALUES(?, ?) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -716,10 +831,19 @@ def all_settings() -> dict[str, Any]:
         rows = get_conn().execute("SELECT key, value FROM settings").fetchall()
     result = dict(DEFAULT_SETTINGS)
     for row in rows:
+        if row['key'].startswith('__technical_cleared__:'):
+            continue
         try:
             result[row["key"]] = json.loads(row["value"])
         except (json.JSONDecodeError, TypeError):
             pass
+    from .setting_scope import GLOBAL_TECHNICAL_KEYS
+    for key in GLOBAL_TECHNICAL_KEYS:
+        present, value = technical_setting(key)
+        if present:
+            result[key] = value
+        elif key in result:
+            result[key] = get_setting(key, DEFAULT_SETTINGS.get(key))
     return result
 
 
@@ -972,8 +1096,8 @@ def finish_auto_claim(draft_id: int) -> None:
     with _lock:
         conn = get_conn()
         conn.execute(
-            "UPDATE drafts SET auto_send = 0 WHERE id = ? AND status = 'pending' "
-            "AND auto_send = 2", (draft_id,)
+            "UPDATE drafts SET auto_send = 0, status = 'pending' WHERE id = ? "
+            "AND status IN ('pending', 'approved') AND auto_send = 2", (draft_id,)
         )
         conn.commit()
 
@@ -1126,7 +1250,23 @@ def count_drafts(status: str) -> int:
 
 
 # -------------------------------------------------------------------- Log API
+def _insert_log(conn, level, category, message, detail=''):
+    conn.execute('INSERT INTO logs(ts,level,category,message,detail) VALUES(?,?,?,?,?)',
+                 (time.time(), level, category, message, detail))
+
+
+def log_global(level: str, category: str, message: str, detail: str = '') -> None:
+    """Installation audit only; never falls back to a character content store."""
+    with _lock:
+        conn = _technical_settings_conn()
+        with conn:
+            _insert_log(conn, level, category, message, detail)
+
+
 def log(level: str, category: str, message: str, detail: str = "") -> None:
+    from autoposter.workspaces import is_control_context
+    if is_control_context() and _character_owner() is None:
+        return log_global(level, category, message, detail)
     with _lock:
         conn = get_conn()
         conn.execute(

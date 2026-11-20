@@ -204,7 +204,9 @@ async def _search_similar(
 # Zähler
 # --------------------------------------------------------------------------- #
 async def lifecycle_counts(db: AsyncSession, use_cache: bool = True) -> LifecycleCounts:
-    key = "global"
+    from autoposter.workspaces import current_character
+    owner = current_character()
+    key = f'character:{owner}' if owner is not None else 'global'
     if use_cache and key in _counts_cache:
         stamp, cached = _counts_cache[key]
         if time.time() - stamp < COUNTS_TTL_SECONDS:

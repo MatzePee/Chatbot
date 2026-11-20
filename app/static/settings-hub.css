@@ -129,3 +129,38 @@
   #modals .modal-bg { padding:12px; }
   #modals .modal { padding:16px; }
 }
+
+/* Keep native file controls and settings navigation inside narrow viewports. */
+.settings-hub, .settings-content, .settings-tabs { min-width:0; max-width:100%; }
+.settings-hub .character-image-field { width:100%; min-width:0; box-sizing:border-box; }
+.settings-hub .character-image-field > label { min-width:0; max-width:100%; }
+.settings-hub input[type=file] { display:block; width:100%; min-width:0; max-width:100%; box-sizing:border-box; overflow:hidden; }
+@media (max-width:600px) {
+  .settings-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .settings-tabs a { min-width:0; padding:10px 8px; overflow-wrap:normal; }
+  .settings-hub .character-edit-row > label { flex-basis:100%; }
+  .settings-hub .character-image-field > label { flex-basis:100%; }
+  .settings-hub .character-image-field > [role=status] { min-width:0; overflow-wrap:anywhere; }
+}
+
+/* Settings use one grouped sidebar and one clear scope per page. */
+.settings-scope{display:inline-flex;align-items:center;padding:7px 11px;background:#eaf3ff;border-radius:8px;color:#27649d;font-size:13px;margin:0}
+.settings-subsection{margin:24px 0 30px;min-width:0}
+.settings-subsection>h2,.settings-post-style>h2{font-size:19px;font-weight:650;margin:0 0 14px;color:#253047}
+.settings-hub [hidden]{display:none!important}
+.settings-hub .settings-content>.page>h1{display:none}
+.settings-hub .sect-tools{display:flex;gap:8px;flex-wrap:wrap;font-size:13px;margin:18px 0}
+.settings-hub [data-chat-form]>button{position:sticky;bottom:12px;box-shadow:0 4px 20px #182b4522;z-index:2}
+.settings-post-style{margin-top:32px;min-width:0}
+.settings-post-style .persona-list{flex-basis:180px;width:180px}
+.settings-hub #system-overview table{table-layout:fixed}
+.settings-hub #system-overview td{overflow-wrap:anywhere;padding:8px}
+.settings-hub .settings-content>h1{display:none}
+.settings-hub .settings-content>[role=status]{margin:14px 0}
+html:has(.settings-hub){overflow-x:hidden}
+.workspace-scroll:has(.settings-hub){overflow-x:hidden;overflow-y:auto;overscroll-behavior-x:none;touch-action:pan-y pinch-zoom}
+@media(max-width:760px){
+  .settings-post-style .persona-list{width:100%;flex-basis:auto}
+  .settings-hub .character-edit-row>label{flex-basis:100%}
+  .settings-hub [data-chat-form]>button{width:100%}
+}

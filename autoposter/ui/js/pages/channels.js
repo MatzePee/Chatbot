@@ -1,3 +1,4 @@
+import { platformDefaultsCard, connectionCard } from './settings.js?v=settings-reorg-1'
 import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
 import { watermarkEditor } from '../watermark.js?v=creatorstudio-mobile-system-20260909'
 import { h, clear, empty, field, modal, toast, guard, fmtDateTime } from '../ui.js?v=creatorstudio-mobile-system-20260909'
@@ -48,7 +49,10 @@ export default async function renderChannels() {
   let [channels, personas] = await Promise.all([api.channels(), api.personas()])
   const list = h('div', { class: 'grid c3' })
 
-  const reload = () => { location.href = '/settings/shared?section=channels' }
+  const reload = () => {
+    const target = '/settings/shared?section=channels'
+    location.href = window.CreatorStudioCharacters?.url(target) || target
+  }
 
   function draw() {
     clear(list)
@@ -95,7 +99,7 @@ export default async function renderChannels() {
           (c.platform === 'fanvue' && c.platform_side_scheduling ? ' · plattformseitige Planung' : '')),
         h('div', { class: 'row' },
           c.platform === 'fanvue'
-            ? h('a', { class: 'btn small', href: '/settings/shared#fanvue' }, 'Gemeinsame Verbindung')
+            ? h('a', { class: 'btn small', href: '/settings/shared?section=autochat#fanvue' }, 'Gemeinsame Verbindung')
             : c.platform === 'telegram'
             ? h('button', {class:'small', onClick: () => openTelegram(c)}, 'Bot-Zugang')
             : c.is_connected
@@ -187,6 +191,7 @@ export default async function renderChannels() {
         placeholder: channel.has_client_secret ? '•••••••• (gespeichert)' : '',
       })
       const appName = h('input', { value: channel.oauth_app_name || '', placeholder: 'z. B. „Sally Haupt-App"' })
+      const clearSecret = h('input', { type: 'checkbox' })
       const callback = callbackEditor(channel)
 
       return h('div', {},
@@ -199,13 +204,15 @@ export default async function renderChannels() {
               'Leer lassen, um die globale App aus den Einstellungen zu verwenden.'),
         field('Name der App (nur zur Orientierung)', appName),
         field('Client-ID', clientId, 'Leer = globale App aus den Einstellungen verwenden'),
-        field('Client-Secret', secret, 'Wird verschlüsselt gespeichert.'),
+        field('Client-Secret', secret, 'Wird verschlüsselt gespeichert. Leer/maskiert = unverändert.'),
+        h('label', { class: 'chk' }, clearSecret, 'Gespeichertes Client-Secret entfernen'),
         callback.node,
         h('div', { class: 'row' },
           h('button', { class: 'primary', onClick: guard(async () => {
             await api.updateChannel(channel.id, {
               oauth_client_id: clientId.value.trim(),
               oauth_client_secret: secret.value.trim() || null,
+              oauth_clear_client_secret: clearSecret.checked,
               oauth_app_name: appName.value.trim(),
               ...callback.values(),
             })
@@ -428,7 +435,7 @@ export default async function renderChannels() {
           field('Farbe im Kalender', color),
           field('Persona', personaSel),
         ),
-        channel.platform === 'telegram' ? h('div',{class:'hint'},'Telegram: eigener Zeitplan, eigene Persona, eigene Medienzuordnung. Text 4096 / Caption 1024 Zeichen; Album 2–10 Medien. JPEG/PNG und H.264/AAC-MP4; keine automatischen Wiederholungen bei Telegram. Bot-Zugang separat verwalten.') : callback ? callback.node : h('div', { class: 'okbox' }, 'Fanvue verwendet die gemeinsame Verbindung. ', h('a', { href: '/settings/shared#fanvue' }, 'Callback-Adresse in den gemeinsamen Einstellungen ändern.')),
+        channel.platform === 'telegram' ? h('div',{class:'hint'},'Telegram: eigener Zeitplan, eigene Persona, eigene Medienzuordnung. Text 4096 / Caption 1024 Zeichen; Album 2–10 Medien. JPEG/PNG und H.264/AAC-MP4; keine automatischen Wiederholungen bei Telegram. Bot-Zugang separat verwalten.') : callback ? callback.node : h('div', { class: 'okbox' }, 'Fanvue verwendet die gemeinsame Verbindung. ', h('a', { href: '/settings/shared?section=autochat#fanvue' }, 'Callback-Adresse in den gemeinsamen Einstellungen ändern.')),
         h('div', { class: 'grid c3' },
           numField('posts_per_day', 'Posts pro Tag', null, '0.5'),
           numField('min_gap_minutes', 'Mindestabstand (Min.)'),
@@ -533,7 +540,7 @@ export default async function renderChannels() {
       h('h1', {}, 'Kanäle'),
       h('div', { class: 'spacer' }),
       h('button', { class: 'primary', onClick: openCreate }, 'Kanal anlegen'),
-      h('a', { class: 'btn', href: '/settings/shared#fanvue' }, 'Fanvue-Verbindung'),
+      h('a', { class: 'btn', href: '/settings/shared?section=autochat#fanvue' }, 'Fanvue-Verbindung'),
     ),
     list,
   )
@@ -543,6 +550,9 @@ export default async function renderChannels() {
     ;[channels, personas] = data
     draw()
   }
+  const integrations = await api.integrations()
+  livePage.appendChild(platformDefaultsCard(integrations))
+  livePage.appendChild(await connectionCard(channels))
   return livePage
 
 }

@@ -35,9 +35,44 @@ class DuplicateUpload(Exception):
 
 
 def media_root() -> Path:
-    root = Path(settings.media_root)
+    from app.character_state import state_owner
+    from autoposter.workspaces import CharacterBoundaryError
+    base = Path(settings.media_root).resolve()
+    owner = state_owner()
+    root = base
+    if owner is not None:
+        namespace = base / 'characters'
+        root = namespace / str(owner)
+        if namespace.is_symlink() or root.is_symlink():
+            raise CharacterBoundaryError('Character media namespace must not be a symlink')
     root.mkdir(parents=True, exist_ok=True)
     return root
+
+
+def resolve_media_path(relative: str | Path) -> Path:
+    """Single containment boundary for HTTP files, provider uploads and thumbnails."""
+    from autoposter.workspaces import CharacterBoundaryError
+    root = media_root()
+    candidate = Path(relative)
+    if candidate.is_absolute() or '..' in candidate.parts:
+        raise CharacterBoundaryError('Media path is outside the character workspace')
+    resolved = (root / candidate).resolve()
+    if not resolved.is_relative_to(root):
+        raise CharacterBoundaryError('Media symlink is outside the character workspace')
+    return resolved
+
+
+def _assert_asset_owner(asset: MediaAsset) -> None:
+    from app.character_state import state_owner
+    from autoposter.workspaces import CharacterBoundaryError
+    owner = state_owner()
+    if owner is not None and asset.character_id != owner:
+        raise CharacterBoundaryError('Media does not belong to this character')
+
+
+def original_path(asset: MediaAsset) -> Path:
+    _assert_asset_owner(asset)
+    return resolve_media_path(asset.storage_path)
 
 
 def asset_dir(asset_id: uuid.UUID) -> Path:
@@ -242,16 +277,24 @@ async def ingest(
 
 
 def read_bytes(asset: MediaAsset) -> bytes:
-    return (media_root() / asset.storage_path).read_bytes()
+    return original_path(asset).read_bytes()
 
 
 def thumb_path(asset: MediaAsset, size: int = 256) -> Optional[Path]:
-    candidate = asset_dir(asset.id) / f"thumb_{size}.jpg"
-    return candidate if candidate.exists() else None
+    _assert_asset_owner(asset)
+    directory = asset_dir(asset.id)
+    candidate = resolve_media_path((directory / f"thumb_{int(size)}.jpg").relative_to(media_root()))
+    return candidate if candidate.is_file() else None
 
 
 def public_urls(asset: MediaAsset) -> Tuple[str, str]:
     base = f"/api/v1/media/{asset.id}"
+    from autoposter.workspaces import current_character
+    owner = current_character()
+    if owner is not None:
+        if asset.character_id != owner:
+            raise ValueError('Media does not belong to this character')
+        return f"{base}/thumb?size=256&character_id={owner}", f"{base}/file?character_id={owner}"
     return f"{base}/thumb?size=256", f"{base}/file"
 
 

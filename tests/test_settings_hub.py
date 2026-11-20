@@ -52,12 +52,14 @@ def test_manifest_controls_actions_are_all_preserved(client):
         # Source-level inventory covers both connected/disconnected and
         # unavailable/live list branches, not just one synthetic render.
         parser.feed((ROOT / manifest[section]['source']).read_text())
-        for original in manifest[section]['controls_actions']:
-            assert original in parser.items, original
         from collections import Counter
-        old_counts = Counter(json.dumps(row, sort_keys=True) for row in manifest[section]['controls_actions'])
-        new_counts = Counter(json.dumps(row, sort_keys=True) for row in parser.items)
-        assert not (old_counts - new_counts), 'No duplicate or anonymous control/action may disappear'
+        mapped = {}
+        for row in manifest[section]['mapping']:
+            dest = row['new']['source']
+            if dest not in mapped:
+                parsed = Controls(); parsed.feed((ROOT/dest).read_text()); mapped[dest] = parsed.items
+            assert row['new']['identity'] in mapped[dest], row
+        assert Counter(json.dumps(row['old'],sort_keys=True) for row in manifest[section]['mapping']) == Counter(json.dumps(row,sort_keys=True) for row in manifest[section]['controls_actions'])
         class Options(HTMLParser):
             def __init__(self):
                 super().__init__()
@@ -66,7 +68,7 @@ def test_manifest_controls_actions_are_all_preserved(client):
                 if tag == 'option':
                     self.items.append(dict(attrs))
         options = Options()
-        options.feed((ROOT / manifest[section]['source']).read_text())
+        options.feed(''.join((ROOT/f).read_text() for f in manifest['relocated_sources']))
         # HTMLParser versions tokenize Jinja conditionals differently. Compare
         # actual option values and multiplicity, not template syntax as HTML attrs.
         expected_options = Counter(row.get('value') for row in manifest[section]['original_select_options'])
@@ -76,7 +78,7 @@ def test_manifest_controls_actions_are_all_preserved(client):
     assert hashlib.sha256(source.read_bytes()).hexdigest() == manifest['autopost']['source_sha256']
 
 
-@pytest.mark.parametrize('route,key', [('/settings/shared/fanvue','fanvue_client_secret'), ('/settings/shared/telegram','telegram_bot_token'), ('/settings','openrouter_api_key'), ('/settings','vision_api_key')])
+@pytest.mark.parametrize('route,key', [('/settings/shared/fanvue','fanvue_client_secret'), ('/settings/shared/telegram','telegram_bot_token'), ('/settings/shared/ai','openrouter_api_key'), ('/settings/shared/ai','vision_api_key')])
 def test_blank_secret_preserves_existing_value(client, route, key):
     db.set_setting(key, 'synthetic-existing-secret')
     assert client.post(route, data={key: ''}, follow_redirects=False).status_code == 303
@@ -84,7 +86,7 @@ def test_blank_secret_preserves_existing_value(client, route, key):
 
 
 @pytest.mark.parametrize('mask', ['********', '••••••••'])
-@pytest.mark.parametrize('route,key', [('/settings/shared/fanvue','fanvue_client_secret'), ('/settings/shared/telegram','telegram_bot_token'), ('/settings','openrouter_api_key'), ('/settings','vision_api_key')])
+@pytest.mark.parametrize('route,key', [('/settings/shared/fanvue','fanvue_client_secret'), ('/settings/shared/telegram','telegram_bot_token'), ('/settings/shared/ai','openrouter_api_key'), ('/settings/shared/ai','vision_api_key')])
 def test_masked_secret_preserves_existing_value(client, route, key, mask):
     db.set_setting(key, 'synthetic-existing-secret')
     assert client.post(route, data={key: mask}, follow_redirects=False).status_code == 303
@@ -160,10 +162,10 @@ def test_autopost_module_is_real_javascript_with_preserved_mount(client):
         assert 'javascript' in response.headers['content-type']
 
 
-@pytest.mark.parametrize('route,key', [('/settings/shared/fanvue','fanvue_client_secret'), ('/settings/shared/telegram','telegram_bot_token'), ('/settings','openrouter_api_key'), ('/settings','vision_api_key')])
+@pytest.mark.parametrize('route,key', [('/settings/shared/fanvue','fanvue_client_secret'), ('/settings/shared/telegram','telegram_bot_token'), ('/settings/shared/ai','openrouter_api_key'), ('/settings/shared/ai','vision_api_key')])
 def test_secret_removal_requires_explicit_control(client, route, key):
     db.set_setting(key, 'synthetic-existing-secret')
-    html = client.get('/settings' if route == '/settings' else '/settings/shared').text
+    html = client.get('/settings/shared?section=autochat' if key == 'fanvue_client_secret' else '/settings/shared').text
     assert f'name="clear_{key}"' in html
     response = client.post(route, data={f'clear_{key}': 'on'}, follow_redirects=False)
     assert response.status_code == 303

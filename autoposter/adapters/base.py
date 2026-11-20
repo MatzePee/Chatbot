@@ -24,6 +24,10 @@ class AdapterError(RuntimeError):
         self.needs_reauth = needs_reauth
 
 
+class ExternalActionBlocked(AdapterError):
+    """No provider request was sent: a fresh local safety gate rejected it."""
+
+
 class ValidationIssue(Exception):
     pass
 
@@ -216,8 +220,27 @@ async def backoff_sleep(attempt: int, base: float = 1.5) -> None:
     await asyncio.sleep(delay)
 
 
+async def guard_external_request(request: httpx.Request) -> None:
+    if request.method in {'GET', 'HEAD', 'OPTIONS'}:
+        return
+    # Authentication/setup is not publication. Enumerate exact destinations;
+    # never bypass the stop for arbitrary POSTs merely containing 'get'/'token'.
+    from autoposter.config import settings
+    if request.method == 'POST':
+        if str(request.url) in {settings.x_oauth_token_url, settings.fanvue_oauth_token_url}:
+            return
+        segments = request.url.path.split('/')
+        if (request.url.scheme == 'https' and request.url.host == 'api.telegram.org'
+                and len(segments) == 3 and segments[1].startswith('bot')
+                and segments[2] in {'getMe', 'getChat', 'getChatMember', 'getChatMemberCount'}):
+            return
+    from autoposter.services.runtime import assert_external_write_allowed
+    await assert_external_write_allowed()
+
+
 def http_client(timeout: float = 60.0) -> httpx.AsyncClient:
     return httpx.AsyncClient(
+        event_hooks={'request': [guard_external_request]},
         timeout=httpx.Timeout(timeout, connect=15.0),
         follow_redirects=False,
         headers={"User-Agent": "MP-CreatorStudio-AutoPost/1.0"},

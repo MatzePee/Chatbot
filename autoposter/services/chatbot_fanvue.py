@@ -25,6 +25,10 @@ def oauth_app():
 
 
 def account_matches(channel):
+    from autoposter.workspaces import current_character
+    owner = current_character()
+    if owner is not None and getattr(channel, 'character_id', None) != owner:
+        return False
     tokens = chatbot_db.get_tokens()
     bound = getattr(channel, 'fanvue_account_uuid', '') or ''
     if bound:

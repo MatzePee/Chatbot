@@ -19,15 +19,8 @@ MODES = {None: 'all', 180: '180', 30: '30'}
 
 
 async def _locked_state(db):
-    # SQLite's no-op UPDATE takes the writer lock; PostgreSQL uses FOR UPDATE.
-    if db.bind.dialect.name == 'sqlite':
-        from sqlalchemy.dialects.sqlite import insert
-    else:
-        from sqlalchemy.dialects.postgresql import insert
-    await db.execute(insert(AppSetting).values(key=COLLECTION_KEY, value={}).on_conflict_do_nothing(index_elements=['key']))
-    await db.execute(update(AppSetting).where(AppSetting.key == COLLECTION_KEY).values(key=COLLECTION_KEY))
-    row = (await db.execute(select(AppSetting).where(AppSetting.key == COLLECTION_KEY)
-                            .with_for_update().execution_options(populate_existing=True))).scalar_one()
+    from autoposter.services.owned_settings import locked_setting
+    row = await locked_setting(db, COLLECTION_KEY)
     return row, dict(row.value or {})
 
 
@@ -91,7 +84,9 @@ async def collect(db, days, token, now=None):
             cred = credentials.to_credentials(credrow)
             await db.commit()
             info = await adapter.verify(oauthapp.for_channel(channel), cred)
-            if not info.ok or not x_account_matches(channel, info.username):
+            if (not info.ok or not x_account_matches(channel, info.username)
+                    or not cred.external_user_id or not info.account_id
+                    or str(info.account_id) != str(cred.external_user_id)):
                 raise ValueError('account mismatch')
             cred.external_user_id = info.account_id
             by_external = {}

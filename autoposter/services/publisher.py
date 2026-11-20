@@ -10,7 +10,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autoposter.adapters import AdapterError, MediaRef, get_adapter
-from autoposter.config import settings
+from autoposter.services.runtime import runtime as settings
 from autoposter.models import (
     Channel,
     ChannelHealth,

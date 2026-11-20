@@ -1,3 +1,4 @@
+import { libraryCleanupCard } from './settings.js?v=settings-structure-20261120-2'
 import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
 import { openUploadDialog } from '../upload.js?v=creatorstudio-mobile-system-20260909'
 import { openCreateSetDialog, openSetDialog } from '../sets.js?v=creatorstudio-mobile-system-20260909'
@@ -594,6 +595,15 @@ export default async function renderLibrary({ query }) {
     sidebar, bulkBar,
     h('div', { class: 'library-media' }, grid, tableBox, moreBtn),
   )
+
+  const cleanup = h('details', {class:'card library-cleanup'}, h('summary', {}, 'Bibliothek aufräumen'))
+  cleanup.addEventListener('toggle', async () => {
+    if (!cleanup.open || cleanup.dataset.loaded) return
+    cleanup.dataset.loaded = 'true'
+    try { cleanup.appendChild(await libraryCleanupCard()) }
+    catch (error) { cleanup.dataset.loaded = ''; toast.error(error.message) }
+  })
+  content.querySelector('.library-media').prepend(cleanup)
 
   await Promise.all([load(), refreshCounts(), refreshSets()])
 

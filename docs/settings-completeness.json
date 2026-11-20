@@ -126,11 +126,13 @@
           "action": "/oauth/disconnect"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared?section=autochat",
           "identity": {
             "tag": "form",
             "action": "/oauth/disconnect"
-          }
+          },
+          "source": "app/templates/_fanvue_settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -139,10 +141,12 @@
           "tag": "button"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "button"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -152,11 +156,13 @@
           "href": "/oauth/start"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared?section=autochat",
           "identity": {
             "tag": "a",
             "href": "/oauth/start"
-          }
+          },
+          "source": "app/templates/_fanvue_settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -166,11 +172,13 @@
           "action": "/settings/shared/fanvue"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared?section=autochat",
           "identity": {
             "tag": "form",
             "action": "/settings/shared/fanvue"
-          }
+          },
+          "source": "app/templates/_fanvue_settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -180,11 +188,13 @@
           "name": "fanvue_client_id"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared?section=autochat",
           "identity": {
             "tag": "input",
             "name": "fanvue_client_id"
-          }
+          },
+          "source": "app/templates/_fanvue_settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -195,12 +205,14 @@
           "type": "password"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared?section=autochat",
           "identity": {
             "tag": "input",
             "name": "fanvue_client_secret",
             "type": "password"
-          }
+          },
+          "source": "app/templates/_fanvue_settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -210,11 +222,13 @@
           "name": "fanvue_redirect_uri"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared?section=autochat",
           "identity": {
             "tag": "input",
             "name": "fanvue_redirect_uri"
-          }
+          },
+          "source": "app/templates/_fanvue_settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -224,11 +238,13 @@
           "name": "fanvue_api_version"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared?section=autochat",
           "identity": {
             "tag": "input",
             "name": "fanvue_api_version"
-          }
+          },
+          "source": "app/templates/_fanvue_settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -237,10 +253,12 @@
           "tag": "button"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "button"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -251,12 +269,14 @@
           "id": "telegram-form"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "form",
             "action": "/settings/shared/telegram",
             "id": "telegram-form"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -266,11 +286,13 @@
           "href": "/settings#telegram"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "a",
             "href": "/settings#telegram"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -280,11 +302,13 @@
           "name": "telegram_chat_id"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "telegram_chat_id"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -295,12 +319,14 @@
           "type": "password"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "telegram_bot_token",
             "type": "password"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -310,11 +336,13 @@
           "name": "app_base_url"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "app_base_url"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -325,12 +353,14 @@
           "id": "tg-chatid"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "button",
             "type": "button",
             "id": "tg-chatid"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -341,12 +371,14 @@
           "id": "tg-test"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "button",
             "type": "button",
             "id": "tg-test"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -355,10 +387,12 @@
           "tag": "button"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "button"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -368,11 +402,13 @@
           "action": "/settings/shared/updates"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "form",
             "action": "/settings/shared/updates"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -383,12 +419,14 @@
           "name": "update_check_enabled"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "type": "checkbox",
             "name": "update_check_enabled"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -399,12 +437,14 @@
           "name": "update_notify_telegram"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "type": "checkbox",
             "name": "update_notify_telegram"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -415,12 +455,14 @@
           "type": "number"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "update_check_interval_hours",
             "type": "number"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -429,10 +471,12 @@
           "tag": "button"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "button"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -442,11 +486,13 @@
           "href": "/upload"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "a",
             "href": "/upload"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -456,11 +502,13 @@
           "href": "#telegram"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "a",
             "href": "#telegram"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -470,11 +518,13 @@
           "action": "/system/restart-service"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "form",
             "action": "/system/restart-service"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -483,10 +533,12 @@
           "tag": "button"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "button"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       }
@@ -1373,8 +1425,10 @@
           "url": "/settings/shared?section=autochat",
           "identity": {
             "tag": "a",
-            "href": "/settings/shared"
-          }
+            "href": "/settings/shared#ai"
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1388,7 +1442,9 @@
           "identity": {
             "tag": "a",
             "id": "sect-all"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1402,7 +1458,9 @@
           "identity": {
             "tag": "a",
             "id": "sect-none"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1416,7 +1474,9 @@
           "identity": {
             "tag": "form",
             "action": "/settings"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1427,12 +1487,14 @@
           "type": "password"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "openrouter_api_key",
             "type": "password"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1442,11 +1504,13 @@
           "name": "openrouter_model"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "openrouter_model"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1456,11 +1520,13 @@
           "name": "classifier_model"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "classifier_model"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1470,11 +1536,13 @@
           "name": "ppv_caption_model"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "ppv_caption_model"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1485,12 +1553,14 @@
           "type": "number"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "temperature",
             "type": "number"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1501,12 +1571,14 @@
           "type": "number"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "max_tokens",
             "type": "number"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1522,7 +1594,9 @@
             "tag": "input",
             "name": "history_messages",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1532,11 +1606,13 @@
           "name": "reasoning_mode"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "select",
             "name": "reasoning_mode"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1547,12 +1623,14 @@
           "type": "number"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "generation_retries",
             "type": "number"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1563,12 +1641,14 @@
           "type": "number"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "generation_retry_delay",
             "type": "number"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1578,11 +1658,13 @@
           "name": "vision_model"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "vision_model"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1593,12 +1675,14 @@
           "type": "password"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared",
           "identity": {
             "tag": "input",
             "name": "vision_api_key",
             "type": "password"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1612,7 +1696,9 @@
           "identity": {
             "tag": "textarea",
             "name": "vision_prompt"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1626,7 +1712,9 @@
           "identity": {
             "tag": "textarea",
             "name": "system_prompt"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1642,7 +1730,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "time_context_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1658,7 +1748,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "timestamps_in_history"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1674,7 +1766,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "time_guard_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1688,7 +1782,9 @@
           "identity": {
             "tag": "input",
             "name": "persona_timezone"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1702,7 +1798,9 @@
           "identity": {
             "tag": "textarea",
             "name": "persona_schedule"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1716,7 +1814,9 @@
           "identity": {
             "tag": "select",
             "id": "tc-weekday"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1732,7 +1832,9 @@
             "tag": "input",
             "id": "tc-time",
             "type": "time"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1748,7 +1850,9 @@
             "tag": "button",
             "type": "button",
             "id": "tc-btn"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1764,7 +1868,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "anti_ai_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1778,7 +1884,9 @@
           "identity": {
             "tag": "input",
             "name": "anti_ai_petnames"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1792,7 +1900,9 @@
           "identity": {
             "tag": "textarea",
             "name": "anti_ai_rules"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1808,7 +1918,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "incoming_image_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1822,7 +1934,9 @@
           "identity": {
             "tag": "textarea",
             "name": "incoming_image_react_prompt"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1836,7 +1950,9 @@
           "identity": {
             "tag": "textarea",
             "name": "incoming_image_woman_prompt"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1852,7 +1968,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "tip_thanks_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1866,7 +1984,9 @@
           "identity": {
             "tag": "textarea",
             "name": "tip_thanks_prompt"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1880,7 +2000,9 @@
           "identity": {
             "tag": "select",
             "name": "tip_thanks_folder"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1894,7 +2016,9 @@
           "identity": {
             "tag": "input",
             "name": "tip_thanks_folder"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1908,7 +2032,9 @@
           "identity": {
             "tag": "select",
             "name": "mode"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1924,7 +2050,9 @@
             "tag": "input",
             "name": "chats_cache_seconds",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1938,7 +2066,9 @@
           "identity": {
             "tag": "select",
             "name": "chat_filter"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1954,7 +2084,9 @@
             "tag": "input",
             "name": "poll_interval_seconds",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1970,7 +2102,9 @@
             "tag": "input",
             "name": "max_chats_per_cycle",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -1986,7 +2120,9 @@
             "tag": "input",
             "name": "reply_cooldown_seconds",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2002,7 +2138,9 @@
             "tag": "input",
             "name": "queue_context_messages",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2018,7 +2156,9 @@
             "tag": "input",
             "name": "send_delay_min_seconds",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2034,7 +2174,9 @@
             "tag": "input",
             "name": "send_delay_max_seconds",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2050,7 +2192,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "active_hours_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2066,7 +2210,9 @@
             "tag": "input",
             "name": "active_hour_start",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2082,7 +2228,9 @@
             "tag": "input",
             "name": "active_hour_end",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2096,7 +2244,9 @@
           "identity": {
             "tag": "select",
             "name": "chat_custom_list_id"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2110,7 +2260,9 @@
           "identity": {
             "tag": "select",
             "name": "prio2_custom_list_id"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2126,7 +2278,9 @@
             "tag": "input",
             "name": "prio2_interval_minutes",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2142,7 +2296,9 @@
             "tag": "input",
             "name": "prio2_jitter_minutes",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2158,7 +2314,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "draft_recheck_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2174,7 +2332,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "draft_regen_on_stale"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2190,7 +2350,9 @@
             "tag": "input",
             "name": "draft_recheck_interval_seconds",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2206,7 +2368,9 @@
             "tag": "input",
             "name": "draft_max_regen",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2222,7 +2386,9 @@
             "tag": "input",
             "name": "bracket_max_regen",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2238,7 +2404,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "ppv_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2254,7 +2422,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "ppv_use_llm_classifier"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2270,7 +2440,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "ppv_caption_use_vision"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2286,7 +2458,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "ppv_block_on_distress"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2302,7 +2476,9 @@
             "tag": "input",
             "name": "ppv_intent_threshold",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2318,7 +2494,9 @@
             "tag": "input",
             "name": "ppv_min_fan_messages",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2334,7 +2512,9 @@
             "tag": "input",
             "name": "ppv_sexual_streak_trigger",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2350,7 +2530,9 @@
             "tag": "input",
             "name": "ppv_max_media_per_set",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2366,7 +2548,9 @@
             "tag": "input",
             "name": "ppv_offer_reset_days",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2382,7 +2566,9 @@
             "tag": "input",
             "name": "ppv_thumb_cache_hours",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2398,7 +2584,9 @@
             "tag": "input",
             "name": "ppv_cooldown_minutes",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2414,7 +2602,9 @@
             "tag": "input",
             "name": "ppv_cooldown_outbound",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2430,7 +2620,9 @@
             "tag": "input",
             "name": "ppv_cooldown_long_minutes",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2446,7 +2638,9 @@
             "tag": "input",
             "name": "ppv_unpurchased_threshold",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2460,7 +2654,9 @@
           "identity": {
             "tag": "input",
             "name": "ppv_keywords"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2474,7 +2670,9 @@
           "identity": {
             "tag": "input",
             "name": "ppv_bodyparts_keywords"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2488,7 +2686,9 @@
           "identity": {
             "tag": "input",
             "name": "ppv_pic_request_keywords"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2502,7 +2702,9 @@
           "identity": {
             "tag": "input",
             "name": "ppv_freecontent_keywords"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2518,7 +2720,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "ppv_confirm_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2534,7 +2738,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "ppv_confirm_fail_open"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2550,7 +2756,9 @@
             "tag": "input",
             "name": "ppv_confirm_context_messages",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2564,7 +2772,9 @@
           "identity": {
             "tag": "input",
             "name": "ppv_keyword_exceptions"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2578,7 +2788,9 @@
           "identity": {
             "tag": "input",
             "name": "ppv_video_keywords"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2592,7 +2804,9 @@
           "identity": {
             "tag": "input",
             "name": "ppv_photo_keywords"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2606,7 +2820,9 @@
           "identity": {
             "tag": "textarea",
             "name": "ppv_no_match_prompt"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2620,7 +2836,9 @@
           "identity": {
             "tag": "textarea",
             "name": "ppv_sales_prompt"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2634,7 +2852,9 @@
           "identity": {
             "tag": "textarea",
             "name": "ppv_freecontent_prompt"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2650,7 +2870,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "reactivation_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2666,7 +2888,9 @@
             "tag": "input",
             "name": "reactivation_inactive_hours",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2682,7 +2906,9 @@
             "tag": "input",
             "name": "reactivation_cooldown_days",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2698,7 +2924,9 @@
             "tag": "input",
             "name": "reactivation_max_per_cycle",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2714,7 +2942,9 @@
             "tag": "input",
             "name": "reactivation_max_attempts",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2730,7 +2960,9 @@
             "tag": "input",
             "name": "reactivation_max_silence_days",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2746,7 +2978,9 @@
             "tag": "input",
             "name": "reactivation_delay_min_minutes",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2762,7 +2996,9 @@
             "tag": "input",
             "name": "reactivation_delay_max_minutes",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2776,7 +3012,9 @@
           "identity": {
             "tag": "select",
             "name": "reactivation_folder"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2790,7 +3028,9 @@
           "identity": {
             "tag": "input",
             "name": "reactivation_folder"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2804,7 +3044,9 @@
           "identity": {
             "tag": "textarea",
             "name": "reactivation_prompt"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2820,7 +3062,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "memory_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2836,7 +3080,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "memory_consolidate_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2852,7 +3098,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "messages_store_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2862,11 +3110,13 @@
           "name": "memory_model"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared#ai",
           "identity": {
             "tag": "input",
             "name": "memory_model"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2882,7 +3132,9 @@
             "tag": "input",
             "name": "memory_max_chars",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2898,7 +3150,9 @@
             "tag": "input",
             "name": "memory_trigger_messages",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2914,7 +3168,9 @@
             "tag": "input",
             "name": "memory_quiet_hours",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2930,7 +3186,9 @@
             "tag": "input",
             "name": "memory_min_interval_hours",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2946,7 +3204,9 @@
             "tag": "input",
             "name": "memory_min_fan_messages",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2962,7 +3222,9 @@
             "tag": "input",
             "name": "memory_max_per_cycle",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2978,7 +3240,9 @@
             "tag": "input",
             "name": "memory_sweep_hour",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -2994,7 +3258,9 @@
             "tag": "input",
             "name": "memory_max_long",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3010,7 +3276,9 @@
             "tag": "input",
             "name": "memory_max_short",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3026,7 +3294,9 @@
             "tag": "input",
             "name": "memory_short_max_age_days",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3042,7 +3312,9 @@
             "tag": "input",
             "name": "messages_retention_days",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3058,7 +3330,9 @@
             "tag": "input",
             "name": "memory_backfill_max_pages",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3074,7 +3348,9 @@
             "tag": "input",
             "name": "memory_backfill_chunk",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3090,7 +3366,9 @@
             "tag": "input",
             "name": "memory_backfill_delay",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3104,7 +3382,9 @@
           "identity": {
             "tag": "select",
             "name": "memory_backfill_auto"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3120,7 +3400,9 @@
             "tag": "input",
             "name": "memory_backfill_max_messages",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3136,7 +3418,9 @@
             "tag": "input",
             "name": "memory_backfill_per_hour",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3152,7 +3436,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "memory_reactivation_use_loops"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3166,7 +3452,9 @@
           "identity": {
             "tag": "a",
             "href": "/chats"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3180,7 +3468,9 @@
           "identity": {
             "tag": "a",
             "href": "/chats"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3196,7 +3486,9 @@
             "tag": "input",
             "name": "max_reply_chars",
             "type": "number"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3210,7 +3502,9 @@
           "identity": {
             "tag": "input",
             "name": "banned_words"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3224,7 +3518,9 @@
           "identity": {
             "tag": "input",
             "name": "escalation_keywords"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3238,7 +3534,9 @@
           "identity": {
             "tag": "a",
             "href": "/settings/shared#telegram"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3249,12 +3547,14 @@
           "name": "telegram_enabled"
         },
         "new": {
-          "url": "/settings/shared?section=autochat",
+          "url": "/settings/shared#telegram",
           "identity": {
             "tag": "input",
             "type": "checkbox",
             "name": "telegram_enabled"
-          }
+          },
+          "source": "app/templates/shared_settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3270,7 +3570,9 @@
             "tag": "input",
             "type": "checkbox",
             "name": "alert_keywords_enabled"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3284,7 +3586,9 @@
           "identity": {
             "tag": "textarea",
             "name": "alert_keywords"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3300,7 +3604,9 @@
             "tag": "input",
             "id": "kw-probe",
             "type": "text"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3316,7 +3622,9 @@
             "tag": "button",
             "type": "button",
             "id": "kw-test"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3328,7 +3636,9 @@
           "url": "/settings/shared?section=autochat",
           "identity": {
             "tag": "button"
-          }
+          },
+          "source": "app/templates/settings.html",
+          "permission": "owner editor/admin; preview blocked"
         },
         "save_backend_unchanged": true
       }
@@ -3369,12 +3679,14 @@
           "id": "upd-now"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "button",
             "type": "button",
             "id": "upd-now"
-          }
+          },
+          "source": "app/templates/_program_updates.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3385,12 +3697,14 @@
           "id": "upd-install-form"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "form",
             "action": "/system/update",
             "id": "upd-install-form"
-          }
+          },
+          "source": "app/templates/_program_updates.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       },
@@ -3401,12 +3715,14 @@
           "id": "upd-install"
         },
         "new": {
-          "url": "/settings/shared?section=shared",
+          "url": "/settings/shared",
           "identity": {
             "tag": "button",
             "type": "submit",
             "id": "upd-install"
-          }
+          },
+          "source": "app/templates/_program_updates.html",
+          "permission": "installation admin; preview blocked"
         },
         "save_backend_unchanged": true
       }
@@ -3415,7 +3731,7 @@
   "autopost": {
     "source": "autoposter/ui/js/pages/settings.js",
     "target": "/settings/shared?section=autopost",
-    "source_sha256": "ac2569cee218f76a8d8484d7204aa2a894869742504ac4d142814173f1643511",
+    "source_sha256": "3f3d8c95430a5e88f7b9ce9467cdd618f2f31607b1ec5d7f87ae40222771b364",
     "controls": [
       [
         "keyInput",
@@ -3526,92 +3842,111 @@
       {
         "old_api_action": "archiveUsed",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "archiveUsed"
+        "same_api_action": "archiveUsed",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "channels",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "channels"
+        "same_api_action": "channels",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "clearSecret",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "clearSecret"
+        "same_api_action": "clearSecret",
+        "new_source": "app/templates/shared_settings.html",
+        "relocated_form_action": "/settings/shared/ai"
       },
       {
         "old_api_action": "deletePlanned",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "deletePlanned"
+        "same_api_action": "deletePlanned",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "imageComment",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "imageComment"
+        "same_api_action": "imageComment",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "integrations",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "integrations"
+        "same_api_action": "integrations",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "llmUsage",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "llmUsage"
+        "same_api_action": "llmUsage",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "maintenanceReport",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "maintenanceReport"
+        "same_api_action": "maintenanceReport",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "openrouterModels",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "openrouterModels"
+        "same_api_action": "openrouterModels",
+        "new_source": "app/static/settings-common.js"
       },
       {
         "old_api_action": "openrouterTest",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "openrouterTest"
+        "same_api_action": "openrouterTest",
+        "new_source": "app/static/settings-common.js"
       },
       {
         "old_api_action": "rebuildCounters",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "rebuildCounters"
+        "same_api_action": "rebuildCounters",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "saveImageComment",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "saveImageComment"
+        "same_api_action": "saveImageComment",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "saveIntegrations",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "saveIntegrations"
+        "same_api_action": "saveIntegrations",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "setRuntime",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "setRuntime"
+        "same_api_action": "setRuntime",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "settings",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "settings"
+        "same_api_action": "settings",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "testAllChannels",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "testAllChannels"
+        "same_api_action": "testAllChannels",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "testChannel",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "testChannel"
+        "same_api_action": "testChannel",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       },
       {
         "old_api_action": "updateChannel",
         "new_url": "/settings/shared?section=autopost",
-        "same_api_action": "updateChannel"
+        "same_api_action": "updateChannel",
+        "new_source": "autoposter/ui/js/pages/settings.js"
       }
     ],
     "permissions": "Existing current_user / require_admin / require_editor dependencies and preview middleware preserved; real user loaded via /api/v1/auth/me; unchanged APIs.",
@@ -3619,6 +3954,3469 @@
     "visibility_aging_addition": {
       "source": "autoposter/ui/js/pages/visibility-aging.js",
       "preservation": "Only an import and appended card were added to settings.js; all pre-existing source lines preserved."
+    },
+    "previous_manifest_sha256": "ac2569cee218f76a8d8484d7204aa2a894869742504ac4d142814173f1643511",
+    "fingerprint_review_reason": "Current renderer byte-identical to original fresh-baseline. All 18 API actions, 4 models and remaining controls preserved; obsolete autoEvery input intentionally retired for midnight Europe/Berlin daily planner. Historical inventory retained and retirement explicitly checked; old-to-current form mappings and all current API permission dependencies audited.",
+    "relocations": {
+      "keyInput": "shared Jinja openrouter_api_key",
+      "filterFree": "settings-common.js ai-free-models",
+      "budget": "shared Jinja openrouter_monthly_budget_usd",
+      "baseUrl": "shared Jinja public_base_url",
+      "modelSelects": "shared Jinja task model fields; exact IDs",
+      "xTier": "channels.js mounts platformDefaultsCard",
+      "connections": "channels.js mounts connectionCard",
+      "system": "shared commonOverview",
+      "usage": "shared commonOverview"
     }
+  },
+  "reviewed_current_inventory": {
+    "shared": {
+      "all_original_mapping_rows_verified": 26,
+      "current_controls": [
+        {
+          "tag": "form"
+        },
+        {
+          "tag": "input",
+          "name": "name"
+        },
+        {
+          "tag": "button",
+          "type": "submit"
+        },
+        {
+          "tag": "form",
+          "action": "/settings/shared/ai"
+        },
+        {
+          "tag": "input",
+          "name": "openrouter_api_key",
+          "type": "password"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "clear_openrouter_api_key"
+        },
+        {
+          "tag": "input",
+          "name": "openrouter_model"
+        },
+        {
+          "tag": "input",
+          "name": "classifier_model"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_caption_model"
+        },
+        {
+          "tag": "input",
+          "name": "temperature",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "max_tokens",
+          "type": "number"
+        },
+        {
+          "tag": "select",
+          "name": "reasoning_mode"
+        },
+        {
+          "tag": "input",
+          "name": "generation_retries",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "generation_retry_delay",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_model"
+        },
+        {
+          "tag": "input",
+          "name": "vision_model"
+        },
+        {
+          "tag": "input",
+          "name": "vision_api_key",
+          "type": "password"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "clear_vision_api_key"
+        },
+        {
+          "tag": "input",
+          "name": "openrouter_model_caption"
+        },
+        {
+          "tag": "input",
+          "name": "openrouter_model_text"
+        },
+        {
+          "tag": "input",
+          "name": "openrouter_model_vision"
+        },
+        {
+          "tag": "input",
+          "name": "openrouter_model_fallback"
+        },
+        {
+          "tag": "input",
+          "type": "number",
+          "name": "openrouter_monthly_budget_usd"
+        },
+        {
+          "tag": "button"
+        },
+        {
+          "tag": "form",
+          "action": "/settings/shared/telegram",
+          "id": "telegram-form"
+        },
+        {
+          "tag": "a",
+          "href": "/settings#telegram"
+        },
+        {
+          "tag": "input",
+          "name": "telegram_chat_id"
+        },
+        {
+          "tag": "input",
+          "type": "hidden",
+          "name": "telegram_enabled_present"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "telegram_enabled"
+        },
+        {
+          "tag": "input",
+          "name": "telegram_bot_token",
+          "type": "password"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "clear_telegram_bot_token"
+        },
+        {
+          "tag": "input",
+          "name": "app_base_url"
+        },
+        {
+          "tag": "button",
+          "type": "button",
+          "id": "tg-chatid"
+        },
+        {
+          "tag": "button",
+          "type": "button",
+          "id": "tg-test"
+        },
+        {
+          "tag": "button"
+        },
+        {
+          "tag": "form",
+          "action": "/settings/shared/updates"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "update_check_enabled"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "update_notify_telegram"
+        },
+        {
+          "tag": "input",
+          "name": "update_check_interval_hours",
+          "type": "number"
+        },
+        {
+          "tag": "button"
+        },
+        {
+          "tag": "a",
+          "href": "/upload"
+        },
+        {
+          "tag": "a",
+          "href": "#telegram"
+        },
+        {
+          "tag": "form",
+          "action": "/system/restart-service"
+        },
+        {
+          "tag": "button"
+        },
+        {
+          "tag": "form",
+          "action": "/settings/shared/urls",
+          "id": "base-urls"
+        },
+        {
+          "tag": "input",
+          "type": "url",
+          "name": "public_base_url"
+        },
+        {
+          "tag": "button"
+        }
+      ],
+      "select_options": [],
+      "source_sha256": "d1186630deae836bb658f90f84a5054c761e56d8ffa88aa3998cf321afb7cddf",
+      "field_scopes": {
+        "app_base_url": "installation",
+        "clear_fanvue_client_secret": "character",
+        "clear_telegram_bot_token": "installation",
+        "fanvue_api_version": "character",
+        "fanvue_client_id": "character",
+        "fanvue_client_secret": "character",
+        "fanvue_redirect_uri": "character",
+        "telegram_bot_token": "installation",
+        "telegram_chat_id": "installation",
+        "update_check_enabled": "installation",
+        "update_check_interval_hours": "installation",
+        "update_notify_telegram": "installation",
+        "memory_model": "installation",
+        "telegram_enabled": "installation"
+      }
+    },
+    "autochat": {
+      "all_original_mapping_rows_verified": 129,
+      "current_controls": [
+        {
+          "tag": "a",
+          "href": "/settings/shared#ai"
+        },
+        {
+          "tag": "a",
+          "id": "sect-all"
+        },
+        {
+          "tag": "a",
+          "id": "sect-none"
+        },
+        {
+          "tag": "form",
+          "action": "/settings"
+        },
+        {
+          "tag": "input",
+          "name": "history_messages",
+          "type": "number"
+        },
+        {
+          "tag": "textarea",
+          "name": "vision_prompt"
+        },
+        {
+          "tag": "textarea",
+          "name": "system_prompt"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "time_context_enabled"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "timestamps_in_history"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "time_guard_enabled"
+        },
+        {
+          "tag": "input",
+          "name": "persona_timezone"
+        },
+        {
+          "tag": "textarea",
+          "name": "persona_schedule"
+        },
+        {
+          "tag": "select",
+          "id": "tc-weekday"
+        },
+        {
+          "tag": "input",
+          "id": "tc-time",
+          "type": "time"
+        },
+        {
+          "tag": "button",
+          "type": "button",
+          "id": "tc-btn"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "anti_ai_enabled"
+        },
+        {
+          "tag": "input",
+          "name": "anti_ai_petnames"
+        },
+        {
+          "tag": "textarea",
+          "name": "anti_ai_rules"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "incoming_image_enabled"
+        },
+        {
+          "tag": "textarea",
+          "name": "incoming_image_react_prompt"
+        },
+        {
+          "tag": "textarea",
+          "name": "incoming_image_woman_prompt"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "tip_thanks_enabled"
+        },
+        {
+          "tag": "textarea",
+          "name": "tip_thanks_prompt"
+        },
+        {
+          "tag": "select",
+          "name": "tip_thanks_folder"
+        },
+        {
+          "tag": "input",
+          "name": "tip_thanks_folder"
+        },
+        {
+          "tag": "select",
+          "name": "mode"
+        },
+        {
+          "tag": "input",
+          "name": "chats_cache_seconds",
+          "type": "number"
+        },
+        {
+          "tag": "select",
+          "name": "chat_filter"
+        },
+        {
+          "tag": "input",
+          "name": "poll_interval_seconds",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "max_chats_per_cycle",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "reply_cooldown_seconds",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "queue_context_messages",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "send_delay_min_seconds",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "send_delay_max_seconds",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "active_hours_enabled"
+        },
+        {
+          "tag": "input",
+          "name": "active_hour_start",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "active_hour_end",
+          "type": "number"
+        },
+        {
+          "tag": "select",
+          "name": "chat_custom_list_id"
+        },
+        {
+          "tag": "select",
+          "name": "prio2_custom_list_id"
+        },
+        {
+          "tag": "input",
+          "name": "prio2_interval_minutes",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "prio2_jitter_minutes",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "draft_recheck_enabled"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "draft_regen_on_stale"
+        },
+        {
+          "tag": "input",
+          "name": "draft_recheck_interval_seconds",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "draft_max_regen",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "bracket_max_regen",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_enabled"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_use_llm_classifier"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_caption_use_vision"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_block_on_distress"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_intent_threshold",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_min_fan_messages",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_sexual_streak_trigger",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_max_media_per_set",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_offer_reset_days",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_thumb_cache_hours",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_cooldown_minutes",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_cooldown_outbound",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_cooldown_long_minutes",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_unpurchased_threshold",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_keywords"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_bodyparts_keywords"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_pic_request_keywords"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_freecontent_keywords"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_confirm_enabled"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "ppv_confirm_fail_open"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_confirm_context_messages",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_keyword_exceptions"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_video_keywords"
+        },
+        {
+          "tag": "input",
+          "name": "ppv_photo_keywords"
+        },
+        {
+          "tag": "textarea",
+          "name": "ppv_no_match_prompt"
+        },
+        {
+          "tag": "textarea",
+          "name": "ppv_sales_prompt"
+        },
+        {
+          "tag": "textarea",
+          "name": "ppv_freecontent_prompt"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "reactivation_enabled"
+        },
+        {
+          "tag": "input",
+          "name": "reactivation_inactive_hours",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "reactivation_cooldown_days",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "reactivation_max_per_cycle",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "reactivation_max_attempts",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "reactivation_max_silence_days",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "reactivation_delay_min_minutes",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "reactivation_delay_max_minutes",
+          "type": "number"
+        },
+        {
+          "tag": "select",
+          "name": "reactivation_folder"
+        },
+        {
+          "tag": "input",
+          "name": "reactivation_folder"
+        },
+        {
+          "tag": "textarea",
+          "name": "reactivation_prompt"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "memory_enabled"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "memory_consolidate_enabled"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "messages_store_enabled"
+        },
+        {
+          "tag": "input",
+          "name": "memory_max_chars",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_trigger_messages",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_quiet_hours",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_min_interval_hours",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_min_fan_messages",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_max_per_cycle",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_sweep_hour",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_max_long",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_max_short",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_short_max_age_days",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "messages_retention_days",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_backfill_max_pages",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_backfill_chunk",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_backfill_delay",
+          "type": "number"
+        },
+        {
+          "tag": "select",
+          "name": "memory_backfill_auto"
+        },
+        {
+          "tag": "input",
+          "name": "memory_backfill_max_messages",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "memory_backfill_per_hour",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "memory_reactivation_use_loops"
+        },
+        {
+          "tag": "a",
+          "href": "/chats"
+        },
+        {
+          "tag": "a",
+          "href": "/chats"
+        },
+        {
+          "tag": "input",
+          "name": "max_reply_chars",
+          "type": "number"
+        },
+        {
+          "tag": "input",
+          "name": "banned_words"
+        },
+        {
+          "tag": "input",
+          "name": "escalation_keywords"
+        },
+        {
+          "tag": "a",
+          "href": "/settings/shared#telegram"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "alert_keywords_enabled"
+        },
+        {
+          "tag": "textarea",
+          "name": "alert_keywords"
+        },
+        {
+          "tag": "input",
+          "id": "kw-probe",
+          "type": "text"
+        },
+        {
+          "tag": "button",
+          "type": "button",
+          "id": "kw-test"
+        },
+        {
+          "tag": "button"
+        }
+      ],
+      "select_options": [
+        "none",
+        "exclude",
+        "default",
+        "",
+        "{{ loop.index0 }}",
+        "",
+        "{{ f }}",
+        "{{ s['tip_thanks_folder'] }}",
+        "approval",
+        "auto",
+        "unread",
+        "not_answered",
+        "online",
+        "not_muted",
+        "subscribers",
+        "recent_subscribers",
+        "followers",
+        "on_free_trial",
+        "spenders",
+        "spent_more_than_50",
+        "has_tipped",
+        "",
+        "",
+        "{{ s['chat_custom_list_id'] }}",
+        "{{ lst['uuid'] }}",
+        "",
+        "{{ s['prio2_custom_list_id'] }}",
+        "{{ lst['uuid'] }}",
+        "",
+        "{{ f }}",
+        "{{ s['reactivation_folder'] }}",
+        "off",
+        "manual",
+        "auto"
+      ],
+      "source_sha256": "8130d3c3f0778dcca9f020dbd7ff0af387b0d2beda0171934f4c71d22014ad46",
+      "field_scopes": {
+        "active_hour_end": "character",
+        "active_hour_start": "character",
+        "active_hours_enabled": "character",
+        "alert_keywords": "character",
+        "alert_keywords_enabled": "character",
+        "anti_ai_enabled": "character",
+        "anti_ai_petnames": "character",
+        "anti_ai_rules": "character",
+        "banned_words": "character",
+        "bracket_max_regen": "character",
+        "chat_custom_list_id": "character",
+        "chat_filter": "character",
+        "chats_cache_seconds": "character",
+        "classifier_model": "installation",
+        "clear_openrouter_api_key": "installation",
+        "clear_vision_api_key": "installation",
+        "draft_max_regen": "character",
+        "draft_recheck_enabled": "character",
+        "draft_recheck_interval_seconds": "character",
+        "draft_regen_on_stale": "character",
+        "escalation_keywords": "character",
+        "generation_retries": "installation",
+        "generation_retry_delay": "installation",
+        "history_messages": "character",
+        "incoming_image_enabled": "character",
+        "incoming_image_react_prompt": "character",
+        "incoming_image_woman_prompt": "character",
+        "max_chats_per_cycle": "character",
+        "max_reply_chars": "character",
+        "max_tokens": "installation",
+        "memory_backfill_auto": "character",
+        "memory_backfill_chunk": "character",
+        "memory_backfill_delay": "character",
+        "memory_backfill_max_messages": "character",
+        "memory_backfill_max_pages": "character",
+        "memory_backfill_per_hour": "character",
+        "memory_consolidate_enabled": "character",
+        "memory_enabled": "character",
+        "memory_max_chars": "character",
+        "memory_max_long": "character",
+        "memory_max_per_cycle": "character",
+        "memory_max_short": "character",
+        "memory_min_fan_messages": "character",
+        "memory_min_interval_hours": "character",
+        "memory_model": "installation",
+        "memory_quiet_hours": "character",
+        "memory_reactivation_use_loops": "character",
+        "memory_short_max_age_days": "character",
+        "memory_sweep_hour": "character",
+        "memory_trigger_messages": "character",
+        "messages_retention_days": "character",
+        "messages_store_enabled": "character",
+        "mode": "character",
+        "openrouter_api_key": "installation",
+        "openrouter_model": "installation",
+        "persona_schedule": "character",
+        "persona_timezone": "character",
+        "poll_interval_seconds": "character",
+        "ppv_block_on_distress": "character",
+        "ppv_bodyparts_keywords": "character",
+        "ppv_caption_model": "installation",
+        "ppv_caption_use_vision": "character",
+        "ppv_confirm_context_messages": "character",
+        "ppv_confirm_enabled": "character",
+        "ppv_confirm_fail_open": "character",
+        "ppv_cooldown_long_minutes": "character",
+        "ppv_cooldown_minutes": "character",
+        "ppv_cooldown_outbound": "character",
+        "ppv_enabled": "character",
+        "ppv_freecontent_keywords": "character",
+        "ppv_freecontent_prompt": "character",
+        "ppv_intent_threshold": "character",
+        "ppv_keyword_exceptions": "character",
+        "ppv_keywords": "character",
+        "ppv_max_media_per_set": "character",
+        "ppv_min_fan_messages": "character",
+        "ppv_no_match_prompt": "character",
+        "ppv_offer_reset_days": "character",
+        "ppv_photo_keywords": "character",
+        "ppv_pic_request_keywords": "character",
+        "ppv_sales_prompt": "character",
+        "ppv_sexual_streak_trigger": "character",
+        "ppv_thumb_cache_hours": "character",
+        "ppv_unpurchased_threshold": "character",
+        "ppv_use_llm_classifier": "character",
+        "ppv_video_keywords": "character",
+        "prio2_custom_list_id": "character",
+        "prio2_interval_minutes": "character",
+        "prio2_jitter_minutes": "character",
+        "queue_context_messages": "character",
+        "reactivation_cooldown_days": "character",
+        "reactivation_delay_max_minutes": "character",
+        "reactivation_delay_min_minutes": "character",
+        "reactivation_enabled": "character",
+        "reactivation_folder": "character",
+        "reactivation_inactive_hours": "character",
+        "reactivation_max_attempts": "character",
+        "reactivation_max_per_cycle": "character",
+        "reactivation_max_silence_days": "character",
+        "reactivation_prompt": "character",
+        "reasoning_mode": "installation",
+        "reply_cooldown_seconds": "character",
+        "send_delay_max_seconds": "character",
+        "send_delay_min_seconds": "character",
+        "system_prompt": "character",
+        "telegram_enabled": "installation",
+        "temperature": "installation",
+        "time_context_enabled": "character",
+        "time_guard_enabled": "character",
+        "timestamps_in_history": "character",
+        "tip_thanks_enabled": "character",
+        "tip_thanks_folder": "character",
+        "tip_thanks_prompt": "character",
+        "vision_api_key": "installation",
+        "vision_model": "installation",
+        "vision_prompt": "character"
+      }
+    },
+    "updates": {
+      "all_original_mapping_rows_verified": 3,
+      "current_controls": [
+        {
+          "tag": "button",
+          "type": "button",
+          "id": "upd-now"
+        },
+        {
+          "tag": "form",
+          "action": "/system/update",
+          "id": "upd-install-form"
+        },
+        {
+          "tag": "button",
+          "type": "submit",
+          "id": "upd-install"
+        }
+      ],
+      "select_options": [],
+      "source_sha256": "9af3f6b0d65e5db665dfb3b74f643de7ed6f0e187913a3483944b1f837fb89ef",
+      "field_scopes": {}
+    },
+    "autopost": {
+      "original_fresh_baseline_identical": true,
+      "baseline_sha256": "3f3d8c95430a5e88f7b9ce9467cdd618f2f31607b1ec5d7f87ae40222771b364",
+      "controls": [
+        [
+          "onlyFuture",
+          "input"
+        ],
+        [
+          "xTier",
+          "select"
+        ],
+        [
+          "gap",
+          "input"
+        ],
+        [
+          "warn",
+          "input"
+        ],
+        [
+          "autoPlan",
+          "input"
+        ],
+        [
+          "autoDays",
+          "input"
+        ],
+        [
+          "toggle",
+          "input"
+        ],
+        [
+          "enabled",
+          "input"
+        ],
+        [
+          "text",
+          "textarea"
+        ],
+        [
+          "url",
+          "input"
+        ]
+      ],
+      "model_tasks": [
+        "openrouter_model_caption",
+        "openrouter_model_text",
+        "openrouter_model_vision",
+        "openrouter_model_fallback"
+      ],
+      "api_actions": [
+        "archiveUsed",
+        "channels",
+        "clearSecret",
+        "deletePlanned",
+        "imageComment",
+        "integrations",
+        "llmUsage",
+        "maintenanceReport",
+        "openrouterModels",
+        "openrouterTest",
+        "rebuildCounters",
+        "saveImageComment",
+        "saveIntegrations",
+        "setRuntime",
+        "settings",
+        "testAllChannels",
+        "testChannel",
+        "updateChannel"
+      ],
+      "retired": [
+        {
+          "control": "autoEvery",
+          "field": "auto_plan_interval_hours",
+          "reason": "Explicit midnight Europe/Berlin daily planner policy; persisted interval retained but intentionally ignored; no rolling-hour input",
+          "tests": [
+            "tests/autoposter/test_nightly_planning.py",
+            "tests/settings_hub_ui.cjs"
+          ]
+        }
+      ]
+    },
+    "api_permissions": [
+      {
+        "source": "autoposter/api/characters.py",
+        "function": "mode",
+        "routes": [
+          "router.get('/mode')"
+        ],
+        "dependencies": []
+      },
+      {
+        "source": "autoposter/api/characters.py",
+        "function": "list_characters",
+        "routes": [
+          "router.get('', response_model=list[CharacterOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/characters.py",
+        "function": "create_character",
+        "routes": [
+          "router.post('', status_code=201, response_model=CharacterOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "list_personas",
+        "routes": [
+          "router.get('/personas', response_model=List[PersonaOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "create_persona",
+        "routes": [
+          "router.post('/personas', response_model=PersonaOut, status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "update_persona",
+        "routes": [
+          "router.patch('/personas/{persona_id}', response_model=PersonaOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "list_examples",
+        "routes": [
+          "router.get('/personas/{persona_id}/examples', response_model=List[PersonaExampleOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "add_examples",
+        "routes": [
+          "router.post('/personas/{persona_id}/examples', response_model=List[PersonaExampleOut], status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "delete_example",
+        "routes": [
+          "router.delete('/personas/examples/{example_id}', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "check_rhythm",
+        "routes": [
+          "router.post('/personas/rhythm/check', response_model=RhythmCheckResult)"
+        ],
+        "dependencies": [
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "rhythm_template",
+        "routes": [
+          "router.get('/personas/rhythm/template')"
+        ],
+        "dependencies": [
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "list_channels",
+        "routes": [
+          "router.get('/channels', response_model=List[ChannelOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "create_channel",
+        "routes": [
+          "router.post('/channels', response_model=ChannelOut, status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "update_channel",
+        "routes": [
+          "router.patch('/channels/{channel_id}', response_model=ChannelOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "deletion_preview",
+        "routes": [
+          "router.get('/channels/{channel_id}/deletion-preview')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "delete_channel",
+        "routes": [
+          "router.delete('/channels/{channel_id}', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "pause_channel",
+        "routes": [
+          "router.post('/channels/{channel_id}/pause', response_model=ChannelOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "oauth_start",
+        "routes": [
+          "router.get('/oauth/{platform}/start')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "oauth_callback",
+        "routes": [
+          "router.get('/oauth/{platform}/callback', response_class=HTMLResponse)"
+        ],
+        "dependencies": [
+          "Depends(get_db)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "save_telegram",
+        "routes": [
+          "router.put('/channels/{channel_id}/telegram', response_model=ChannelOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "test_channel",
+        "routes": [
+          "router.post('/channels/{channel_id}/test')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "test_all_channels",
+        "routes": [
+          "router.post('/channels/test-all')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "disconnect",
+        "routes": [
+          "router.post('/channels/{channel_id}/disconnect', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "get_watermark",
+        "routes": [
+          "router.get('/channels/{channel_id}/watermark', include_in_schema=False)"
+        ],
+        "dependencies": [
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "upload_watermark",
+        "routes": [
+          "router.post('/channels/{channel_id}/watermark', response_model=ChannelOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "delete_watermark",
+        "routes": [
+          "router.delete('/channels/{channel_id}/watermark', response_model=ChannelOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/channels.py",
+        "function": "watermark_preview",
+        "routes": [
+          "router.get('/channels/{channel_id}/watermark/preview', include_in_schema=False)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/top_posts.py",
+        "function": "start_collection",
+        "routes": [
+          "router.post('/collection/{scope}', status_code=202)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/top_posts.py",
+        "function": "overview",
+        "routes": [
+          "router.get('')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/top_posts.py",
+        "function": "release",
+        "routes": [
+          "router.post('/{post_id}/reuse')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "assign_batch",
+        "routes": [
+          "router.post('/batch', response_model=AssignmentResult)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "reuse_asset",
+        "routes": [
+          "router.post('/channel/{channel_id}/assets/{asset_id}/reuse', response_model=MediaOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "remove",
+        "routes": [
+          "router.post('/remove', response_model=AssignmentResult)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "check_remove",
+        "routes": [
+          "router.post('/check-remove')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "reorder",
+        "routes": [
+          "router.post('/reorder')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "channel_pool",
+        "routes": [
+          "router.get('/channel/{channel_id}', response_model=List[MediaOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "board",
+        "routes": [
+          "router.get('/board')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "list_rules",
+        "routes": [
+          "router.get('/rules', response_model=List[AssignmentRuleOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "create_rule",
+        "routes": [
+          "router.post('/rules', response_model=AssignmentRuleOut, status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "delete_rule",
+        "routes": [
+          "router.delete('/rules/{rule_id}', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/assignments.py",
+        "function": "apply_rules",
+        "routes": [
+          "router.post('/rules/apply')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "list_posts",
+        "routes": [
+          "router.get('', response_model=List[PostOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "create_post",
+        "routes": [
+          "router.post('', response_model=PostOut, status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "get_post",
+        "routes": [
+          "router.get('/{post_id}', response_model=PostOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "update_post",
+        "routes": [
+          "router.patch('/{post_id}', response_model=PostOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "delete_post",
+        "routes": [
+          "router.delete('/{post_id}', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "bulk_move",
+        "routes": [
+          "router.post('/bulk-move', response_model=Dict[str, int])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "bulk_delete",
+        "routes": [
+          "router.post('/bulk-delete')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "duplicate_post",
+        "routes": [
+          "router.post('/{post_id}/duplicate', response_model=List[PostOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "revisions",
+        "routes": [
+          "router.get('/{post_id}/revisions')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "attempts",
+        "routes": [
+          "router.get('/{post_id}/attempts')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "preflight",
+        "routes": [
+          "router.get('/{post_id}/preflight', response_model=PreflightResult)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "translate_text",
+        "routes": [
+          "router.post('/translate', response_model=TranslateTextResult)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "generate",
+        "routes": [
+          "router.post('/generate', response_model=GenerateResult)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "bulk_generate",
+        "routes": [
+          "router.post('/bulk-generate')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "bulk_generate_start",
+        "routes": [
+          "router.post('/bulk-generate/start')"
+        ],
+        "dependencies": [
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "publish_now",
+        "routes": [
+          "router.post('/{post_id}/publish')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "approve",
+        "routes": [
+          "router.post('/{post_id}/approve', response_model=PostOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "fill",
+        "routes": [
+          "calendar_router.post('/fill', response_model=PlanFillResult)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "plan_range",
+        "routes": [
+          "calendar_router.post('/plan', response_model=PlanRangeResult)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "plan_range_start",
+        "routes": [
+          "calendar_router.post('/plan/start')"
+        ],
+        "dependencies": [
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "month_overview",
+        "routes": [
+          "calendar_router.get('/month')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "list_blackouts",
+        "routes": [
+          "calendar_router.get('/blackouts')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "create_blackout",
+        "routes": [
+          "calendar_router.post('/blackouts', status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "delete_blackout",
+        "routes": [
+          "calendar_router.delete('/blackouts/{blackout_id}', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "export_csv",
+        "routes": [
+          "calendar_router.get('/export.csv')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "run_status",
+        "routes": [
+          "runs_router.get('/{run_id}')"
+        ],
+        "dependencies": [
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "run_cancel",
+        "routes": [
+          "runs_router.post('/{run_id}/cancel')"
+        ],
+        "dependencies": [
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/posts.py",
+        "function": "run_list",
+        "routes": [
+          "runs_router.get('')"
+        ],
+        "dependencies": [
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "character_upgrade_status",
+        "routes": [
+          "character_upgrade_router.get('/character-upgrade')",
+          "router.get('/character-upgrade')"
+        ],
+        "dependencies": [
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "character_upgrade_stage",
+        "routes": [
+          "character_upgrade_router.post('/character-upgrade')",
+          "router.post('/character-upgrade')"
+        ],
+        "dependencies": [
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "character_upgrade_cancel",
+        "routes": [
+          "character_upgrade_router.delete('/character-upgrade')",
+          "router.delete('/character-upgrade')"
+        ],
+        "dependencies": [
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "version",
+        "routes": [
+          "router.get('/version')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "update_check",
+        "routes": [
+          "router.post('/update-check')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "update_now",
+        "routes": [
+          "router.post('/update')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "restart_now",
+        "routes": [
+          "router.post('/restart')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "publish_status",
+        "routes": [
+          "router.get('/publish/status')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "save_git_settings",
+        "routes": [
+          "router.post('/publish/settings')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/system.py",
+        "function": "publish",
+        "routes": [
+          "router.post('/publish')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "upload",
+        "routes": [
+          "router.post('/upload', status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "search",
+        "routes": [
+          "router.post('/search', response_model=MediaPage)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "counts",
+        "routes": [
+          "router.get('/counts', response_model=LifecycleCounts)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "tags",
+        "routes": [
+          "router.get('/tags')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "matrix",
+        "routes": [
+          "router.get('/matrix')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "timeline",
+        "routes": [
+          "router.get('/timeline')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "detail",
+        "routes": [
+          "router.get('/{asset_id}', response_model=MediaDetail)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "file",
+        "routes": [
+          "router.get('/{asset_id}/file')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "thumb",
+        "routes": [
+          "router.get('/{asset_id}/thumb')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "update",
+        "routes": [
+          "router.patch('/{asset_id}', response_model=MediaOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "bulk_update",
+        "routes": [
+          "router.post('/bulk', response_model=Dict[str, int])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "archive",
+        "routes": [
+          "router.post('/{asset_id}/archive', response_model=MediaOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "delete_asset",
+        "routes": [
+          "router.delete('/{asset_id}', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "similar",
+        "routes": [
+          "router.get('/{asset_id}/similar')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "list_sets",
+        "routes": [
+          "sets_router.get('', response_model=List[MediaSetOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "create_set",
+        "routes": [
+          "sets_router.post('', response_model=MediaSetOut, status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "update_set",
+        "routes": [
+          "sets_router.patch('/{set_id}', response_model=MediaSetOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "delete_set",
+        "routes": [
+          "sets_router.delete('/{set_id}', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "list_views",
+        "routes": [
+          "views_router.get('', response_model=List[SavedViewOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "create_view",
+        "routes": [
+          "views_router.post('', response_model=SavedViewOut, status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "delete_view",
+        "routes": [
+          "views_router.delete('/{view_id}', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "report",
+        "routes": [
+          "maintenance_router.get('/report', response_model=MaintenanceReport)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "archive_used",
+        "routes": [
+          "maintenance_router.post('/archive-used')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "rebuild_counters",
+        "routes": [
+          "maintenance_router.post('/rebuild-counters')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/media.py",
+        "function": "delete_planned_posts",
+        "routes": [
+          "maintenance_router.post('/delete-planned')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/auth.py",
+        "function": "login",
+        "routes": [
+          "router.post('/login', response_model=UserOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)"
+        ]
+      },
+      {
+        "source": "autoposter/api/auth.py",
+        "function": "logout",
+        "routes": [
+          "router.post('/logout')"
+        ],
+        "dependencies": []
+      },
+      {
+        "source": "autoposter/api/auth.py",
+        "function": "me",
+        "routes": [
+          "router.get('/me', response_model=UserOut)"
+        ],
+        "dependencies": [
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/auth.py",
+        "function": "auth_mode",
+        "routes": [
+          "router.get('/mode')"
+        ],
+        "dependencies": []
+      },
+      {
+        "source": "autoposter/api/auth.py",
+        "function": "list_users",
+        "routes": [
+          "router.get('/users', response_model=List[UserOut])"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/auth.py",
+        "function": "create_user",
+        "routes": [
+          "router.post('/users', response_model=UserOut, status_code=201)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/auth.py",
+        "function": "delete_user",
+        "routes": [
+          "router.delete('/users/{user_id}', status_code=204, response_model=None)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "dashboard",
+        "routes": [
+          "router.get('/dashboard', response_model=DashboardOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "check_problems",
+        "routes": [
+          "router.post('/problems/check')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "inventory_overview",
+        "routes": [
+          "router.get('/inventory', response_model=InventoryOverview)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "counts",
+        "routes": [
+          "router.get('/counts', response_model=LifecycleCounts)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "best_times",
+        "routes": [
+          "router.get('/analytics/best-times')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "top_posts",
+        "routes": [
+          "router.get('/analytics/top-posts')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "notifications",
+        "routes": [
+          "router.get('/notifications')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "mark_read",
+        "routes": [
+          "router.post('/notifications/read')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "get_settings",
+        "routes": [
+          "router.get('/settings')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "update_runtime",
+        "routes": [
+          "router.post('/settings/runtime')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "get_integrations",
+        "routes": [
+          "router.get('/settings/integrations')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "visibility_aging_status",
+        "routes": [
+          "router.get('/settings/visibility-aging')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "visibility_aging_run",
+        "routes": [
+          "router.post('/settings/visibility-aging/run', status_code=202)"
+        ],
+        "dependencies": [
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "ppv_restore_preview",
+        "routes": [
+          "router.post('/settings/ppv-restore/preview')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "ppv_restore_status",
+        "routes": [
+          "router.get('/settings/ppv-restore')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "ppv_restore_run",
+        "routes": [
+          "router.post('/settings/ppv-restore/run', status_code=202)"
+        ],
+        "dependencies": [
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "post_retention_status",
+        "routes": [
+          "router.get('/settings/post-retention')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "post_retention_preview",
+        "routes": [
+          "router.post('/settings/post-retention/preview')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "post_retention_run",
+        "routes": [
+          "router.post('/settings/post-retention/run', status_code=202)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "save_integrations",
+        "routes": [
+          "router.post('/settings/integrations')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "clear_integration_secret",
+        "routes": [
+          "router.post('/settings/integrations/clear')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "openrouter_models",
+        "routes": [
+          "router.get('/settings/openrouter/models')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "openrouter_test",
+        "routes": [
+          "router.post('/settings/openrouter/test')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "jobs_status",
+        "routes": [
+          "router.get('/jobs')"
+        ],
+        "dependencies": [
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "run_job",
+        "routes": [
+          "router.post('/jobs/{name}/run')"
+        ],
+        "dependencies": [
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "llm_usage",
+        "routes": [
+          "router.get('/llm/usage')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "get_image_comment",
+        "routes": [
+          "router.get('/settings/image-comment', response_model=image_comments.CommentSettings)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "save_image_comment",
+        "routes": [
+          "router.post('/settings/image-comment', response_model=image_comments.CommentSettings)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "telegram_members",
+        "routes": [
+          "router.get('/analytics/telegram-members')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "refresh_x_followers",
+        "routes": [
+          "router.post('/analytics/x-followers/refresh')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_editor)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "x_followers",
+        "routes": [
+          "router.get('/analytics/x-followers')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/dashboard.py",
+        "function": "acknowledge_failure",
+        "routes": [
+          "router.post('/problems/posts/{post_id}/ack')"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(current_user)"
+        ]
+      },
+      {
+        "source": "autoposter/api/characters.py",
+        "function": "rename_character",
+        "routes": [
+          "router.patch('/{character_id}', response_model=CharacterOut)"
+        ],
+        "dependencies": [
+          "Depends(get_db)",
+          "Depends(require_admin)"
+        ]
+      }
+    ],
+    "upgrade": {
+      "current_controls": [
+        {
+          "tag": "form",
+          "id": "character-upgrade-form"
+        },
+        {
+          "tag": "input",
+          "name": "name"
+        },
+        {
+          "tag": "select",
+          "name": "technical_source"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "confirmed"
+        },
+        {
+          "tag": "button",
+          "type": "submit"
+        },
+        {
+          "tag": "button",
+          "type": "button",
+          "id": "character-upgrade-cancel"
+        }
+      ],
+      "actions": {
+        "stage": "POST /api/v1/system/character-upgrade",
+        "cancel": "DELETE /api/v1/system/character-upgrade",
+        "status": "GET /api/v1/system/character-upgrade"
+      },
+      "permission": "require_admin; preview mutations blocked; helper4 rechecked before stage",
+      "technical_conflict_policy": "Explicit optional autochat/autopost technical source; no selection fails closed on a conflict; account secrets excluded by GLOBAL_TECHNICAL_KEYS."
+    },
+    "character_management": {
+      "location": "Einstellungen → Gemeinsam",
+      "scope": "Control-plane Character names only; identity/account/automation unchanged",
+      "actions": [
+        "POST /api/v1/characters",
+        "PATCH /api/v1/characters/{character_id}"
+      ],
+      "permission": "require_admin; preview read-only",
+      "new_workspace": "empty, paused, no copied credentials"
+    },
+    "relocated_js_sources": {
+      "app/static/settings-common.js": "c893257867d697d60f69d7783ad85b08dbd9dbdc8979222537677adda7d21741",
+      "autoposter/ui/js/pages/channels.js": "6206fc06db87d76b45e790a464cae4d72077132e1494d364ce37f41a0499b11b"
+    }
+  },
+  "relocated_sources": {
+    "app/templates/shared_settings.html": [
+      {
+        "tag": "form"
+      },
+      {
+        "tag": "input",
+        "name": "name"
+      },
+      {
+        "tag": "button",
+        "type": "submit"
+      },
+      {
+        "tag": "form",
+        "action": "/settings/shared/ai"
+      },
+      {
+        "tag": "input",
+        "name": "openrouter_api_key",
+        "type": "password"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "clear_openrouter_api_key"
+      },
+      {
+        "tag": "input",
+        "name": "openrouter_model"
+      },
+      {
+        "tag": "input",
+        "name": "classifier_model"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_caption_model"
+      },
+      {
+        "tag": "input",
+        "name": "temperature",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "max_tokens",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "reasoning_mode"
+      },
+      {
+        "tag": "input",
+        "name": "generation_retries",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "generation_retry_delay",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_model"
+      },
+      {
+        "tag": "input",
+        "name": "vision_model"
+      },
+      {
+        "tag": "input",
+        "name": "vision_api_key",
+        "type": "password"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "clear_vision_api_key"
+      },
+      {
+        "tag": "input",
+        "name": "openrouter_model_caption"
+      },
+      {
+        "tag": "input",
+        "name": "openrouter_model_text"
+      },
+      {
+        "tag": "input",
+        "name": "openrouter_model_vision"
+      },
+      {
+        "tag": "input",
+        "name": "openrouter_model_fallback"
+      },
+      {
+        "tag": "input",
+        "type": "number",
+        "name": "openrouter_monthly_budget_usd"
+      },
+      {
+        "tag": "button"
+      },
+      {
+        "tag": "form",
+        "action": "/settings/shared/telegram",
+        "id": "telegram-form"
+      },
+      {
+        "tag": "a",
+        "href": "/settings#telegram"
+      },
+      {
+        "tag": "input",
+        "name": "telegram_chat_id"
+      },
+      {
+        "tag": "input",
+        "type": "hidden",
+        "name": "telegram_enabled_present"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "telegram_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "telegram_bot_token",
+        "type": "password"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "clear_telegram_bot_token"
+      },
+      {
+        "tag": "input",
+        "name": "app_base_url"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "tg-chatid"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "tg-test"
+      },
+      {
+        "tag": "button"
+      },
+      {
+        "tag": "form",
+        "action": "/settings/shared/updates"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "update_check_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "update_notify_telegram"
+      },
+      {
+        "tag": "input",
+        "name": "update_check_interval_hours",
+        "type": "number"
+      },
+      {
+        "tag": "button"
+      },
+      {
+        "tag": "a",
+        "href": "/upload"
+      },
+      {
+        "tag": "a",
+        "href": "#telegram"
+      },
+      {
+        "tag": "form",
+        "action": "/system/restart-service"
+      },
+      {
+        "tag": "button"
+      },
+      {
+        "tag": "form",
+        "action": "/settings/shared/urls",
+        "id": "base-urls"
+      },
+      {
+        "tag": "input",
+        "type": "url",
+        "name": "public_base_url"
+      },
+      {
+        "tag": "button"
+      }
+    ],
+    "app/templates/settings.html": [
+      {
+        "tag": "a",
+        "href": "/settings/shared#ai"
+      },
+      {
+        "tag": "a",
+        "id": "sect-all"
+      },
+      {
+        "tag": "a",
+        "id": "sect-none"
+      },
+      {
+        "tag": "form",
+        "action": "/settings"
+      },
+      {
+        "tag": "input",
+        "name": "history_messages",
+        "type": "number"
+      },
+      {
+        "tag": "textarea",
+        "name": "vision_prompt"
+      },
+      {
+        "tag": "textarea",
+        "name": "system_prompt"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "time_context_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "timestamps_in_history"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "time_guard_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "persona_timezone"
+      },
+      {
+        "tag": "textarea",
+        "name": "persona_schedule"
+      },
+      {
+        "tag": "select",
+        "id": "tc-weekday"
+      },
+      {
+        "tag": "input",
+        "id": "tc-time",
+        "type": "time"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "tc-btn"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "anti_ai_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "anti_ai_petnames"
+      },
+      {
+        "tag": "textarea",
+        "name": "anti_ai_rules"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "incoming_image_enabled"
+      },
+      {
+        "tag": "textarea",
+        "name": "incoming_image_react_prompt"
+      },
+      {
+        "tag": "textarea",
+        "name": "incoming_image_woman_prompt"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "tip_thanks_enabled"
+      },
+      {
+        "tag": "textarea",
+        "name": "tip_thanks_prompt"
+      },
+      {
+        "tag": "select",
+        "name": "tip_thanks_folder"
+      },
+      {
+        "tag": "input",
+        "name": "tip_thanks_folder"
+      },
+      {
+        "tag": "select",
+        "name": "mode"
+      },
+      {
+        "tag": "input",
+        "name": "chats_cache_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "chat_filter"
+      },
+      {
+        "tag": "input",
+        "name": "poll_interval_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "max_chats_per_cycle",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reply_cooldown_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "queue_context_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "send_delay_min_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "send_delay_max_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "active_hours_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "active_hour_start",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "active_hour_end",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "chat_custom_list_id"
+      },
+      {
+        "tag": "select",
+        "name": "prio2_custom_list_id"
+      },
+      {
+        "tag": "input",
+        "name": "prio2_interval_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "prio2_jitter_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "draft_recheck_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "draft_regen_on_stale"
+      },
+      {
+        "tag": "input",
+        "name": "draft_recheck_interval_seconds",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "draft_max_regen",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "bracket_max_regen",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_use_llm_classifier"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_caption_use_vision"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_block_on_distress"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_intent_threshold",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_min_fan_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_sexual_streak_trigger",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_max_media_per_set",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_offer_reset_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_thumb_cache_hours",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_cooldown_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_cooldown_outbound",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_cooldown_long_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_unpurchased_threshold",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_keywords"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_bodyparts_keywords"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_pic_request_keywords"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_freecontent_keywords"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_confirm_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "ppv_confirm_fail_open"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_confirm_context_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_keyword_exceptions"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_video_keywords"
+      },
+      {
+        "tag": "input",
+        "name": "ppv_photo_keywords"
+      },
+      {
+        "tag": "textarea",
+        "name": "ppv_no_match_prompt"
+      },
+      {
+        "tag": "textarea",
+        "name": "ppv_sales_prompt"
+      },
+      {
+        "tag": "textarea",
+        "name": "ppv_freecontent_prompt"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "reactivation_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_inactive_hours",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_cooldown_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_max_per_cycle",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_max_attempts",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_max_silence_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_delay_min_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_delay_max_minutes",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "reactivation_folder"
+      },
+      {
+        "tag": "input",
+        "name": "reactivation_folder"
+      },
+      {
+        "tag": "textarea",
+        "name": "reactivation_prompt"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "memory_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "memory_consolidate_enabled"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "messages_store_enabled"
+      },
+      {
+        "tag": "input",
+        "name": "memory_max_chars",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_trigger_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_quiet_hours",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_min_interval_hours",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_min_fan_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_max_per_cycle",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_sweep_hour",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_max_long",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_max_short",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_short_max_age_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "messages_retention_days",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_max_pages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_chunk",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_delay",
+        "type": "number"
+      },
+      {
+        "tag": "select",
+        "name": "memory_backfill_auto"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_max_messages",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "memory_backfill_per_hour",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "memory_reactivation_use_loops"
+      },
+      {
+        "tag": "a",
+        "href": "/chats"
+      },
+      {
+        "tag": "a",
+        "href": "/chats"
+      },
+      {
+        "tag": "input",
+        "name": "max_reply_chars",
+        "type": "number"
+      },
+      {
+        "tag": "input",
+        "name": "banned_words"
+      },
+      {
+        "tag": "input",
+        "name": "escalation_keywords"
+      },
+      {
+        "tag": "a",
+        "href": "/settings/shared#telegram"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "alert_keywords_enabled"
+      },
+      {
+        "tag": "textarea",
+        "name": "alert_keywords"
+      },
+      {
+        "tag": "input",
+        "id": "kw-probe",
+        "type": "text"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "kw-test"
+      },
+      {
+        "tag": "button"
+      }
+    ],
+    "app/templates/_fanvue_settings.html": [
+      {
+        "tag": "form",
+        "action": "/oauth/disconnect"
+      },
+      {
+        "tag": "button"
+      },
+      {
+        "tag": "a",
+        "href": "/oauth/start"
+      },
+      {
+        "tag": "form",
+        "action": "/settings/shared/fanvue"
+      },
+      {
+        "tag": "input",
+        "name": "fanvue_client_id"
+      },
+      {
+        "tag": "input",
+        "name": "fanvue_client_secret",
+        "type": "password"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "clear_fanvue_client_secret"
+      },
+      {
+        "tag": "input",
+        "name": "fanvue_redirect_uri"
+      },
+      {
+        "tag": "input",
+        "name": "fanvue_api_version"
+      },
+      {
+        "tag": "button"
+      }
+    ],
+    "app/templates/_program_updates.html": [
+      {
+        "tag": "button",
+        "type": "button",
+        "id": "upd-now"
+      },
+      {
+        "tag": "form",
+        "action": "/system/update",
+        "id": "upd-install-form"
+      },
+      {
+        "tag": "button",
+        "type": "submit",
+        "id": "upd-install"
+      }
+    ]
   }
 }

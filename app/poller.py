@@ -20,15 +20,28 @@ from typing import Any
 from . import (db, fanvue, guardrails, memory, namefilter, notify, openrouter,
                ppv_engine, updater)
 
-_thread: threading.Thread | None = None
-_stop = threading.Event()
-_status: dict[str, Any] = {"last_poll": None, "last_error": None, "cycles": 0}
+from dataclasses import dataclass, field
+from .character_state import CharacterLocal, CharacterDict
+from .character_tasks import CharacterThread
+
+
+@dataclass
+class WorkerState:
+    thread: threading.Thread | None = None
+    watchdog: threading.Thread | None = None
+    stop: threading.Event = field(default_factory=threading.Event)
+    lock: Any = field(default_factory=threading.RLock)
+
+
+_workers = CharacterLocal(WorkerState)
+_worker_state = _workers.get
+_status = CharacterDict({"last_poll": None, "last_error": None, "cycles": 0})
 
 
 # ---------------------------------------------------------------- Hilfsfunktionen
 def status() -> dict[str, Any]:
     st = dict(_status)
-    st["alive"] = bool(_thread and _thread.is_alive())
+    st["alive"] = bool(_worker_state().thread and _worker_state().thread.is_alive())
     last = st.get("last_poll")
     st["stale_seconds"] = (time.time() - last) if last else None
     return st
@@ -687,6 +700,10 @@ def _detect_purchase(user_uuid: str, messages_chrono: list, me_uuid: str) -> Non
         )
 
 
+from autoposter.services.runtime import autochat_automation
+from autoposter.adapters.base import ExternalActionBlocked
+
+@autochat_automation()
 def send_due_cycle() -> None:
     """Sendet faellige Auto-Drafts."""
     if not fanvue.is_connected():
@@ -836,6 +853,12 @@ def _send_draft(draft_id: int) -> bool:
                 db.add_reactivation_sent(user_uuid, media)
             db.log("info", "send", f"Gesendet an {draft['handle'] or user_uuid}", text[:200])
         return True
+    except ExternalActionBlocked as exc:
+        # Definitely not transmitted. Keep the draft reviewable, never sent or
+        # provider-failed, and do not automatically resume after a master stop.
+        db.update_draft(draft_id, status="pending", auto_send=0,
+                        scheduled_send_at=None, error=str(exc))
+        return False
     except fanvue.FanvueError as exc:
         db.update_draft(draft_id, status="failed", error=str(exc))
         db.log("error", "send", f"Senden fehlgeschlagen (Draft #{draft_id})", str(exc))
@@ -863,10 +886,10 @@ def send_draft_now(draft_id: int, edited_text: str = "") -> bool:
 
 # --------------------------------------------------- CSV-Kauf-Import (Hintergrund)
 _import_lock = threading.Lock()
-_import_state: dict[str, Any] = {"running": False, "total": 0, "done": 0, "offers": 0,
+_import_state = CharacterDict({"running": False, "total": 0, "done": 0, "offers": 0,
                                  "purchased_subs": 0, "matched_folders": 0, "csv_purchased": 0,
                                  "unresolved": 0, "error": None, "started_at": None,
-                                 "finished_at": None, "check_api": False}
+                                 "finished_at": None, "check_api": False})
 
 
 def import_status() -> dict[str, Any]:
@@ -881,7 +904,7 @@ def start_purchase_import(rows: list, check_api: bool = True) -> bool:
         _import_state.update(running=True, total=0, done=0, offers=0, purchased_subs=0,
                              matched_folders=0, csv_purchased=0, unresolved=0, error=None,
                              started_at=time.time(), finished_at=None, check_api=check_api)
-    threading.Thread(target=_purchase_import_worker, args=(rows, check_api),
+    CharacterThread(target=_purchase_import_worker, args=(rows, check_api),
                      name="csv-import", daemon=True).start()
     return True
 
@@ -1240,23 +1263,22 @@ def _create_reactivation_draft(chat: Any, me_uuid: str, folder: str,
            f"{', +Bild' if media else ''})", "")
 
 
-_next_prio2_at = 0.0
+_prio2_clock = CharacterDict({'next_at': 0.0})
 
 
 def _prio2_cycle_if_due() -> None:
     """Bearbeitet die Prio-2-Gruppe seltener (Intervall + Zufalls-Jitter)."""
-    global _next_prio2_at
     prio2_list = db.get_setting("prio2_custom_list_id", "")
     if not prio2_list:
         return
     now = time.time()
-    if now < _next_prio2_at:
+    if now < _prio2_clock['next_at']:
         return
     poll_cycle(custom_list_id=prio2_list)
     interval = float(db.get_setting("prio2_interval_minutes", 30)) * 60
     jitter_max = float(db.get_setting("prio2_jitter_minutes", 30))
     jitter = random.randint(60, max(60, int(jitter_max * 60)))
-    _next_prio2_at = time.time() + interval + jitter
+    _prio2_clock['next_at'] = time.time() + interval + jitter
     db.log("info", "poll", f"Prio-2-Gruppe bearbeitet · naechster Lauf in "
            f"{int((interval + jitter)/60)} Min", "")
 
@@ -1682,6 +1704,7 @@ def _notify_update(state: dict) -> None:
 
 
 # ---------------------------------------------------------------- Loop-Steuerung
+@autochat_automation()
 def _loop() -> None:
     """Hauptschleife des Workers.
 
@@ -1691,7 +1714,7 @@ def _loop() -> None:
     die Schleife den Thread lautlos. Der Bot stand dann still, waehrend das
     Dashboard weiter "laeuft" anzeigte.
     """
-    while not _stop.is_set():
+    while not _worker_state().stop.is_set():
         interval = 60.0
         try:
             if db.get_setting("bot_running", False):
@@ -1726,7 +1749,7 @@ def _loop() -> None:
         except Exception:  # noqa: BLE001
             interval = 60.0
         try:
-            _stop.wait(interval)
+            _worker_state().stop.wait(interval)
         except Exception:  # noqa: BLE001
             time.sleep(interval)
     _status["stopped_at"] = time.time()
@@ -1741,13 +1764,13 @@ _WATCHDOG_INTERVAL = 60.0
 
 
 def is_alive() -> bool:
-    return bool(_thread and _thread.is_alive())
+    return bool(_worker_state().thread and _worker_state().thread.is_alive())
 
 
 def _watchdog_loop() -> None:
-    while not _stop.is_set():
+    while not _worker_state().stop.is_set():
         try:
-            if not _stop.is_set() and not is_alive():
+            if not _worker_state().stop.is_set() and not is_alive():
                 db.log("error", "system",
                        "Worker war gestoppt – wird automatisch neu gestartet",
                        f"letzter Durchlauf: {_status.get('last_poll')} · "
@@ -1764,30 +1787,36 @@ def _watchdog_loop() -> None:
                     pass
         except BaseException:  # noqa: BLE001 - der Waechter erst recht nicht
             pass
-        _stop.wait(_WATCHDOG_INTERVAL)
+        _worker_state().stop.wait(_WATCHDOG_INTERVAL)
 
 
 def _start_thread() -> None:
-    global _thread
-    _thread = threading.Thread(target=_loop, name="fanvue-poller", daemon=True)
-    _thread.start()
+    state = _worker_state()
+    state.thread = CharacterThread(target=_loop, name="fanvue-poller", daemon=True)
+    state.thread.start()
 
 
 def start() -> None:
-    global _watchdog
-    if is_alive():
-        return
-    _stop.clear()
-    _start_thread()
-    # Laeufe, die ein Neustart mitten im Einlesen erwischt hat, wieder freigeben.
-    memory.reset_stale_backfills()
-    if not (_watchdog and _watchdog.is_alive()):
-        _watchdog = threading.Thread(target=_watchdog_loop, name="fanvue-watchdog",
-                                     daemon=True)
-        _watchdog.start()
-    db.log("info", "system", "Worker gestartet")
+    state = _worker_state()
+    with state.lock:
+        if is_alive():
+            return
+        if any(t and t.is_alive() for t in (state.thread, state.watchdog)):
+            raise RuntimeError('Previous character worker has not stopped yet')
+        state.stop.clear()
+        memory.reset_stale_backfills()
+        _start_thread()
+        state.watchdog = CharacterThread(target=_watchdog_loop, name="fanvue-watchdog",
+                                         daemon=True)
+        state.watchdog.start()
+        db.log("info", "system", "Worker gestartet")
 
 
 def stop() -> None:
-    _stop.set()
+    state = _worker_state()
+    with state.lock:
+        state.stop.set()
+    for worker in (state.thread, state.watchdog):
+        if worker and worker is not threading.current_thread():
+            worker.join(timeout=5)
     db.log("info", "system", "Worker gestoppt")

@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, update
 from autoposter.adapters.base import AdapterError
 from autoposter.adapters.fanvue import FanvueAdapter
-from autoposter.config import settings
+from autoposter.services.runtime import runtime as settings
 from autoposter.models import AppSetting
 from autoposter.services import appconfig, credentials, visibility_aging
 
@@ -90,14 +90,8 @@ async def scan(request, now, days, delete_ppv):
 
 async def claim(db, account, now, manual):
     key = PREFIX + account
-    if db.bind.dialect.name == 'sqlite':
-        from sqlalchemy.dialects.sqlite import insert
-    else:
-        from sqlalchemy.dialects.postgresql import insert
-    await db.execute(insert(AppSetting).values(key=key, value={}).on_conflict_do_nothing(index_elements=['key']))
-    if db.bind.dialect.name == 'sqlite':
-        await db.execute(update(AppSetting).where(AppSetting.key == key).values(key=key))
-    row = (await db.execute(select(AppSetting).where(AppSetting.key == key).with_for_update().execution_options(populate_existing=True))).scalar_one()
+    from autoposter.services.owned_settings import locked_setting
+    row = await locked_setting(db, key)
     value = dict(row.value or {})
     if stamp(value.get('lease_until')) and stamp(value['lease_until']) > now:
         await db.commit()
@@ -121,7 +115,8 @@ async def heartbeat(db, account, token, clock):
         await db.rollback()
         raise AdapterError('Löschlauf hat seine Sperre verloren; abgebrochen')
     value['lease_until'] = (now+LEASE).isoformat()
-    changed = await db.execute(update(AppSetting).where(AppSetting.key == key, AppSetting.value['token'].as_string() == token).values(value=value).execution_options(synchronize_session=False))
+    from autoposter.services.owned_settings import compare_and_set
+    changed = await compare_and_set(db, key, 'token', token, value)
     await db.commit()
     if changed.rowcount != 1:
         raise AdapterError('Löschlauf hat seine Sperre verloren; abgebrochen')
@@ -222,7 +217,8 @@ async def process(db, *, days, delete_ppv, execute, now=None, manual=True):
             # even on partial provider failure; a later manual run remains possible.
             if not manual or not report['errors']:
                 saved['completed_slot']=moment.astimezone(ZONE).date().isoformat()
-            changed=await db.execute(update(AppSetting).where(AppSetting.key == PREFIX+account,AppSetting.value['token'].as_string() == token).values(value=saved).execution_options(synchronize_session=False))
+            from autoposter.services.owned_settings import compare_and_set
+            changed=await compare_and_set(db, PREFIX+account, 'token', token, saved)
             await db.commit()
             if changed.rowcount != 1:
                 report['status']='error';report['errors'].append({'error':'Laufstatus konnte nicht gesichert werden'})

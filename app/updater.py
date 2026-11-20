@@ -202,9 +202,9 @@ def install() -> tuple[bool, str]:
         out = (res.stdout or b"").decode(errors="replace").strip()
         err = (res.stderr or b"").decode(errors="replace").strip()
         if res.returncode != 0:
-            db.log("error", "update", "Update fehlgeschlagen", (err or out)[:800])
+            db.log_global("error", "update", "Update fehlgeschlagen", (err or out)[:800])
             return False, (err or out or "Unbekannter Fehler")[:400]
-        db.log("info", "update", "Update gestartet; Vorbereitung und Neustart laufen im Hintergrund", out[:800])
+        db.log_global("info", "update", "Update gestartet; Vorbereitung und Neustart laufen im Hintergrund", out[:800])
         db.set_setting("update_state", "")     # erzwingt frische Pruefung nach dem Neustart
         return True, out[:400]
     except FileNotFoundError:

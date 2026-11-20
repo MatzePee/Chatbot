@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Fixed, root-owned system actions. All code and package operations run as SVC_USER.
 set -euo pipefail
+HELPER_PROTOCOL=4
 REPO="/srv/fanvue/Fanvue_Chatbot"
 SVC_USER="matze"
 SERVICE="fanvue-chatbot"
@@ -10,7 +11,8 @@ case "${1:-}" in
       /usr/bin/python3 /usr/local/libexec/mp-creatorstudio-update run "$REPO" "$SVC_USER" "$SERVICE"
     ;;
   restart-service)
-    exec systemd-run --no-block --collect --unit="fanvue-restart-$$" systemctl restart "$SERVICE"
+    exec systemd-run --no-block --collect --unit="fanvue-restart-$$" \
+      /usr/bin/python3 /usr/local/libexec/mp-creatorstudio-update restart "$REPO" "$SVC_USER" "$SERVICE"
     ;;
   reboot)
     exec systemd-run --no-block --collect --unit="fanvue-reboot-$$" systemctl reboot

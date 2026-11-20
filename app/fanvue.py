@@ -193,9 +193,20 @@ def _request(method: str, path: str, *, params: dict | None = None,
         raise preview.PreviewNetworkBlocked(preview.MESSAGE)
     url = f"{API_BASE}{path}"
     last_err = ""
+    from autoposter.services.runtime import assert_autochat_action_allowed
+    mutates = (method.upper() not in ('GET', 'HEAD', 'OPTIONS')
+               and not (method.upper() == 'POST' and path == '/insights/fans/batch'))
+    mutates = mutates or (method.upper() == 'GET' and params is not None
+                         and 'markAsRead' in params
+                         and str(params['markAsRead']).lower() != 'false')
     for attempt in range(_attempts):
+        if mutates:
+            assert_autochat_action_allowed()
+        headers = _headers()  # may refresh credentials; a pause can commit meanwhile
+        if mutates:
+            assert_autochat_action_allowed()
         try:
-            resp = httpx.request(method, url, headers=_headers(), params=params,
+            resp = httpx.request(method, url, headers=headers, params=params,
                                  json=json_body, timeout=_TIMEOUT)
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             # Netzwerk-/Timeout-Problem -> mit Backoff erneut versuchen
@@ -411,7 +422,8 @@ def folder_media_uuids(folder_name: str, max_pages: int = 10) -> set[str]:
 
 
 # In-Process-Cache fuer den Medien->Ordner-Index (teuer zu bauen, fuer alle Fans gleich)
-_media_index_cache: dict[str, Any] = {"ts": 0.0, "index": {}}
+from .character_state import CharacterDict
+_media_index_cache = CharacterDict({"ts": 0.0, "index": {}})
 
 
 def media_folder_index(ttl: float = 900, ppv_only: bool = True,

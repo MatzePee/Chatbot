@@ -9,6 +9,7 @@ anderen nicht lahm und beendet den Webserver nicht.
 """
 from __future__ import annotations
 
+import os
 import asyncio
 import logging
 import random
@@ -52,6 +53,23 @@ def default_jobs() -> List[Job]:
     ]
 
 
+async def dispatch_tick(job: Job) -> Dict[str, Any]:
+    if os.environ.get('MP_CHARACTERS_ENABLED') != '1':
+        return await job.func()
+    from autoposter import character_dispatch
+    owners = await character_dispatch.active_ids()
+    failures = 0
+    for owner in owners:
+        try:
+            await character_dispatch.invoke(owner, job.name, job.func)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            failures += 1
+            logger.exception('Character job %s failed for %s', job.name, owner)
+    return {'characters':len(owners), 'failed':failures}
+
+
 class Scheduler:
     def __init__(self, job_list: Optional[List[Job]] = None) -> None:
         self.jobs: List[Job] = job_list if job_list is not None else default_jobs()
@@ -64,7 +82,7 @@ class Scheduler:
         while not self._stopping.is_set():
             started = datetime.now(timezone.utc)
             try:
-                job.last_result = await job.func()
+                job.last_result = await dispatch_tick(job)
                 job.last_error = None
                 logger.debug("Job %s: %s", job.name, job.last_result)
             except asyncio.CancelledError:
@@ -110,6 +128,10 @@ class Scheduler:
         job = next((j for j in self.jobs if j.name == name), None)
         if not job:
             raise KeyError(f"Unbekannter Job: {name}")
+        if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+            from autoposter.character_dispatch import invoke
+            from autoposter.workspaces import current_character
+            return await invoke(current_character(), job.name, job.func)
         job.last_run = datetime.now(timezone.utc)
         job.runs += 1
         try:

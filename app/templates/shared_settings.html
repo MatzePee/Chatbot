@@ -1,61 +1,62 @@
 {% extends "settings_shell.html" %}
-{% block title %}Einstellungen · MP CreatorStudio{% endblock %}
 {% block settings_content %}
-<h1>Gemeinsame Einstellungen</h1>
-<p class="muted">Verbindungen und Programm-Updates für deinen gesamten Creator Workspace.</p>
-{% include "_deployment_status.html" %}
-{% if saved in ['fanvue', 'telegram', 'updates'] %}<div class="card ok" role="status">Einstellungen gespeichert.</div>{% endif %}
-{% if preview %}<p class="muted">Im geschützten Mitlesemodus sind Änderungen an den Verbindungen und den Updates gesperrt.</p>{% endif %}
-<div class="card" id="fanvue">
-  <h2>Gemeinsame Fanvue-Verbindung</h2>
-  <p class="muted">AutoChat und AutoPost verwenden dieselben Zugangsdaten und dieselbe Anmeldung.</p>
-  {% if connected %}
-    <p><span class="dot green"></span> Verbunden{% if tokens and tokens['account_handle'] %} als <strong>{{ tokens['account_handle'] }}</strong>{% endif %}.</p>
-    {% if tokens and tokens['scope'] %}
-    <p class="small muted">Gewährte Scopes: <code>{{ tokens['scope'] }}</code></p>
-    {% set granted = tokens['scope'] %}
-    {% set missing = [] %}
-    {% for need in ['read:fan','read:insights','read:media','write:media','read:post','write:post','read:chat','write:chat'] %}
-      {% if need not in granted %}{% set _ = missing.append(need) %}{% endif %}
-    {% endfor %}
-    {% if missing %}
-    <p class="small" style="color:#e0b050">⚠ Fehlende Scopes: <code>{{ missing | join(', ') }}</code>.
-    Hinweis: <code>read:fan</code> und <code>read:insights</code> gibt Fanvue nur für
-    <strong>Creator-/Agentur-Konten</strong> frei – bei anderen Kontotypen bleiben sie ungewährt
-    (Bot funktioniert trotzdem, nur ohne Fan-Insights und volle Mitgliederliste).</p>
-    {% if 'write:media' in missing or 'write:post' in missing %}
-    <p class="small" style="color:#e0b050"><strong>AutoPost ist ohne diese Schreibrechte gesperrt.</strong>
-    Trenne die Fanvue-Verbindung und verbinde sie anschließend erneut, um die neuen Rechte freizugeben.</p>
-    {% endif %}
-    {% endif %}
-    {% endif %}
-    <form method="post" action="/oauth/disconnect"><button class="btn-danger">Verbindung trennen</button></form>
-  {% else %}
-    <p><span class="dot red"></span> Nicht verbunden. Trage unten Client-ID, Secret und Redirect-URI ein, speichere, dann verbinde.</p>
-    {% if not preview %}<a class="btn-primary" href="/oauth/start">Mit Fanvue verbinden</a>{% endif %}
-  {% endif %}
-</div>
 
-<form method="post" action="/settings/shared/fanvue">
-  <details class="card sect"{% if not connected %} open{% endif %}>
-    <summary>Fanvue-Zugangsdaten</summary>
-    <label>Client-ID <input name="fanvue_client_id" value="{{ s['fanvue_client_id'] }}"></label>
-    <label>Client-Secret <input name="fanvue_client_secret" type="password" value="{{ s['fanvue_client_secret'] }}"></label>
-    <label class="chk"><input type="checkbox" name="clear_fanvue_client_secret"> Gespeichertes Client-Secret beim Speichern entfernen</label>
-    <label>Redirect-URI (exakt in Fanvue-App hinterlegen)
-      <input name="fanvue_redirect_uri" value="{{ s['fanvue_redirect_uri'] }}"></label>
-    <label>API-Version <input name="fanvue_api_version" value="{{ s['fanvue_api_version'] }}"></label>
-    <p><button class="btn-primary">Fanvue-Einstellungen speichern</button></p>
-  </details>
-</form>
+{% if settings_view == 'characters' %}
+{% include "_character_management.html" %}
+{% endif %}
+
+{% if settings_view == 'ai' %}
+<section class="card" id="ai"><h2>Modelle & Generierung</h2><p>Gilt für alle Charaktere. Chat-Bildanalyse und Post-Bildbeschreibung bleiben getrennte Aufgaben. Exakte Modell-IDs; keine automatische Anbieterabfrage.</p><form method="post" action="/settings/shared/ai">
+<label>API-Key <input name="openrouter_api_key" type="password" value="{{ '********' if s['openrouter_api_key'] else '' }}"></label>
+<label class="chk"><input type="checkbox" name="clear_openrouter_api_key"> Gespeicherten OpenRouter-Key beim Speichern entfernen</label>
+<label>Chat-Modell (Antworten) <span class="info" tabindex="0" data-tip="Das Hauptmodell für die normalen Chat-Antworten. Hier gehört dein unzensiertes Modell hin.">ⓘ</span>
+      <input name="openrouter_model" value="{{ s['openrouter_model'] }}"
+      placeholder="z.B. cognitivecomputations/dolphin-mistral, sao10k/l3-euryale-70b"></label>
+<label>Analyse-Modell (Intent/Vorlieben) <span class="info" tabindex="0" data-tip="Bewertet Fan-Nachrichten (Kaufinteresse, Vorlieben, Content-Anfrage) und muss zuverlässig JSON liefern. Hier ein intelligentes Modell wählen. Leer = Chat-Modell.">ⓘ</span>
+      <input name="classifier_model" value="{{ s['classifier_model'] }}"
+      placeholder="leer = Chat-Modell · z.B. openai/gpt-4o-mini, google/gemini-2.0-flash"></label>
+<label>PPV-Caption-Modell (Bildunterschriften) <span class="info" tabindex="0" data-tip="Modell für die PPV-Bildunterschriften. Sollte explizite Captions schreiben können (unzensiert). Leer = Chat-Modell.">ⓘ</span>
+      <input name="ppv_caption_model" value="{{ s['ppv_caption_model'] }}"
+      placeholder="leer = Chat-Modell"></label>
+<label>Temperatur <span class="info" tabindex="0" data-tip="Kreativität/Zufall der Antworten (0–2). Niedrig = konsistenter/vorhersehbarer, höher = abwechslungsreicher/wilder. Empfohlen ~0.8–1.0.">ⓘ</span> <input name="temperature" type="number" step="0.1" min="0" max="2" value="{{ s['temperature'] }}"></label>
+<label>Max Tokens <span class="info" tabindex="0" data-tip="Maximale Länge der generierten Antwort. Bei Reasoning-Modellen (z.B. gpt-5.x) zählt internes Denken mit – zu niedrig schneidet den Text ab. Empfohlen ≥ 800.">ⓘ</span> <input name="max_tokens" type="number" value="{{ s['max_tokens'] }}"></label>
+<label>Denkprozess des Modells <span class="info" tabindex="0" data-tip="Reasoning-Modelle denken vor der Antwort. Manche schreiben diese Überlegungen versehentlich in den Antworttext („Wait, the fan is writing in German…“). Für kurze Chat-Antworten bringt Nachdenken kaum etwas, kostet aber Tokens – deshalb standardmäßig aus.">ⓘ</span>
+        <select name="reasoning_mode">
+          {% set rm = s['reasoning_mode'] or 'none' %}
+          <option value="none" {% if rm=='none' %}selected{% endif %}>aus (empfohlen)</option>
+          <option value="exclude" {% if rm=='exclude' %}selected{% endif %}>denken, aber nicht ausgeben</option>
+          <option value="default" {% if rm=='default' %}selected{% endif %}>Modell entscheidet</option>
+        </select></label>
+<label>Neuversuche bei leerer Antwort <span class="info" tabindex="0" data-tip="Liefert das Modell eine leere Antwort (kommt bei Reasoning-Modellen vor), wird bis zu so oft neu generiert. Erst wenn alle Versuche leer bleiben, landet der Entwurf zur manuellen Freigabe. Standard 3.">ⓘ</span> <input name="generation_retries" type="number" min="1" max="10" value="{{ s['generation_retries'] }}"></label>
+<label>Pause zwischen Neuversuchen (s) <span class="info" tabindex="0" data-tip="Wartezeit zwischen den Neuversuchen bei leerer Antwort. Gilt nur im automatischen Hintergrundbetrieb – beim manuellen „Neu generieren\" und im Test-Modus wird nicht gewartet. Standard 60.">ⓘ</span> <input name="generation_retry_delay" type="number" min="0" max="600" value="{{ s['generation_retry_delay'] }}"></label>
+<label>Modell für die Verdichtung <span class="info" tabindex="0" data-tip="Leer = Chat-Modell. Verdichten ist eine strukturierte JSON-Aufgabe; ein günstiges Modell genügt und spart ein Vielfaches.">ⓘ</span>
+        <input name="memory_model" value="{{ s['memory_model'] }}" placeholder="leer = Chat-Modell"></label>
+<label>Chat-Bildanalyse
+      <input name="vision_model" value="{{ s['vision_model'] }}"
+        placeholder="z.B. openai/gpt-4o, google/gemini-2.0-flash, anthropic/claude-3.5-sonnet"></label>
+<label>Vision-API-Key (optional, eigener Key)
+      <input name="vision_api_key" type="password" value="{{ '********' if s['vision_api_key'] else '' }}"
+        placeholder="leer = gemeinsamer OpenRouter-Key"></label>
+<label class="chk"><input type="checkbox" name="clear_vision_api_key"> Gespeicherten Vision-Key beim Speichern entfernen (OpenRouter-Key verwenden)</label><label>Post-Bildunterschriften<input name="openrouter_model_caption" value="{{ s.get('openrouter_model_caption', '') }}"></label>
+<label>Textposts<input name="openrouter_model_text" value="{{ s.get('openrouter_model_text', '') }}"></label>
+<label>Post-Bildbeschreibung<input name="openrouter_model_vision" value="{{ s.get('openrouter_model_vision', '') }}"></label>
+<label>Post-Ausweichmodell<input name="openrouter_model_fallback" value="{{ s.get('openrouter_model_fallback', '') }}"></label>
+<p class="muted small">Erfasste AutoPost-Kosten aller Charaktere; AutoChat-Kosten sind nicht enthalten. Der gemeinsame Budgetwert gilt je Charakter für AutoPost und ist kein gemeinsames Ausgabenlimit des OpenRouter-Kontos.</p>
+<label>AutoPost-Monatsbudget je Charakter (USD)<input type="number" min="0" step="0.01" name="openrouter_monthly_budget_usd" value="{{ s.get('openrouter_monthly_budget_usd', 100) }}"></label>
+<button class="btn-primary">KI-Einstellungen speichern</button></form><div id="ai-overview" data-live-preserve></div></section>
+{% endif %}
+{% if settings_view in ['system','updates'] %}{% include "_deployment_status.html" %}{% endif %}
+{% if saved in ['ai', 'urls', 'telegram', 'updates'] %}<div class="card ok" role="status">Einstellungen gespeichert.</div>{% endif %}
+{% if preview %}<p class="muted">Im geschützten Mitlesemodus sind Änderungen an den Verbindungen und den Updates gesperrt.</p>{% endif %}
+{% if settings_view == 'telegram' %}
 <form method="post" action="/settings/shared/telegram" id="telegram-form">
   <div class="card" id="telegram">
     <h2>Telegram-Verbindung</h2>
     <p class="muted">Gemeinsamer Bot und Zielchat für Telegram-Benachrichtigungen.
     AutoPost meldet Post-Fehler und erforderliche Konto-Neuanmeldungen automatisch an diesen Chat.
     Bestehende Probleme werden frühestens nach sechs Stunden erneut gemeldet.
-    Die Meldungen zu Gesprächen und Freigaben wählst du in den
-    <a href="/settings#telegram">AutoChat-Einstellungen</a>.</p>
+    Die Meldungen zu Gesprächen und Freigaben wählst du unter
+    <a href="/settings/shared?section=autochat&view=notifications">Benachrichtigungen des Charakters</a>.</p>
     <details style="margin-bottom:10px">
       <summary class="muted" style="cursor:pointer">Einrichtung in 3 Schritten</summary>
       <ol class="muted" style="font-size:13px;line-height:1.7;margin:8px 0 0 0">
@@ -70,8 +71,10 @@
       <label>Chat-ID <input name="telegram_chat_id" value="{{ s['telegram_chat_id'] }}"
         placeholder="wird unten ermittelt"></label>
     </div>
-    <label>Bot-Token (von @BotFather)
-      <input name="telegram_bot_token" type="password" value="{{ s['telegram_bot_token'] }}"
+    <input type="hidden" name="telegram_enabled_present" value="1">
+  <label class="chk"><input type="checkbox" name="telegram_enabled" value="1" {% if s['telegram_enabled'] %}checked{% endif %}> AutoChat-Benachrichtigungen für alle Charaktere aktivieren</label>
+  <label>Bot-Token (von @BotFather)
+      <input name="telegram_bot_token" type="password" value="{{ '********' if s['telegram_bot_token'] else '' }}"
         placeholder="123456789:ABCdef..."></label>
     <label class="chk"><input type="checkbox" name="clear_telegram_bot_token"> Gespeichertes Bot-Token beim Speichern entfernen</label>
     <label>Basis-URL dieser Oberfläche (für den Link in der Meldung)
@@ -88,6 +91,8 @@
 </form>
 <script src="/static/telegram-settings.js?v={{ css_v }}" defer></script>
 
+{% endif %}
+{% if settings_view == 'updates' %}
 <section id="updates">
 {% include "_program_updates.html" %}
 <form method="post" action="/settings/shared/updates">
@@ -111,6 +116,10 @@
 </form>
 </section>
 
+{% endif %}
+{% if settings_view == 'system' %}
+<div id="system-overview"></div>
+<div class="card"><h2>Diagnose</h2><p>Systemzustand, Ressourcen und Protokolle prüfen.</p><a class="btn" href="/system">Systemübersicht öffnen</a></div>
 <div class="card" id="service-controls">
   <h2>Dienststeuerung</h2>
   <p class="muted">Startet MP CreatorStudio neu, damit Änderungen am Programmcode aktiv werden. Die Oberfläche ist dabei kurz nicht erreichbar.</p>
@@ -120,4 +129,9 @@
   </form>
 </div>
 
+<form method="post" action="/settings/shared/urls" class="card" id="base-urls"><h2>Basis-URLs</h2>
+<label>Öffentliche Basis-URL (Callback-Rückfalladresse)<input type="url" name="public_base_url" value="{{ s.get('public_base_url', '') }}"></label>
+<p class="muted">Die Benachrichtigungsadresse app_base_url wird separat bei Telegram gepflegt; die beiden Adressen werden nicht zusammengeführt.</p><button class="btn-primary">Basis-URL speichern</button></form>
+{% endif %}
+{% if settings_view in ['ai','system'] %}<script type="module" src="/static/settings-common.js?v=settings-structure-20261120-2"></script>{% endif %}
 {% endblock %}

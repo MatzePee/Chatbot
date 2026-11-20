@@ -354,7 +354,9 @@ class FanvueAdapter:
             # 2) Für jedes Teil eine kurzlebige URL abfragen und direkt nach
             # S3 laden (presigned URLs, ohne Fanvue-Auth-Header).
             etags: List[Dict[str, Any]] = []
-            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as s3:
+            from autoposter.adapters.base import guard_external_request
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0),
+                                         event_hooks={'request': [guard_external_request]}) as s3:
                 for index in range(parts_count):
                     chunk = data[index * PART_SIZE : (index + 1) * PART_SIZE]
                     part = await client.get(

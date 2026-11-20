@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 
-from autoposter.config import settings
+from autoposter.services.runtime import runtime as settings
 from autoposter.db import session_scope
 from autoposter.models import Channel, ChannelHealth, MediaAsset, MediaStatus, Post, PostStatus
 from autoposter.services import (
@@ -46,14 +46,9 @@ async def delete_old_fanvue_posts(*, manual=False, days=None, delete_ppv=None):
         else:
             result = await post_retention.scheduled(db)
         if result.get('status') not in {'disabled','paused','dry_run'}:
-            from autoposter.models import AppSetting
-            if db.bind.dialect.name == 'sqlite':
-                from sqlalchemy.dialects.sqlite import insert
-            else:
-                from sqlalchemy.dialects.postgresql import insert
+            from autoposter.services.owned_settings import record_job_result
             value={**result,'recorded_at':datetime.now(timezone.utc).isoformat()}
-            stmt=insert(AppSetting).values(key='fanvue_retention_last_run',value=value)
-            await db.execute(stmt.on_conflict_do_update(index_elements=['key'],set_={'value':value}))
+            await record_job_result(db, 'fanvue_retention_last_run', value)
             await db.commit()
         return result
 
@@ -73,14 +68,9 @@ async def age_fanvue_visibility(*, manual=False, now=None):
         items = result.get('accounts', [])
         has_result = not items or any(a.get('status') not in {'already_done','running','retry_wait'} for a in items)
         if manual or result.get('status') not in {'disabled', 'paused', 'dry_run'} and has_result:
-            from autoposter.models import AppSetting
-            if db.bind.dialect.name == 'sqlite':
-                from sqlalchemy.dialects.sqlite import insert
-            else:
-                from sqlalchemy.dialects.postgresql import insert
+            from autoposter.services.owned_settings import record_job_result
             value = {**result, 'recorded_at':datetime.now(timezone.utc).isoformat()}
-            stmt = insert(AppSetting).values(key='visibility_aging_last_run', value=value)
-            await db.execute(stmt.on_conflict_do_update(index_elements=['key'], set_={'value':value}))
+            await record_job_result(db, 'visibility_aging_last_run', value)
             await db.commit()
         return result
 
@@ -149,6 +139,9 @@ async def retry_failed(hours: int = 2) -> Dict[str, Any]:
 # --------------------------------------------------------------------------- #
 # Planung
 # --------------------------------------------------------------------------- #
+from autoposter.services.runtime import autopost_automation
+
+@autopost_automation()
 async def generate_plan(days: int = 14) -> Dict[str, Any]:
     """Kalenderlücken einmal je Berliner Kalendertag ab Mitternacht schließen.
 
@@ -163,16 +156,8 @@ async def generate_plan(days: int = 14) -> Dict[str, Any]:
         # marker commits together with the posts; rollback/crash permits retry.
         from autoposter.models import AppSetting
         from sqlalchemy import update
-        if db.bind.dialect.name == 'sqlite':
-            from sqlalchemy.dialects.sqlite import insert
-        else:
-            from sqlalchemy.dialects.postgresql import insert
-        key = 'auto_plan_daily_gate'
-        await db.execute(insert(AppSetting).values(key=key, value={}).on_conflict_do_nothing(index_elements=['key']))
-        if db.bind.dialect.name == 'sqlite':
-            await db.execute(update(AppSetting).where(AppSetting.key == key).values(key=key))
-        gate = (await db.execute(select(AppSetting).where(AppSetting.key == key).with_for_update()
-            .execution_options(populate_existing=True))).scalar_one()
+        from autoposter.services.owned_settings import locked_setting
+        gate = await locked_setting(db, 'auto_plan_daily_gate')
         values = await appconfig.get_all(db, use_cache=False)
         if not values.get("auto_plan_enabled", False):
             return {"skipped": "automatisches Nachplanen ist ausgeschaltet"}
@@ -285,7 +270,7 @@ async def refresh_metrics(hours: int = 72) -> Dict[str, Any]:
             ).scalar_one_or_none()
             if not channel or not cred_service.is_connected(channel):
                 continue
-            # X lifetime views are collected once nightly by collect_x_post_metrics.
+            # X lifetime views are manual-only; this job never collects them.
             if channel.platform == "x":
                 continue
             try:

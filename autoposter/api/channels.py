@@ -316,6 +316,10 @@ async def create_channel(
         health=ChannelHealth.needs_reauth.value,
         health_note="Noch nicht verbunden",
     )
+    from autoposter.workspaces import current_character
+    if current_character() is not None:
+        channel.is_active = False
+        channel.auto_plan_enabled = False
     if channel.platform == "telegram":
         channel.is_active = False
         channel.auto_plan_enabled = False
@@ -374,6 +378,7 @@ async def update_channel(
     policy_data = data.pop("policy", None)
     client_id = data.pop("oauth_client_id", None)
     client_secret = data.pop("oauth_client_secret", None)
+    clear_client_secret = data.pop("oauth_clear_client_secret", False)
     app_name = data.pop("oauth_app_name", None)
     for key, value in data.items():
         setattr(channel, key, value)
@@ -394,6 +399,13 @@ async def update_channel(
                 + ", ".join(names)
                 + ". Zu jeder X-App gehört genau ein Account – bitte eine eigene App anlegen.",
             )
+
+    if clear_client_secret:
+        if channel.platform != 'x':
+            raise HTTPException(422, 'Client-Secret hier nur für X entfernen')
+        channel.oauth_client_secret_enc = None
+        channel.last_verified_at = None
+        channel.health = ChannelHealth.needs_reauth.value
 
     if policy_data:
         policy = channel.policy
@@ -663,8 +675,13 @@ async def oauth_callback(
     row = (
         await db.execute(select(OAuthState).where(OAuthState.state == state))
     ).scalar_one_or_none()
-    if not row or row.platform != platform:
+    from datetime import timedelta
+    if not row or row.platform != platform or row.created_at < datetime.now(timezone.utc)-timedelta(minutes=10):
         return page("Ungültiger Status", "Der OAuth-State ist unbekannt oder abgelaufen.", False)
+    consumed = (await db.execute(delete(OAuthState).where(OAuthState.state == state).returning(OAuthState.state))).scalar_one_or_none()
+    if consumed is None:
+        return page("Ungültiger Status", "Der OAuth-State wurde bereits verwendet.", False)
+    await db.commit()  # claim once before any provider call, including concurrent callbacks
 
     channel: Optional[Channel] = None
     if row.channel_id:
@@ -685,8 +702,6 @@ async def oauth_callback(
         if not info.ok:
             return page("Kontoprüfung fehlgeschlagen", html.escape(info.message), False)
         if not x_account_matches(channel, info.username):
-            await db.delete(row)
-            await db.flush()
             return page("Falsches X-Konto", "Verbunden wurde @" + html.escape(info.username or "unbekannt")
                         + ", erwartet wird " + html.escape(channel.handle)
                         + ". Bitte bei X das richtige Konto anmelden und erneut verbinden.", False)
@@ -704,7 +719,6 @@ async def oauth_callback(
         channel.health_note = ""
         db.add(channel)
 
-    await db.delete(row)
     await db.flush()
 
     name = channel.display_name if channel else platform

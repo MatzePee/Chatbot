@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, literal, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autoposter.config import settings
@@ -103,16 +103,61 @@ CACHE_TTL = 5.0
 #: Synchron lesbare Momentaufnahme. Adapter laufen teils außerhalb einer
 #: DB-Sitzung; sie greifen hierauf zu statt auf die Datenbank.
 _snapshot: Dict[str, Any] = {}
+_character_cache = {}
+_character_snapshots = {}
+
+
+def _owner():
+    from autoposter.workspaces import current_character
+    return current_character()
+
+
+def _technical(field):
+    import os
+    from app.setting_scope import is_global_technical
+    return (_owner() is not None or os.environ.get('MP_CHARACTERS_ENABLED') == '1') and is_global_technical(field)
+
+
+def _control_only():
+    import os
+    return _owner() is None and os.environ.get('MP_CHARACTERS_ENABLED') == '1'
+
+
+def _account_configuration():
+    from .chatbot_fanvue import configuration, FIELDS as account_fields
+    if _control_only():
+        return {field: '' for field in account_fields}
+    return configuration()
+
+
+def _technical_overlay(values):
+    from app import db as chat_db
+    out = dict(values)
+    for field in FIELDS:
+        if _technical(field):
+            present, value = chat_db.technical_setting(field)
+            if present:
+                out[field] = value
+    return out
 
 
 def current(field: str, default: Any = None) -> Any:
     """Aktueller Wert ohne DB-Zugriff. Reihenfolge: Oberfläche > .env > Default."""
+    if _technical(field):
+        from app import db as chat_db
+        present, value = chat_db.technical_setting(field)
+        if present:
+            return value
+    if _control_only() and not _technical(field):
+        return default
     if field in ("fanvue_client_id", "fanvue_client_secret", "fanvue_api_version"):
-        from .chatbot_fanvue import configuration
-        return configuration()[field]
-    value = _snapshot.get(field)
+        return _account_configuration()[field]
+    snapshot = _character_snapshots.get(_owner(), {}) if _owner() else _snapshot
+    value = snapshot.get(field)
     if value not in (None, ""):
         return value
+    if _owner() and field in ('x_client_id', 'x_client_secret'):
+        return default
     env_attr = FIELDS.get(field)
     if env_attr and hasattr(settings, env_attr):
         env_value = getattr(settings, env_attr)
@@ -123,33 +168,70 @@ def current(field: str, default: Any = None) -> Any:
 
 async def refresh_snapshot(db: AsyncSession) -> Dict[str, Any]:
     global _snapshot
+    if _owner():
+        values = await get_all(db, use_cache=False)
+        _character_snapshots[_owner()] = dict(values)
+        return values
     _snapshot = await get_all(db, use_cache=False)
     return dict(_snapshot)
 
 
 def invalidate() -> None:
     global _cache, _cache_time
+    if _owner():
+        _character_cache.pop(_owner(), None)
+        _character_snapshots.pop(_owner(), None)
+        return
     _cache = None
     _cache_time = 0.0
 
 
 async def _load_raw(db: AsyncSession) -> Dict[str, Any]:
     row = (
-        await db.execute(select(AppSetting).where(AppSetting.key == SETTINGS_KEY))
+        await db.execute(select(AppSetting).where(AppSetting.key == SETTINGS_KEY)
+                         .execution_options(populate_existing=True))
     ).scalar_one_or_none()
     return dict(row.value or {}) if row else {}
+
+
+async def _legacy_global_technical(db):
+    """Read only the allowlisted infrastructure portion of the unprefixed row.
+
+    This intentionally uses the bound connection, not an unscoped ORM session or
+    a changed active context. The literal key is NOT character-prefixed by its
+    mapped TypeDecorator. Account credentials are never returned by this helper.
+    """
+    if _owner() is None:
+        return {}
+    from app.setting_scope import GLOBAL_TECHNICAL_KEYS
+    connection = await db.connection()
+    value = (await connection.execute(select(AppSetting.__table__.c.value).where(
+        AppSetting.__table__.c.key == literal(SETTINGS_KEY, String())))).scalar_one_or_none()
+    return {key:item for key,item in (value or {}).items() if key in GLOBAL_TECHNICAL_KEYS}
 
 
 async def get_all(db: AsyncSession, *, use_cache: bool = True) -> Dict[str, Any]:
     """Effektive Werte: DB vor .env vor Default. Geheimnisse entschlüsselt."""
     global _cache, _cache_time
-    if use_cache and _cache is not None and time.time() - _cache_time < CACHE_TTL:
-        from .chatbot_fanvue import configuration
-        return {**_cache, **configuration()}
+    owner = _owner()
+    cache, stamp = _character_cache.get(owner, (None, 0)) if owner else (_cache, _cache_time)
+    # A process cache must never expose an uncommitted caller transaction.
+    transactional = owner is not None or _control_only()
+    if use_cache and not transactional and cache is not None and time.time() - stamp < CACHE_TTL:
+        return _technical_overlay({**cache, **_account_configuration()})
 
     stored = await _load_raw(db)
+    legacy_technical = await _legacy_global_technical(db)
+    # Technical fields are installation-owned, never inherited from a character
+    # JSON copy left by an older migration. Keep only character fields there.
+    if owner:
+        stored = {key:value for key,value in stored.items() if not _technical(key)}
+        stored.update(legacy_technical)
     effective: Dict[str, Any] = {}
     for field, env_attr in FIELDS.items():
+        if _control_only() and not _technical(field):
+            effective[field] = '' if field in ('x_client_id', 'x_client_secret') else DEFAULTS.get(field)
+            continue
         if field in stored and stored[field] not in (None, ""):
             value = stored[field]
             if field in SECRET_FIELDS:
@@ -158,13 +240,18 @@ async def get_all(db: AsyncSession, *, use_cache: bool = True) -> Dict[str, Any]
                 except Exception:
                     value = ""
             effective[field] = value
+        elif owner and field in ('x_client_id', 'x_client_secret'):
+            effective[field] = ''
         elif env_attr and hasattr(settings, env_attr):
             effective[field] = getattr(settings, env_attr)
         else:
             effective[field] = DEFAULTS.get(field)
 
-    from .chatbot_fanvue import configuration
-    effective.update(configuration())
+    effective.update(_account_configuration())
+    if transactional:
+        from .settings_transaction import overlay
+        return await overlay(db, effective)
+    effective = _technical_overlay(effective)
     _cache = dict(effective)
     _cache_time = time.time()
     return dict(effective)
@@ -192,15 +279,28 @@ async def set_many(db: AsyncSession, values: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError('Sichtbarkeitsalter muss eine ganze Zahl von 1 bis 36500 Tagen sein.')
     if 'visibility_aging_enabled' in values and type(values['visibility_aging_enabled']) is not bool:
         raise ValueError('Sichtbarkeitsautomatik muss ein boolescher Wert sein.')
+    technical_values = {
+        field: value for field, value in values.items()
+        if _technical(field) and field in FIELDS
+        and (field not in SECRET_FIELDS or not (value is None or (isinstance(value, str) and set(value.strip()) <= set('*•●'))))
+    }
+    from . import settings_transaction
+    if technical_values:
+        # No autoflush or character JSON mutation before storage preflight.
+        await settings_transaction.enlist(db)
+    elif _owner() is not None or _control_only():
+        await settings_transaction.lock_character_settings(db)
     stored = await _load_raw(db)
 
     for field, value in values.items():
+        if _technical(field) and field in FIELDS:
+            continue
         if field in ("fanvue_client_id", "fanvue_client_secret", "fanvue_api_version"):
             continue  # Managed exclusively in AutoChat settings.
         if field not in FIELDS:
             continue
         if field in SECRET_FIELDS:
-            if value in (None, "", "********"):
+            if value is None or (isinstance(value, str) and set(value.strip()) <= set('*•●')):
                 continue  # unverändert lassen
             stored[field] = encrypt(str(value))
         else:
@@ -215,13 +315,26 @@ async def set_many(db: AsyncSession, values: Dict[str, Any]) -> Dict[str, Any]:
     else:
         db.add(AppSetting(key=SETTINGS_KEY, value=stored))
     await db.flush()
+    if technical_values:
+        await settings_transaction.write(db, technical_values)
     invalidate()
+    if _owner() is not None or _control_only():
+        return await get_all(db, use_cache=False)
     return await refresh_snapshot(db)
 
 
 async def clear_secret(db: AsyncSession, field: str) -> None:
+    if field in SECRET_FIELDS and _technical(field):
+        from . import settings_transaction
+        await settings_transaction.enlist(db)
+        await settings_transaction.write(db, {field: ''})
+        invalidate()
+        return
     if field == "fanvue_client_secret":
         return  # The shared secret is owned by AutoChat settings.
+    if _owner() is not None or _control_only():
+        from . import settings_transaction
+        await settings_transaction.lock_character_settings(db)
     stored = await _load_raw(db)
     stored.pop(field, None)
     row = (

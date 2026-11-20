@@ -22,12 +22,14 @@ def test_chat_settings_preserve_shared_values_and_tokens(client):
     for key, value in values.items():
         db.set_setting(key, value)
     tokens = dict(db.get_tokens())
-    response = client.post('/settings', data={'openrouter_model': 'new-chat-model',
+    db.set_setting('openrouter_model', 'existing-global-model')
+    response = client.post('/settings', data={'openrouter_model': 'new-chat-model', 'system_prompt': 'Updated owner persona',
                            'fanvue_client_secret': 'must-be-ignored',
                            'telegram_bot_token': 'must-be-ignored', 'telegram_chat_id': 'wrong-chat',
                            'app_base_url': 'https://wrong.example'}, follow_redirects=False)
     assert response.status_code == 303
-    assert db.get_setting('openrouter_model') == 'new-chat-model'
+    assert db.get_setting('openrouter_model') == 'existing-global-model'
+    assert db.get_setting('system_prompt') == 'Updated owner persona'
     assert {key: db.get_setting(key) for key in values} == values
     assert dict(db.get_tokens()) == tokens
 
@@ -69,11 +71,16 @@ def test_shared_controls_render_only_on_shared_page(client):
     shared = client.get('/settings/shared')
     chat = client.get('/settings')
     assert shared.status_code == chat.status_code == 200
-    for key in main._SHARED_SETTINGS_KEYS:
+    from app.setting_scope import GLOBAL_AI_KEYS
+    for key in main._SHARED_SETTINGS_KEYS - main._SHARED_FANVUE_KEYS:
         assert f'name="{key}"' in shared.text
         assert f'name="{key}"' not in chat.text
-    assert 'name="openrouter_api_key"' in chat.text
-    assert 'name="openrouter_api_key"' not in shared.text
+    for key in main._SHARED_FANVUE_KEYS:
+        assert f'name="{key}"' in chat.text
+        assert f'name="{key}"' not in shared.text
+    for key in GLOBAL_AI_KEYS:
+        assert f'name="{key}"' in shared.text
+        assert f'name="{key}"' not in chat.text
     assert 'href="/settings/shared" class="active"' in shared.text
     assert 'href="/settings/shared" class="active"' in chat.text
 
@@ -113,7 +120,9 @@ def test_notification_options_and_publication_render_in_their_own_area(client):
     shared = client.get('/settings/shared').text
     chat = client.get('/settings').text
     assert '<title>Einstellungen · MP CreatorStudio</title>' in shared
-    for name in ['telegram_enabled', 'alert_keywords_enabled', 'alert_keywords']:
+    assert 'name="telegram_enabled"' in shared
+    assert 'name="telegram_enabled"' not in chat
+    for name in ('alert_keywords', 'alert_keywords_enabled'):
         assert f'name="{name}"' in chat
         assert f'name="{name}"' not in shared
     assert 'id="tg-chatid"' in shared and 'id="tg-chatid"' not in chat

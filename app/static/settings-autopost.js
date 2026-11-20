@@ -1,7 +1,7 @@
 import { api } from '/autoposter/js/api.js?v=creatorstudio-mobile-system-20260909'
-import renderSettings from '/autoposter/js/pages/settings.js?v=settings-navigation-20261101'
-import renderChannels from '/autoposter/js/pages/channels.js?v=settings-navigation-20261101'
-import renderPersonas from '/autoposter/js/pages/personas.js?v=creatorstudio-persona-types-20260910'
+import renderSettings from '/autoposter/js/pages/settings.js?v=settings-structure-20261120-2'
+import renderChannels from '/autoposter/js/pages/channels.js?v=settings-reorg-1'
+import renderPersonas from '/autoposter/js/pages/personas.js?v=settings-structure-20261120-2'
 
 const root = document.getElementById('autopost-settings')
 const pages = { autopost: renderSettings, channels: renderChannels, personas: renderPersonas }
@@ -14,6 +14,8 @@ async function load() {
     page.querySelectorAll('a[href^="#/"]').forEach(a => {
       a.href = '/autoposter/' + a.getAttribute('href')
     })
+    page.querySelector('.page-head h1, :scope > h1')?.remove()
+    if(section==='channels')page.querySelector('a[href*="section=autochat"]')?.remove()
     root.replaceChildren(page)
     window.dispatchEvent(new Event('settings-ready'))
   } catch (error) {

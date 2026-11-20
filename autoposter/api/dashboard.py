@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from autoposter.config import settings
+from autoposter.services.runtime import runtime as settings
 from autoposter.db import get_db
 from autoposter.deps import current_user, require_admin, require_editor
 from autoposter.models import (
@@ -424,8 +424,11 @@ async def save_integrations(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ) -> Dict[str, Any]:
+    from autoposter.services.settings_transaction import SettingsTransactionUnsupported
     try:
         values = await appconfig.set_many(db, payload)
+    except SettingsTransactionUnsupported as exc:
+        raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     return appconfig.mask(values)
@@ -440,7 +443,11 @@ async def clear_integration_secret(
     field = payload.get("field", "")
     if field not in appconfig.SECRET_FIELDS:
         raise HTTPException(400, f"Unbekanntes Geheimnis: {field}")
-    await appconfig.clear_secret(db, field)
+    from autoposter.services.settings_transaction import SettingsTransactionUnsupported
+    try:
+        await appconfig.clear_secret(db, field)
+    except SettingsTransactionUnsupported as exc:
+        raise HTTPException(409, str(exc)) from exc
     return appconfig.mask(await appconfig.get_all(db, use_cache=False))
 
 
@@ -470,6 +477,20 @@ async def openrouter_test(
 async def jobs_status(_: User = Depends(current_user)) -> Dict[str, Any]:
     """Status der Hintergrundjobs. Im Celery-Modus laufen sie in Worker und Beat."""
     from autoposter import scheduler as scheduler_module
+    import os
+    if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+        from autoposter.character_dispatch import job_status
+        from datetime import datetime, timezone
+        definitions = scheduler_module.scheduler.jobs if scheduler_module.scheduler else scheduler_module.default_jobs()
+        result = []
+        for job in definitions:
+            state = await job_status(job.name)
+            started = state.get('started_at')
+            result.append({'name':job.name, 'interval_seconds':job.interval_seconds,
+                           'last_run':datetime.fromtimestamp(started, timezone.utc).isoformat() if started else None,
+                           'last_result':state.get('result'), 'last_error':state.get('error'),
+                           'status':state.get('status', 'idle')})
+        return {'mode':settings.scheduler_mode, 'jobs':result, 'note':''}
 
     if settings.scheduler_mode != "inprocess" or not scheduler_module.scheduler:
         return {

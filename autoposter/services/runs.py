@@ -17,6 +17,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional
+from autoposter.workspaces import current_character, character_context, CharacterBoundaryError
 
 logger = logging.getLogger("autoposter.runs")
 
@@ -32,6 +33,7 @@ class Cancelled(RuntimeError):
 class Run:
     id: str
     label: str
+    _character_id: Optional[uuid.UUID] = field(default=None, repr=False)
     total: int = 0
     done: int = 0
     message: str = ""
@@ -43,6 +45,10 @@ class Run:
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: Optional[datetime] = None
     _cancel: bool = False
+
+    @property
+    def character_id(self):
+        return self._character_id
 
     @property
     def percent(self) -> int:
@@ -62,6 +68,7 @@ class Run:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
+            "character_id": str(self.character_id) if self.character_id else None,
             "label": self.label,
             "total": self.total,
             "done": self.done,
@@ -90,23 +97,27 @@ def _prune() -> None:
 
 
 def create(label: str, total: int = 0) -> Run:
+    import os
+    if os.environ.get('MP_CHARACTERS_ENABLED') == '1' and current_character() is None:
+        raise CharacterBoundaryError('Character ID required for background run')
     _prune()
-    run = Run(id=uuid.uuid4().hex[:12], label=label, total=total)
+    run = Run(id=uuid.uuid4().hex, label=label, total=total, _character_id=current_character())
     _runs[run.id] = run
     return run
 
 
 def get(run_id: str) -> Optional[Run]:
-    return _runs.get(run_id)
+    run = _runs.get(run_id)
+    return run if run and run.character_id == current_character() else None
 
 
 def active() -> List[Run]:
-    return [r for r in _runs.values() if r.status == "running"]
+    return [r for r in _runs.values() if r.status == "running" and r.character_id == current_character()]
 
 
 def cancel(run_id: str) -> bool:
     """Abbruch anfordern. Der Lauf beendet sich beim nächsten Prüfpunkt."""
-    run = _runs.get(run_id)
+    run = get(run_id)
     if not run or run.status != "running":
         return False
     run._cancel = True
@@ -139,10 +150,16 @@ def note(run: Optional[Run], text: str) -> None:
 
 def launch(run: Run, work: Callable[[Run], Awaitable[Dict[str, Any]]]) -> Run:
     """Arbeit im Hintergrund starten und den Lauf zu Ende führen."""
+    if run.character_id != current_character():
+        raise CharacterBoundaryError('Background run belongs to another Character')
 
     async def _wrapper() -> None:
         try:
-            run.result = await work(run)
+            if run.character_id is not None:
+                with character_context(run.character_id):
+                    run.result = await work(run)
+            else:
+                run.result = await work(run)
             run.status = "cancelled" if run._cancel else "done"
             if run.status == "done":
                 run.message = "Fertig"

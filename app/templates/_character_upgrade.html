@@ -1,0 +1,21 @@
+<div class="card" id="character-upgrade" data-live-preserve style="overflow-wrap:anywhere">
+  <h2>Bestehende Installation in Charakter-Arbeitsbereiche umstellen</h2>
+  <p>Ein normales GitHub-Update behält den Einzelcharakterbetrieb bei. Die Umstellung erfolgt nur nach Bestätigung beim nächsten vollständigen Dienstneustart, auf getrennten Datenkopien. Originale, Schlüssel, Medien, Chats und Termine bleiben erhalten. Alle Charakter-Automatiken starten ausgeschaltet; bestehende Termine werden nicht neu geplant.</p>
+  <p id="character-upgrade-status" role="status">Status wird geprüft…</p>
+  <form id="character-upgrade-form">
+    <label>Name des bestehenden Charakters <input name="name" maxlength="120" required autocomplete="off" style="max-width:100%;box-sizing:border-box"></label>
+    <label style="display:block">Bei Konflikten technischer Einstellungen
+      <select name="technical_source" style="display:block;width:100%;max-width:100%;box-sizing:border-box">
+        <option value="">Nicht automatisch entscheiden – Umstellung bei Konflikt abbrechen</option>
+        <option value="autochat">Gemeinsame Einstellungen der bisherigen Oberfläche behalten</option>
+        <option value="autopost">Alte separate AutoPost-Einstellungen behalten</option>
+      </select>
+    </label>
+    <p class="small muted">Diese bewusste Auswahl betrifft nur globale technische Einstellungen, etwa einen abweichenden GitHub-Schlüssel. Character-Konten bleiben getrennt; Originaldaten werden nicht verändert.</p>
+    <label style="display:block"><input type="checkbox" name="confirmed"> Ich bestätige die Zuordnung sämtlicher bestehender Konten und Inhalte zu diesem Charakter. Zusätzliche Worker und andere Datenbank-Schreiber sind gestoppt. Die Umstellung darf beim nächsten vollständigen Neustart erfolgen.</label>
+    <button type="submit" disabled>Umstellung vormerken</button>
+    <button type="button" id="character-upgrade-cancel" hidden>Vormerkung abbrechen</button>
+  </form>
+  <p class="small muted">Keine Konten werden in neue Charaktere kopiert. Bei verweigerter Migration bleiben die ursprünglichen Daten aktiv. Nach erfolgreicher Umstellung keine alte Version ohne abgestimmte Datenrückführung starten. Der vorhandene Dienstneustart bleibt eine separate, bewusste Aktion. Linux/SQLite und ein einziger App-Prozess werden vorausgesetzt; externe Worker und Sonderlayouts benötigen eine koordinierte Wartung.</p>
+</div>
+<script src="/static/character-upgrade.js?v={{ css_v }}" defer></script>

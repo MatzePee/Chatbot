@@ -1,0 +1,14 @@
+{% set active_view = request.query_params.get('view', {'shared':'characters','autochat':'autochat','autopost':'autopost','channels':'accounts','personas':'profile'}.get(settings_section, 'characters')) %}
+{% if request.url.path == '/system' %}{% set active_view = 'system' %}{% elif request.url.path == '/upload' %}{% set active_view = 'updates' %}{% endif %}
+{% set owner = request.query_params.get('character_id', '') %}
+{% for group, entries in [
+ ('Für ' ~ (request.state.character_name | default('diesen Charakter')), [
+  ('profile','autochat','Profil & Persönlichkeit'),('accounts','channels','Konten & Kanäle'),
+  ('autochat','autochat','AutoChat'),('autopost','autopost','AutoPost'),('notifications','autochat','Benachrichtigungen')]),
+ ('Studio', [('characters','shared','Charakterverwaltung'),('ai','shared','KI & Kosten'),('telegram','shared','Telegram-Zentrale')]),
+ ('System', [('system','shared','Status & Wartung'),('updates','shared','Updates & Veröffentlichung')]) ] %}
+<span class="workspace-nav-heading">{{ group }}</span>
+{% for key, section, label in entries %}
+<a href="/settings/shared?section={{ section }}&view={{ key }}&character_id={{ owner | urlencode }}"{% if active_view == key %} class="active" aria-current="page"{% endif %}>{{ label }}</a>
+{% endfor %}
+{% endfor %}

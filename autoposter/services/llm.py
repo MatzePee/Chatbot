@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import json
 import random
 import re
@@ -18,6 +19,8 @@ from autoposter.config import settings
 from autoposter.models import LlmUsage, Persona, PersonaExample, Post, PostStatus
 from autoposter.services import rhythm
 from autoposter.services.appconfig import current as cfg
+
+logger = logging.getLogger(__name__)
 
 PLATFORM_RULES = {
     "telegram": "Plattform Telegram-Kanal. Eigene geplante Beiträge, keine X-Spiegelung. Klarer persönlicher Text; Plaintext ohne HTML/Markdown. Text max. 4096, Medien-Caption max. 1024 Zeichen inklusive Hashtags. Keine Fanvue-Zielgruppen oder X-Regeln.",
@@ -517,7 +520,9 @@ class LlmClient:
         models_to_try = [model, cfg("openrouter_model_fallback")]
         last_error: Optional[Exception] = None
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(settings.llm_timeout_seconds)) as client:
+        from autoposter.services.runtime import guard_generation_request
+        async with httpx.AsyncClient(timeout=httpx.Timeout(settings.llm_timeout_seconds),
+                                     event_hooks={'request': [guard_generation_request]}) as client:
             for candidate in models_to_try:
                 body["model"] = candidate
                 try:

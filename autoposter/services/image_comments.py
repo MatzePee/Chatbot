@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select, update
 
 from autoposter.adapters import AdapterError, get_adapter
-from autoposter.config import settings
+from autoposter.services.runtime import runtime as settings
 from autoposter.models import AppSetting, Channel, Post, XImageComment
 from autoposter.services import credentials, notify
 

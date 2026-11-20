@@ -3,9 +3,12 @@
   function updateSettingsNavigation() {
     const links = [...document.querySelectorAll('[data-settings-nav] a')];
     const section = document.querySelector('[data-settings-section]')?.dataset.settingsSection;
+    const view = document.querySelector('[data-settings-view]')?.dataset.settingsView;
+    const exactView = view && links.find(link => new URL(link.href).searchParams.get('view') === view);
+    const serverSelection = !view && links.find(link => link.getAttribute('aria-current') === 'page');
     const category = section && links.find(link => new URL(link.href).searchParams.get('section') === section);
     const samePage = links.filter(link => link.pathname === location.pathname && link.search === location.search);
-    const selected = (location.hash && samePage.find(link => link.hash === location.hash)) || category || samePage[0];
+    const selected = exactView || serverSelection || (location.hash && samePage.find(link => link.hash === location.hash)) || category || samePage[0];
     links.forEach(link => {
       link.classList.toggle('active', link === selected);
       if (link === selected) link.setAttribute('aria-current', link.hash ? 'location' : 'page');

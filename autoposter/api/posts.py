@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autoposter.adapters import get_adapter
-from autoposter.config import settings
+from autoposter.services.runtime import runtime as settings
 from autoposter.db import get_db, session_scope
 from autoposter.deps import current_user, require_editor
 from autoposter.models import (

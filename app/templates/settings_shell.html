@@ -1,15 +1,20 @@
 {% extends "base.html" %}
-{% block title %}Einstellungen · MP CreatorStudio{% endblock %}
+{% set settings_view = request.query_params.get('view', {'shared':'characters','autochat':'autochat','autopost':'autopost','channels':'accounts','personas':'profile'}.get(settings_section, 'characters')) %}
+{% set settings_titles = {'characters':'Charakterverwaltung','profile':'Profil & Persönlichkeit','accounts':'Konten & Kanäle','autochat':'AutoChat','autopost':'AutoPost','notifications':'Benachrichtigungen','ai':'KI & Kosten','telegram':'Telegram-Zentrale','system':'Status & Wartung','updates':'Updates & Veröffentlichung'} %}
+{% block title %}{{ settings_titles.get(settings_view, 'Einstellungen') }} · MP CreatorStudio{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/settings-hub.css?v=settings-navigation-20261101">
-<section class="settings-hub">
-  <div class="settings-heading"><p class="settings-eyebrow">CREATOR WORKSPACE</p><h1>Einstellungen</h1><p class="muted">Alle Einstellungen an einem Ort. Jeder Bereich speichert unabhängig.</p></div>
-  <nav class="settings-tabs" aria-label="Einstellungsbereiche">
-    {% for key, label in [('shared', 'Gemeinsam'), ('autochat', 'AutoChat'), ('autopost', 'AutoPost'), ('channels', 'Kanäle'), ('personas', 'Personas')] %}
-    <a href="/settings/shared?section={{ key }}"{% if settings_section == key %} class="active" aria-current="page"{% endif %}>{{ label }}</a>
-    {% endfor %}
-  </nav>
-  <div class="settings-content" data-settings-section="{{ settings_section }}">{% block settings_content %}{% endblock %}</div>
+<link rel="stylesheet" href="/static/settings-hub.css?v=settings-structure-20261120-2">
+<section class="settings-hub" data-settings-view="{{ settings_view }}">
+  <div class="settings-heading">
+    <p class="settings-eyebrow">EINSTELLUNGEN</p>
+    <h1>{{ settings_titles.get(settings_view, 'Einstellungen') }}</h1>
+    <p class="settings-scope" data-settings-scope>{% if settings_view in ['characters','ai','telegram','system','updates'] %}Gilt für alle Charaktere{% else %}Für {{ request.state.character_name | default('diesen Charakter') }}{% endif %}</p>
+  </div>
+  {% if request.query_params.get('saved') == 'settings' %}<p class="card ok" role="status">Änderungen gespeichert.</p>{% endif %}
+  <div class="settings-content" data-settings-section="{{ settings_section }}" data-live-preserve>{% block settings_content %}{% endblock %}</div>
 </section>
-<script src="/static/settings-hub.js?v=settings-hub-20261011" defer></script>
+<div id="toasts" data-live-preserve aria-live="polite"></div>
+<div id="modals" data-live-preserve></div>
+<script type="module" src="/static/settings-layout.js?v=settings-structure-20261120-2"></script>
+<script src="/static/settings-hub.js?v=settings-structure-20261120-2" defer></script>
 {% endblock %}

@@ -21,14 +21,11 @@ def test_calendar_age_boundaries(days,band):
     assert top_posts.age_info(NOW-timedelta(days=days),NOW)==(days,band)
 
 
-def test_berlin_calendar_boundaries_and_dst_schedule():
+def test_berlin_calendar_age_across_dst():
     # 23:30 UTC is already the next Berlin calendar day.
     then=datetime(2026,10,17,23,30,tzinfo=timezone.utc)
     assert top_posts.age_info(then,NOW)==(14,'red')
-    assert not x_post_metrics.due(datetime(2026,11,1,23,59,tzinfo=timezone.utc),{})
-    assert x_post_metrics.due(datetime(2026,11,2,0,0,tzinfo=timezone.utc),{})
-    assert x_post_metrics.due(datetime(2026,7,1,23,0,tzinfo=timezone.utc),{})
-    assert not x_post_metrics.due(datetime(2026,11,2,0,0,tzinfo=timezone.utc),{'daily_slot':'2026-11-02'})
+
 
 
 @pytest.mark.asyncio
@@ -90,27 +87,6 @@ async def test_scheduled_image_blocks_release_even_if_denormalized_flags_are_sta
 
 
 @pytest.mark.asyncio
-async def test_daily_collector_uses_old_posts_and_persistent_claim(db,monkeypatch):
-    channel=await make_channel(db,'One');asset,post=await published_image(db,channel)
-    row=ChannelCredential(platform='x',external_user_id='author',access_token_enc='fake')
-    db.add(row);await db.flush();channel.credential_id=row.id;await db.commit()
-    monkeypatch.setattr(credentials,'to_credentials',lambda row:Credentials('fake',external_user_id='author'))
-    monkeypatch.setattr(XAdapter,'verify',AsyncMock(return_value=AccountInfo(ok=True,account_id='author',username=channel.handle)))
-    fetch=AsyncMock(return_value={'data':[{'id':post.external_post_id,'author_id':'author','public_metrics':{'impression_count':5000}}]})
-    monkeypatch.setattr(XAdapter,'fetch_metrics_batch',fetch)
-    before=datetime(2026,11,1,23,59,tzinfo=timezone.utc)
-    assert (await x_post_metrics.collect(db,before))['skipped']
-    at_one=before+timedelta(minutes=1)
-    assert (await x_post_metrics.collect(db,at_one))['updated']==1
-    assert fetch.await_count==1
-    assert fetch.call_args.args[-1]==['101']
-    assert (await x_post_metrics.collect(db,at_one))['skipped']
-    await db.refresh(post)
-    assert post.metrics['impression_count']==5000
-    assert (await db.get(AppSetting,top_posts.COLLECTION_KEY)).value['status']=='ok'
-
-
-@pytest.mark.asyncio
 async def test_batch_request_is_read_only_and_uses_public_lifetime_views():
     adapter=XAdapter()
     with respx.mock() as mock:
@@ -118,20 +94,6 @@ async def test_batch_request_is_read_only_and_uses_public_lifetime_views():
         await adapter.fetch_metrics_batch(Credentials('fake'),['123','456'])
         req=route.calls.last.request
         assert dict(req.url.params)=={'ids':'123,456','tweet.fields':'public_metrics,author_id'}
-
-
-@pytest.mark.asyncio
-async def test_collector_rejects_metrics_from_wrong_post_author(db,monkeypatch):
-    channel=await make_channel(db,'One');asset,post=await published_image(db,channel)
-    row=ChannelCredential(platform='x',external_user_id='correct',access_token_enc='fake')
-    db.add(row);await db.flush();channel.credential_id=row.id;await db.commit()
-    monkeypatch.setattr(credentials,'to_credentials',lambda row:Credentials('fake',external_user_id='correct'))
-    monkeypatch.setattr(XAdapter,'verify',AsyncMock(return_value=AccountInfo(ok=True,account_id='correct',username=channel.handle)))
-    monkeypatch.setattr(XAdapter,'fetch_metrics_batch',AsyncMock(return_value={'data':[{'id':'101','author_id':'other','public_metrics':{'impression_count':999999}}]}))
-    await x_post_metrics.collect(db,NOW)
-    await db.refresh(post)
-    assert post.metrics['x_account_mismatch']
-    assert not (await top_posts.overview(db,NOW))['items']
 
 
 @pytest.mark.asyncio
@@ -264,3 +226,196 @@ async def test_channel_publication_history_uses_real_dates_and_deduplicates_usag
     assert targets[str(c.id)]['last_views'] is None
     assert not targets[str(d.id)]['publications']
     assert targets[str(d.id)]['last_published_at'] is None
+
+
+async def manual_x_fixture(db, monkeypatch, *, returned_id='42', author_id='42'):
+    """Real adapter, exact transport allowlist; no mocked collector/verify method."""
+    import httpx
+    import autoposter.adapters.x as x_module
+    channel = await make_channel(db, 'One')
+    _, post = await published_image(db, channel)
+    row = ChannelCredential(platform='x', external_user_id='42', access_token_enc='fake')
+    db.add(row)
+    await db.flush()
+    channel.credential_id = row.id
+    await db.commit()
+    monkeypatch.setattr(credentials, 'to_credentials', lambda row: Credentials('synthetic', external_user_id=row.external_user_id))
+    requests = []
+    def transport(request):
+        requests.append(request)
+        assert request.method == 'GET'
+        assert request.headers['authorization'] == 'Bearer synthetic'
+        if request.url.path == '/2/users/me':
+            assert dict(request.url.params) == {'user.fields': 'username,name,verified'}
+            return httpx.Response(200, json={'data': {'id': returned_id, 'username': channel.handle.lstrip('@'), 'name': 'Fixture'}})
+        assert request.url.path == '/2/tweets', str(request.url)
+        assert request.url.params['tweet.fields'] == 'public_metrics,author_id'
+        return httpx.Response(200, json={'data': [
+            {'id': external, 'author_id': author_id, 'public_metrics': {'impression_count': 5000}}
+            for external in request.url.params['ids'].split(',')]})
+    monkeypatch.setattr(x_module, 'http_client', lambda **kwargs: httpx.AsyncClient(transport=httpx.MockTransport(transport)))
+    return channel, post, requests
+
+
+@pytest.mark.asyncio
+async def test_manual_collection_rejects_changed_bound_account_id_before_post_reads(db, monkeypatch):
+    _, post, requests = await manual_x_fixture(db, monkeypatch, returned_id='99', author_id='99')
+    token = await x_post_metrics.claim(db, None, NOW)
+    result = await x_post_metrics.collect(db, None, token, NOW)
+    assert [r.url.path for r in requests] == ['/2/users/me']
+    assert result['updated'] == 0 and result['errors']
+    await db.refresh(post)
+    assert post.metrics['impression_count'] == 1000
+
+
+@pytest.mark.asyncio
+async def test_manual_wrong_post_author_is_excluded_from_cached_ranking(db, monkeypatch):
+    _, post, requests = await manual_x_fixture(db, monkeypatch, author_id='999')
+    token = await x_post_metrics.claim(db, None, NOW)
+    result = await x_post_metrics.collect(db, None, token, NOW)
+    assert result['unavailable'] == 1
+    await db.refresh(post)
+    assert post.metrics['x_account_mismatch'] is True
+    assert not (await top_posts.overview(db, NOW))['items']
+    assert [r.url.path for r in requests] == ['/2/users/me', '/2/tweets']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('now', [datetime(2026, 3, 29, 1, 30, tzinfo=timezone.utc),
+                                datetime(2026, 10, 25, 1, 30, tzinfo=timezone.utc)])
+@pytest.mark.parametrize('days', [30, 180])
+async def test_manual_scope_filters_publication_instant_across_dst_and_retains_old_cache(db, monkeypatch, now, days):
+    channel, old, requests = await manual_x_fixture(db, monkeypatch)
+    cutoff = now - timedelta(days=days)
+    old.published_at = cutoff - timedelta(microseconds=1)
+    inside = Post(channel_id=channel.id, status='published', external_post_id='202', published_at=cutoff)
+    outside = Post(channel_id=channel.id, status='published', external_post_id='203', published_at=cutoff-timedelta(seconds=1), metrics={'impression_count': 1200})
+    db.add_all([inside, outside])
+    await db.commit()
+    token = await x_post_metrics.claim(db, days, now)
+    result = await x_post_metrics.collect(db, days, token, now)
+    assert result['updated'] == 1 and not result['errors']
+    assert requests[-1].url.params['ids'] == '202'
+    await db.refresh(old); await db.refresh(outside)
+    assert old.metrics['impression_count'] == 1000
+    assert outside.metrics['impression_count'] == 1200
+    cached = await top_posts.overview(db, now)
+    assert {i['views'] for i in cached['items']} == {1000, 1200, 5000}
+
+
+@pytest.mark.asyncio
+async def test_manual_all_includes_old_posts_but_requires_matching_claim_and_read_get_never_collects(db, monkeypatch):
+    from autoposter import jobs
+    from autoposter.api.top_posts import router
+    from autoposter.db import get_db
+    from autoposter.deps import current_user
+    from fastapi import FastAPI
+    from httpx import AsyncClient, ASGITransport
+    _, post, requests = await manual_x_fixture(db, monkeypatch)
+    post.published_at = NOW-timedelta(days=1000)
+    await db.commit()
+    with pytest.raises(ValueError, match='matching manual'):
+        await x_post_metrics.collect(db, None, 'not-claimed', NOW)
+    assert requests == []
+    assert await jobs.collect_x_post_metrics() == {'skipped': True, 'reason': 'manual_only'}
+    app=FastAPI(); app.include_router(router)
+    async def session(): yield db
+    app.dependency_overrides[get_db] = session
+    app.dependency_overrides[current_user] = lambda: SimpleNamespace(id=None)
+    async with AsyncClient(transport=ASGITransport(app=app),base_url='http://test') as client:
+        assert (await client.get('/analytics/top-posts-x')).status_code == 200
+    assert requests == []
+    token = await x_post_metrics.claim(db, None, NOW)
+    with pytest.raises(ValueError, match='matching manual'):
+        await x_post_metrics.collect(db, 30, token, NOW)
+    assert requests == []
+    assert (await x_post_metrics.collect(db, None, token, NOW))['updated'] == 1
+    assert requests[-1].url.params['ids'] == '101'
+    state = (await db.get(AppSetting, top_posts.COLLECTION_KEY, populate_existing=True)).value
+    assert state['active'] is None and state['manual']['all']['status'] == 'ok'
+    assert state['manual']['all']['triggered_at'] == NOW.isoformat()
+
+
+@pytest.mark.asyncio
+async def test_manual_claim_serializes_independent_sessions_and_expired_completion_cannot_clear_new_claim(tmp_path):
+    import asyncio
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from autoposter.db import Base
+    engine=create_async_engine('sqlite+aiosqlite:///'+str(tmp_path/'claims.db'))
+    try:
+        async with engine.begin() as conn: await conn.run_sync(Base.metadata.create_all)
+        maker=async_sessionmaker(engine,expire_on_commit=False)
+        async def attempt(days):
+            async with maker() as session:
+                try: return await x_post_metrics.claim(session,days,NOW)
+                except HTTPException as exc: return exc.status_code
+        first, second=await asyncio.gather(attempt(30),attempt(180))
+        assert [first,second].count(409)==1
+        winner=first if first!=409 else second
+        async with maker() as session:
+            state=(await session.get(AppSetting,top_posts.COLLECTION_KEY)).value
+            assert state['active']['token']==winner
+            assert len(state['manual'])==1
+            later=await x_post_metrics.claim(session,None,NOW+timedelta(minutes=46))
+            await x_post_metrics.fail(session,winner)
+            state=(await session.get(AppSetting,top_posts.COLLECTION_KEY,populate_existing=True)).value
+            assert state['active']['token']==later
+            await x_post_metrics.fail(session,later)
+            state=(await session.get(AppSetting,top_posts.COLLECTION_KEY,populate_existing=True)).value
+            assert state['active'] is None and state['manual']['all']['status']=='error'
+    finally: await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_manual_endpoint_real_auth_roles_scope_and_background_claim(db, monkeypatch):
+    from fastapi import FastAPI
+    from httpx import AsyncClient, ASGITransport
+    from autoposter.api import top_posts as endpoint
+    from autoposter.db import get_db
+    from autoposter.config import settings
+    from autoposter.models import User
+    from autoposter.security import create_token
+    monkeypatch.setattr(settings,'auth_enabled',True)
+    app=FastAPI(); app.include_router(endpoint.router)
+    async def session(): yield db
+    app.dependency_overrides[get_db]=session
+    background=AsyncMock()
+    monkeypatch.setattr(endpoint,'_collect_in_background',background)
+    users={}
+    for role in ['viewer','editor','admin']:
+        user=User(email=role+'@fixture.invalid',password_hash='unused',role=role)
+        db.add(user); await db.flush(); users[role]=user
+    await db.commit()
+    async with AsyncClient(transport=ASGITransport(app=app),base_url='http://test') as client:
+        assert (await client.post('/analytics/top-posts-x/collection/all')).status_code==401
+        for role in ['viewer','editor','admin']:
+            headers={'Authorization':'Bearer '+create_token(str(users[role].id))}
+            before = await db.get(AppSetting,top_posts.COLLECTION_KEY,populate_existing=True)
+            before_value = dict(before.value) if before else None
+            response=await client.post('/analytics/top-posts-x/collection/invalid',headers=headers)
+            assert response.status_code==(403 if role=='viewer' else 422)
+            after = await db.get(AppSetting,top_posts.COLLECTION_KEY,populate_existing=True)
+            assert (after.value if after else None) == before_value
+            if role=='viewer':
+                assert (await client.post('/analytics/top-posts-x/collection/all',headers=headers)).status_code==403
+                assert (await client.get('/analytics/top-posts-x',headers=headers)).status_code==200
+            else:
+                for scope,days in [('all',None),('180',180),('30',30)]:
+                    response=await client.post('/analytics/top-posts-x/collection/'+scope,headers=headers)
+                    assert response.status_code==202,response.text
+                    state=(await db.get(AppSetting,top_posts.COLLECTION_KEY,populate_existing=True)).value
+                    token=state['active']['token']
+                    assert background.call_args.args==(days,token)
+                    assert (await client.post('/analytics/top-posts-x/collection/all',headers=headers)).status_code==409
+                    await x_post_metrics.fail(db,token)
+        assert background.await_count==6
+
+
+
+def test_neither_scheduler_registers_paid_automatic_x_collection():
+    from autoposter.scheduler import default_jobs
+    from autoposter.celery_app import celery_app
+    assert 'collect_x_post_metrics' not in {job.name for job in default_jobs()}
+    for entry in celery_app.conf.beat_schedule.values():
+        assert entry['task'] != 'autoposter.collect_x_post_metrics'
+        assert entry.get('kwargs',{}).get('job_name') != 'collect_x_post_metrics'

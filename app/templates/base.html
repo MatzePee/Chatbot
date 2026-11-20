@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+  <script src="/static/character-workspace.js?v=settings-structure-20261120-2"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}MP CreatorStudio{% endblock %}</title>
@@ -36,19 +37,10 @@
     <div class="workspace-section"><strong>{% if shared %}Einstellungen{% else %}AutoChat{% endif %}</strong></div>
     <nav class="workspace-nav"{% if shared %} data-settings-nav{% endif %} aria-label="{% if shared %}Einstellungsseiten{% else %}AutoChat-Seiten{% endif %}">
       {% if shared %}
-        <span class="workspace-nav-heading">Einstellungsbereiche</span>
-        <a href="/settings/shared?section=shared">Gemeinsam</a>
-        <a href="/settings/shared?section=autochat">AutoChat</a>
-        <a href="/settings/shared?section=autopost">AutoPost</a>
-        <a href="/settings/shared?section=channels"><span class="workspace-icon" aria-hidden="true">◉</span><span>Kanäle</span></a>
-        <a href="/settings/shared?section=personas"><span class="workspace-icon" aria-hidden="true">☺</span><span>Personas</span></a>
-        <span class="workspace-nav-heading">Verbindungen</span>
-        <a href="/settings/shared#fanvue"{% if request.url.path == '/settings/shared' %} class="active" aria-current="location"{% endif %}><span class="workspace-icon" aria-hidden="true">◉</span><span>Fanvue</span></a>
-        <a href="/settings/shared#telegram"><span class="workspace-icon" aria-hidden="true">✉</span><span>Telegram</span></a>
-        <span class="workspace-nav-heading">Verwaltung</span>
-        {% set links = [('/system', '◫', 'Systemübersicht'), ('/settings/shared#updates', '↻', 'Programm-Updates'), ('/upload', '↥', 'GitHub-Veröffentlichung')] %}
+        {% include "_settings_navigation.html" %}
+        {% set links = [] %}
       {% else %}
-        {% set links = [('/', '◫', 'Dashboard'), ('/queue', '☷', 'Vorschläge' if preview else 'Freigabe'), ('/chats', '◉', 'Subs'), ('/ppv', '▦', 'PPV'), ('/reports', '▤', 'Reports'), ('/test', '▷', 'Test'), ('/logs', '≡', 'Logs'), ('/settings', '⚙', 'AutoChat-Einstellungen')] %}
+        {% set links = [('/', '◫', 'Dashboard'), ('/queue', '☷', 'Vorschläge' if preview else 'Freigabe'), ('/chats', '◉', 'Subs'), ('/ppv', '▦', 'PPV'), ('/reports', '▤', 'Reports'), ('/test', '▷', 'Test'), ('/logs', '≡', 'Logs'), ('/settings/shared?section=autochat&view=autochat', '⚙', 'AutoChat-Einstellungen')] %}
       {% endif %}
       {% for href, icon, label in links %}
         {% set active = request.url.path == href or (href not in ['/', '/settings', '/settings/shared'] and request.url.path.startswith(href + '/')) %}
@@ -73,7 +65,7 @@
       <div class="card warn">
         <strong>⚠ Eigene Konto-Kennung fehlt.</strong>
         AutoChat kann seine eigenen Nachrichten nicht von Fan-Nachrichten unterscheiden.
-        Prüfe die <a href="/settings/shared#fanvue">gemeinsame Fanvue-Verbindung</a>.
+        Prüfe die <a href="/settings/shared?section=autochat#fanvue">gemeinsame Fanvue-Verbindung</a>.
       </div>
       {% endif %}
       {% block content %}{% endblock %}

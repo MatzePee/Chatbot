@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import os
+from .character_upgrade import bootstrap as _character_bootstrap
+_character_bootstrap()
+
 import re as _re
 import secrets
 import subprocess
@@ -10,7 +13,7 @@ import time
 from datetime import datetime
 from urllib.parse import quote as _q
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -21,6 +24,8 @@ from .preview import enabled as preview_enabled, install_network_guard, PreviewM
 install_network_guard()
 
 from . import csv_import, db, default_docs, deployment, fanvue, memory, openrouter, poller
+from .character_state import CharacterDict
+from .character_tasks import CharacterThread
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
@@ -73,9 +78,10 @@ templates.env.filters["fdate"] = _fmt_isodate
 
 @app.on_event("startup")
 def _startup() -> None:
-    from tools.backup import backup
-    backup(os.path.dirname(db.DATA_DIR))
-    db.init_db()
+    from tools.backup import backup, repository_root
+    backup(repository_root(db.DATA_DIR))
+    if os.environ.get('MP_CHARACTERS_ENABLED') != '1':
+        db.init_db()
     # Worker starts after the AutoPost has initialized successfully.
 
 
@@ -98,6 +104,15 @@ def _static_version() -> str:
 
 
 def _base_ctx(request: Request) -> dict:
+    from autoposter.workspaces import current_character
+    if os.environ.get('MP_CHARACTERS_ENABLED') == '1' and current_character() is None:
+        # Infrastructure pages do not borrow the legacy account, queue or mode.
+        return {
+            'request':request, 'workspace_area':'settings', 'css_v':_static_version(),
+            'connected':False, 'running':False, 'deployment_pending':deployment.pending(),
+            'preview':preview_enabled(), 'mode':'Technik / global', 'pending_count':0,
+            'tokens':None, 'account_missing':False, 'poller_status':{'alive':False},
+        }
     return {
         "request": request,
         "workspace_area": ("settings" if request.url.path == "/system" or
@@ -150,18 +165,16 @@ def api_upload_status():
 async def upload_settings(request: Request):
     form = await request.form()
     _check_upload_csrf(request, form)
-    for key in ("git_remote_url", "git_branch", "git_user_name", "git_user_email",
-                "git_commit_default"):
-        if key in form:
-            db.set_setting(key, str(form[key]).strip())
-    # Leeres Token-Feld bedeutet "unverändert lassen", nicht "löschen" -
-    # sonst wuerde ein versehentlicher Speichern-Klick den Token entfernen.
+    values = {key: str(form[key]).strip()
+              for key in ("git_remote_url", "git_branch", "git_user_name", "git_user_email", "git_commit_default")
+              if key in form}
+    # Blank means preserve; explicit clear remains encrypted/tombstoned.
     token = str(form.get("github_token", "")).strip()
     if token:
-        db.set_setting("github_token", token)
+        values['github_token'] = token
     elif str(form.get("clear_token", "")) == "1":
-        db.set_setting("github_token", "")
-    db.log("info", "upload", "Upload-Einstellungen gespeichert")
+        values['github_token'] = ''
+    db.set_technical_settings(values, audit=('info', 'upload', 'Upload-Einstellungen gespeichert', ''))
     return RedirectResponse(f"/upload?msg={_q('Einstellungen gespeichert')}", status_code=303)
 
 
@@ -443,7 +456,21 @@ async def test_run(request: Request):
 
 
 # ------------------------------------------------------------- Chat-Export
-EXPORT_DIR = os.path.join(os.path.dirname(BASE_DIR), "exports")
+EXPORT_DIR = os.environ.get('MP_EXPORT_DIR') or os.path.join(os.path.dirname(BASE_DIR), "exports")
+
+
+def _character_export_dir():
+    from autoposter.workspaces import current_character, CharacterBoundaryError
+    from pathlib import Path
+    owner=current_character()
+    if owner is None:
+        return EXPORT_DIR
+    base=Path(EXPORT_DIR).resolve()
+    namespace=base/'characters'
+    directory=namespace/str(owner)
+    if namespace.is_symlink() or directory.is_symlink() or not directory.resolve().is_relative_to(base):
+        raise CharacterBoundaryError('Export path outside character workspace')
+    return str(directory)
 
 
 def _safe_filename(s: str) -> str:
@@ -502,7 +529,8 @@ def _write_chat_export(user_uuid: str, handle: str, display: str, me_uuid: str) 
     schon hier. Die Quelle steht im Kopf der Datei, damit niemand einen
     unvollstaendigen Auszug fuer den ganzen Verlauf haelt.
     """
-    os.makedirs(EXPORT_DIR, exist_ok=True)
+    directory=_character_export_dir()
+    os.makedirs(directory, mode=0o700, exist_ok=True)
     quelle = "Fanvue-API (vollständiger Verlauf)"
     try:
         msgs = fanvue.full_message_history(user_uuid)
@@ -520,9 +548,24 @@ def _write_chat_export(user_uuid: str, handle: str, display: str, me_uuid: str) 
              f"Quelle: {quelle}",
              f"Exportiert: {datetime.now().strftime('%d.%m.%Y %H:%M')} · "
              f"{len(koerper)} Nachrichten", ""] + koerper
-    path = os.path.join(EXPORT_DIR, _safe_filename(handle or user_uuid) + ".md")
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines))
+    path = os.path.join(directory, _safe_filename(handle or user_uuid) + ".md")
+    # Never follow an existing export symlink into another workspace. O_NOFOLLOW
+    # also closes the leaf-symlink race between validation and open.
+    from pathlib import Path
+    from autoposter.workspaces import current_character, CharacterBoundaryError
+    if current_character() is not None:
+        target=Path(path)
+        if target.is_symlink() or not target.resolve().is_relative_to(Path(directory).resolve()):
+            raise CharacterBoundaryError('Export file outside character workspace')
+        try:
+            fd=os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        except OSError as exc:
+            raise CharacterBoundaryError('Export file unavailable') from exc
+        with os.fdopen(fd, 'w', encoding='utf-8') as fh:
+            fh.write('\n'.join(lines))
+    else:
+        with open(path, 'w', encoding='utf-8') as fh:
+            fh.write('\n'.join(lines))
     return path, len(koerper)
 
 
@@ -534,8 +577,11 @@ def chat_export(user_uuid: str, back: str = Form("")):
     zurueck. Ohne `back` bleibt es beim alten Weg ueber die PPV-Unterseite.
     """
     from urllib.parse import quote as _q
-    me_uuid = fanvue.account_uuid() if fanvue.is_connected() else ""
     chat = db.get_chat(user_uuid)
+    from autoposter.workspaces import current_character
+    if current_character() is not None and chat is None:
+        raise HTTPException(404, 'Chat in diesem Character nicht gefunden')
+    me_uuid = fanvue.account_uuid() if fanvue.is_connected() else ""
     try:
         path, n = _write_chat_export(user_uuid, chat["handle"] if chat else "",
                                      chat["display_name"] if chat else "", me_uuid)
@@ -551,7 +597,7 @@ def chat_export(user_uuid: str, back: str = Form("")):
         return RedirectResponse(f"/chats/{user_uuid}/ppv?err={_q(str(exc)[:200])}", status_code=303)
 
 
-_export_state: dict = {"running": False, "done": 0, "total": 0, "error": None}
+_export_state = CharacterDict({"running": False, "done": 0, "total": 0, "error": None})
 
 
 def export_status():
@@ -588,7 +634,7 @@ def chat_export_all():
     except Exception:  # noqa: BLE001
         members = _fetch_group_members(custom_list_id=custom_list)
     me_uuid = fanvue.account_uuid()
-    threading.Thread(target=_export_group_worker, args=(members, me_uuid),
+    CharacterThread(target=_export_group_worker, args=(members, me_uuid),
                      name="chat-export", daemon=True).start()
     return RedirectResponse("/chats?exportstarted=1", status_code=303)
 
@@ -803,7 +849,7 @@ def system_reboot():
 
 
 # ------------------------------------------------------------- Freigabe-Queue
-_draft_context_cache = {}
+_draft_context_cache = CharacterDict()
 
 
 def _draft_context(user_uuid: str, inbound_uuid: str, n: int, me_uuid: str,
@@ -1068,7 +1114,7 @@ def _parse_insight(ins: dict) -> Optional[dict]:
     }
 
 
-_insights_cache: dict[str, dict] = {}  # uuid -> {"data": parsed|None, "ts": float}
+_insights_cache = CharacterDict()  # character -> fan UUID -> insights
 
 
 def _insights_for(uuids: list[str], ttl: float = 600) -> dict[str, dict]:
@@ -1104,7 +1150,7 @@ def _insights_for(uuids: list[str], ttl: float = 600) -> dict[str, dict]:
 # blaettern, sortieren und Formulare abschicken laufen dann ohne einen einzigen
 # API-Aufruf. Der Knopf "Neu laden" leert den Zwischenspeicher.
 _CHAT_PAGE_SIZE = [100]      # veraenderlich: faellt bei Bedarf auf 50 zurueck
-_list_cache: dict[str, dict] = {}
+_list_cache = CharacterDict()
 _cache_lock = threading.Lock()
 _cache_inflight: set[str] = set()
 # Alter der Listen, die DIESE Anfrage benutzt hat. Thread-lokal, weil mehrere
@@ -1140,10 +1186,12 @@ def _cache_refresh_async(key: str, loader) -> None:
     Pro Schluessel laeuft hoechstens ein Durchlauf: sonst starten drei schnelle
     Klicks drei parallele Serien von API-Aufrufen.
     """
+    from .character_state import state_owner
+    inflight_key = (state_owner(), key)
     with _cache_lock:
-        if key in _cache_inflight:
+        if inflight_key in _cache_inflight:
             return
-        _cache_inflight.add(key)
+        _cache_inflight.add(inflight_key)
 
     def lauf() -> None:
         try:
@@ -1152,9 +1200,9 @@ def _cache_refresh_async(key: str, loader) -> None:
             db.log("warn", "system", "Fan-Liste konnte nicht aktualisiert werden", str(exc))
         finally:
             with _cache_lock:
-                _cache_inflight.discard(key)
+                _cache_inflight.discard(inflight_key)
 
-    threading.Thread(target=lauf, daemon=True, name="fanlist-refresh").start()
+    CharacterThread(target=lauf, daemon=True, name="fanlist-refresh").start()
 
 
 def _cached(key: str, loader) -> list[dict]:
@@ -1792,13 +1840,97 @@ _SHARED_TELEGRAM_KEYS = frozenset({"telegram_bot_token", "telegram_chat_id", "ap
 _SHARED_SETTINGS_KEYS = _SHARED_FANVUE_KEYS | _SHARED_UPDATE_KEYS | _SHARED_TELEGRAM_KEYS
 
 
+async def _settings_admin(request: Request):
+    # Keep the existing optional LAN authentication; no new mandatory login.
+    from autoposter.config import settings
+    if settings.auth_enabled:
+        from autoposter import db as postdb
+        from autoposter.deps import current_user
+        async with postdb.SessionLocal(info={'control_plane': True}) as session:
+            user = await current_user(db=session, session_cookie=request.cookies.get(settings.cookie_name), authorization=request.headers.get('authorization'))
+            if user.role != 'admin':
+                raise HTTPException(403, 'Admin erforderlich')
+
+
+@app.get('/settings/shared/ai-usage', dependencies=[Depends(_settings_admin)])
+async def common_ai_usage():
+    from datetime import timezone
+    from sqlalchemy import select, func
+    from autoposter import db as postdb
+    from autoposter.models import LlmUsage, Character
+    from autoposter.workspaces import control_context
+    start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Dedicated control-plane read, never borrow a selected owner's session.
+    with control_context():
+        async with postdb.SessionLocal(info={'control_plane': True}) as session:
+            rows = (await session.execute(select(LlmUsage.task, func.count(LlmUsage.id), func.sum(LlmUsage.cost_usd)).where(LlmUsage.created_at >= start).group_by(LlmUsage.task))).all()
+            character_rows = (await session.execute(
+                select(Character.id, Character.name, func.sum(LlmUsage.cost_usd))
+                .outerjoin(LlmUsage, (LlmUsage.character_id == Character.id) & (LlmUsage.created_at >= start))
+                .group_by(Character.id, Character.name).order_by(Character.name)
+            )).all()
+    return {'scope': 'installation', 'coverage': 'recorded_autopost_only', 'budget_scope': 'per_character_autopost', 'month_start': start.isoformat(),
+            'total_usd': sum(float(cost or 0) for _,_,cost in rows),
+            'budget_usd': db.get_setting('openrouter_monthly_budget_usd', 100),
+            'by_character': [{'id': str(owner), 'name': name, 'cost_usd': float(cost or 0)} for owner,name,cost in character_rows],
+            'by_task': [{'task': task, 'calls': int(count), 'cost_usd': float(cost or 0)} for task,count,cost in rows]}
+
+
+@app.post('/settings/shared/ai', dependencies=[Depends(_settings_admin)])
+async def save_common_ai(request: Request):
+    from .setting_scope import GLOBAL_AI_KEYS, GLOBAL_TECHNICAL_SECRET_KEYS
+    import math
+    form = await request.form()
+    values = {}
+    for key in GLOBAL_AI_KEYS:
+        if key in GLOBAL_TECHNICAL_SECRET_KEYS and 'clear_' + key in form:
+            values[key] = ''
+            continue
+        if key not in form:
+            continue
+        val = str(form[key]).strip()
+        if key in GLOBAL_TECHNICAL_SECRET_KEYS and set(val) <= set('*•●'):
+            continue
+        try:
+            if key in {'max_tokens','generation_retries','generation_retry_delay'}:
+                val = int(val)
+                low, high = {'max_tokens': (1,1000000), 'generation_retries': (1,10), 'generation_retry_delay': (0,600)}[key]
+                if not low <= val <= high: raise ValueError
+            elif key in {'temperature','openrouter_monthly_budget_usd'}:
+                val = float(val)
+                if not math.isfinite(val) or val < 0 or (key == 'temperature' and val > 2): raise ValueError
+            elif key == 'reasoning_mode' and val not in {'none','exclude','default'}:
+                raise ValueError
+        except (ValueError, TypeError):
+            raise HTTPException(422, 'Ungültige technische KI-Einstellung')
+        values[key] = val
+    db.set_technical_settings(values, audit=('info', 'system', 'Gemeinsame KI-Einstellungen gespeichert', ''))
+    return RedirectResponse('/settings/shared?saved=ai#ai', status_code=303)
+
+
+@app.post('/settings/shared/urls', dependencies=[Depends(_settings_admin)])
+async def save_common_urls(request: Request):
+    form = await request.form()
+    db.set_technical_settings({key: str(form[key]).strip() for key in ('public_base_url',) if key in form})
+    return RedirectResponse('/settings/shared?saved=urls#base-urls', status_code=303)
+
+
 @app.get("/settings/shared", response_class=HTMLResponse)
 def shared_settings_page(request: Request, saved: str = "", section: str = "shared"):
     if section == "autochat":
         return settings_page(request)
     section = section if section in ("autopost", "channels", "personas") else "shared"
     ctx = _base_ctx(request)
-    ctx.update(s=db.all_settings(), saved=saved, workspace_area="settings",
+    values = db.all_settings()
+    # Existing AutoPost integration snapshots/env fallbacks remain authoritative
+    # until an explicit canonical save; do not render blanks over working IDs.
+    from autoposter.services import appconfig
+    from .setting_scope import GLOBAL_TECHNICAL_KEYS
+    for key in GLOBAL_TECHNICAL_KEYS & appconfig.FIELDS.keys():
+        value = appconfig.current(key)
+        if value is not None:
+            values[key] = value
+    ctx.update(s=values, saved=saved, workspace_area="settings",
                settings_section=section)
     return templates.TemplateResponse("autopost_settings.html" if section != "shared" else "shared_settings.html", ctx)
 
@@ -1816,10 +1948,10 @@ async def save_shared_fanvue(request: Request):
                 continue
             db.set_setting(key, value)
     db.log("info", "system", "Gemeinsame Fanvue-Einstellungen gespeichert")
-    return RedirectResponse("/settings/shared?saved=fanvue#fanvue", status_code=303)
+    return RedirectResponse("/settings/shared?section=autochat&saved=fanvue#fanvue", status_code=303)
 
 
-@app.post("/settings/shared/telegram")
+@app.post("/settings/shared/telegram", dependencies=[Depends(_settings_admin)])
 async def save_shared_telegram(request: Request):
     form = await request.form()
     for key in _SHARED_TELEGRAM_KEYS:
@@ -1831,11 +1963,13 @@ async def save_shared_telegram(request: Request):
             if key == "telegram_bot_token" and set(value) <= set("*•●"):
                 continue
             db.set_setting(key, value)
+    if "telegram_enabled_present" in form:
+        db.set_setting("telegram_enabled", 1 if str(form.get("telegram_enabled", "")).lower() in {"1", "true", "on"} else 0)
     db.log("info", "system", "Gemeinsame Telegram-Verbindung gespeichert")
     return RedirectResponse("/settings/shared?saved=telegram#telegram", status_code=303)
 
 
-@app.post("/settings/shared/updates")
+@app.post("/settings/shared/updates", dependencies=[Depends(_settings_admin)])
 async def save_shared_updates(request: Request):
     form = await request.form()
     try:
@@ -2022,13 +2156,14 @@ _BOOL_KEYS = {"active_hours_enabled", "ppv_enabled", "ppv_use_llm_classifier",
 
 @app.post("/settings")
 async def save_settings(request: Request):
+    from .setting_scope import GLOBAL_TECHNICAL_KEYS
     form = await request.form()
     previous_lists = {key: db.get_setting(key, "") for key in
                       ("chat_custom_list_id", "chat_custom_list_name", "prio2_custom_list_id", "prio2_custom_list_name")}
     for key in db.DEFAULT_SETTINGS:
         # Shared controls have their own forms. Omitted checkboxes here must
         # never disable the updater or overwrite the shared connection.
-        if key == "bot_running" or key in _SHARED_SETTINGS_KEYS:
+        if key == "bot_running" or key in _SHARED_SETTINGS_KEYS or key in GLOBAL_TECHNICAL_KEYS:
             continue
         if key in {"openrouter_api_key", "vision_api_key"} and "clear_" + key in form:
             db.set_setting(key, "")
@@ -2347,7 +2482,7 @@ def logs_page(request: Request):
 
 # --------------------------------------------------------------------- OAuth
 @app.get("/oauth/start")
-def oauth_start(request: Request):
+async def oauth_start(request: Request):
     client_id = db.get_setting("fanvue_client_id")
     redirect_uri = db.get_setting("fanvue_redirect_uri")
     if not client_id or not redirect_uri:
@@ -2355,14 +2490,46 @@ def oauth_start(request: Request):
         return RedirectResponse("/settings/shared#fanvue", status_code=303)
     verifier, challenge = fanvue.make_pkce()
     state = fanvue.new_state()
-    request.session["pkce_verifier"] = verifier
-    request.session["oauth_state"] = state
+    if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+        from autoposter.db import SessionLocal
+        from autoposter.models import OAuthState
+        async with SessionLocal() as session:
+            session.add(OAuthState(state=state,platform='fanvue-chat',code_verifier=verifier))
+            await session.commit()
+    else:
+        request.session["pkce_verifier"] = verifier
+        request.session["oauth_state"] = state
     url = fanvue.build_authorize_url(client_id, redirect_uri, state, challenge)
     return RedirectResponse(url, status_code=303)
 
 
 @app.get("/oauth/callback", response_class=HTMLResponse)
-def oauth_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+async def oauth_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+        from autoposter.db import SessionLocal
+        from autoposter.models import OAuthState
+        from sqlalchemy import delete
+        from datetime import datetime, timedelta, timezone
+        async with SessionLocal() as session:
+            verifier = (await session.execute(delete(OAuthState).where(
+                OAuthState.state == state, OAuthState.platform == 'fanvue-chat',
+                OAuthState.created_at >= datetime.now(timezone.utc)-timedelta(minutes=10)
+            ).returning(OAuthState.code_verifier))).scalar_one_or_none()
+            await session.commit()
+        if verifier is None:
+            raise HTTPException(400, 'OAuth-State unbekannt, abgelaufen oder bereits verwendet')
+        ctx = {'request':request, 'ok':False}
+        if error or not code:
+            ctx['message'] = 'Fanvue-Verbindung abgebrochen.'
+        else:
+            try:
+                await run_in_threadpool(fanvue.exchange_code, code, verifier)
+                db.log('info','oauth','Fanvue erfolgreich verbunden')
+                ctx.update(ok=True,message='Fanvue erfolgreich verbunden!')
+            except Exception as exc:
+                db.log('error','oauth','Fanvue-Verbindung fehlgeschlagen',type(exc).__name__)
+                ctx['message'] = 'Fanvue-Verbindung fehlgeschlagen. Bitte Zugang und Konto prüfen.'
+        return templates.TemplateResponse('oauth_result.html',ctx)
     ctx = {"request": request}
     if error:
         ctx["message"] = f"Fanvue hat einen Fehler gemeldet: {error}"
@@ -2396,6 +2563,9 @@ def oauth_disconnect():
 
 @app.get("/health")
 def health():
+    if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+        return {'ok':True, 'ts':time.time(), 'preview':preview_enabled(),
+                'characters_enabled':True, 'deployment_pending':deployment.pending()}
     return {"ok": True, "running": db.get_setting("bot_running", False) and not preview_enabled() and not deployment.pending(),
         "preview": preview_enabled(),
             "connected": fanvue.is_connected(), "ts": time.time()}

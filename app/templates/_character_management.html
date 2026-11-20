@@ -1,0 +1,10 @@
+<section class="card" id="characters" data-character-management data-current-only="{{ 'true' if settings_view == 'profile' else 'false' }}" data-live-preserve data-readonly="{{ 'true' if preview else 'false' }}" hidden>
+  <h2>{{ 'Name & Profilbild' if settings_view == 'profile' else 'Charaktere' }}</h2>
+  {% if settings_view != 'profile' %}<p class="muted">Charaktere anlegen und ihre Namen bearbeiten. Neue Arbeitsbereiche starten leer, pausiert und ohne übernommene Zugangsdaten.</p>{% endif %}
+  <div data-character-list></div>
+  <form data-character-create>
+    <label>Neuer Charakter <input name="name" required maxlength="120" aria-label="Neuer Character-Name" placeholder="Name des neuen Charakters"></label>
+    <button type="submit" class="btn-primary">Leer und deaktiviert erstellen</button>
+    <span role="status" data-character-create-status></span>
+  </form>
+</section>

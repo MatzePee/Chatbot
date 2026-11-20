@@ -15,14 +15,14 @@ export default async function renderPersonas() {
     listBox.appendChild(h('button', {
       class: 'primary', style: { width: '100%', justifyContent: 'center', marginBottom: '8px' },
       onClick: guard(async () => {
-        const name = prompt('Name der Persona?')
+        const name = prompt('Name der Stilvorlage?')
         if (!name) return
         const p = await api.createPersona({ name, language: 'de' })
         personas.push(p); state.active = p; drawList(); drawDetail()
       }),
-    }, '+ Neue Persona'))
+    }, '+ Neue Stilvorlage'))
 
-    if (!personas.length) { listBox.appendChild(empty('Keine Personas.')); return }
+    if (!personas.length) { listBox.appendChild(empty('Noch keine Stilvorlagen.')); return }
     for (const p of personas) {
       listBox.appendChild(h('button', {
         style: {
@@ -38,7 +38,7 @@ export default async function renderPersonas() {
   function drawDetail() {
     clear(detailBox)
     const p = state.active
-    if (!p) { detailBox.appendChild(empty('Keine Persona ausgewählt.')); return }
+    if (!p) { detailBox.appendChild(empty('Keine Stilvorlage ausgewählt.')); return }
 
     const name = h('input', { value: p.name })
     const bio = h('textarea', {}); bio.value = p.bio || ''
@@ -77,7 +77,7 @@ export default async function renderPersonas() {
       })
       Object.assign(p, updated)
       window.CreatorStudioLive?.saved(detailBox)
-      toast.ok('Persona gespeichert')
+      toast.ok('Post-Stil gespeichert')
       drawList()
     })
 
@@ -134,7 +134,7 @@ export default async function renderPersonas() {
     }
 
     textPanel.appendChild(card('Text-Post testen',
-      h('p', { class: 'hint' }, 'Verwendet die gespeicherten Einstellungen der Persona des gewählten Kanals.'),
+      h('p', { class: 'hint' }, 'Verwendet die gespeicherten Einstellungen der Stilvorlage des gewählten Kanals.'),
       h('div', { class: 'row', style: { marginBottom: '10px' } }, chanSel, testBtn), out))
 
     detailBox.appendChild(h('div', { class: 'stack' },
@@ -160,7 +160,7 @@ export default async function renderPersonas() {
       postTypeTabs,
       textPanel,
       mediaPanel,
-      h('button', { class: 'primary', onClick: save }, 'Persona speichern'),
+      h('button', { class: 'primary', onClick: save }, 'Post-Stil speichern'),
     ))
   }
 

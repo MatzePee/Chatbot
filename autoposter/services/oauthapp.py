@@ -97,7 +97,7 @@ def store_app(channel: Channel, client_id: str, client_secret: Optional[str], ap
     if channel.platform == "fanvue":
         return channel  # Preserve legacy data, but never create a second connection.
     channel.oauth_client_id = (client_id or "").strip()
-    if client_secret and client_secret not in ("********",):
+    if client_secret and not set(client_secret.strip()) <= set('*•●'):
         channel.oauth_client_secret_enc = encrypt(client_secret.strip())
     if not channel.oauth_client_id:
         # Zurück auf die globale App: gespeichertes Secret verwerfen.

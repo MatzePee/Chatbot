@@ -22,7 +22,7 @@ def existing(tmp_path):
     (root / '.env').write_text('PRIVATE=preserved\n')
     (root / 'app/main.py').touch()
     (root / '.venv/bin/python').symlink_to(sys.executable)
-    user = pwd.getpwuid(os.getuid()).pw_name
+    user = pwd.getpwnam('nobody').pw_name if os.getuid() == 0 else pwd.getpwuid(os.getuid()).pw_name
     return repair.Installation('sabrinas-bot.service', user, root, 8766)
 
 
@@ -68,6 +68,7 @@ def test_rendering_preserves_spaces_and_uses_detected_port(existing):
     assert 'REPO=' + shlex.quote(str(existing.repo)) in wrapper
     assert 'SVC_USER=' + existing.user in wrapper
     assert 'SERVICE=' + existing.service in wrapper
+    assert '/usr/local/libexec/mp-creatorstudio-update restart' in wrapper
     subprocess.run(['bash', '-n'], input=wrapper, text=True, check=True)
     namespace = {}
     exec(compile(ast.parse(files[repair.SUPERVISOR][0]), '<supervisor>', 'exec'), namespace)

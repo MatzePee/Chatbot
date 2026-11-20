@@ -42,6 +42,20 @@ if settings.ui_mode == "react":
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings.ensure_dirs()
+    import os
+    if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+        from autoposter.character_startup import validate_installation
+        app.state.characters = await validate_installation(engine)
+        from app import deployment
+        if os.environ.get('MP_PREVIEW') == '1' or deployment.pending():
+            settings.scheduler_mode = 'off'
+        await scheduler.start_if_enabled()
+        try:
+            yield
+        finally:
+            await scheduler.stop_if_running()
+            await engine.dispose()
+        return
 
     # Im portablen Modus (SQLite) das Schema selbst anlegen, damit kein
     # separater Migrationslauf nötig ist.
@@ -139,6 +153,15 @@ app.add_middleware(
 )
 
 
+from autoposter.workspaces import CharacterBoundaryError
+
+
+@app.exception_handler(CharacterBoundaryError)
+async def character_boundary_handler(request: Request, exc: CharacterBoundaryError) -> JSONResponse:
+    # The transaction dependency rolls back; never expose foreign IDs/paths.
+    return JSONResponse(status_code=404, content={'detail': 'Objekt in diesem Character nicht gefunden'})
+
+
 @app.exception_handler(AdapterError)
 async def adapter_error_handler(request: Request, exc: AdapterError) -> JSONResponse:
     return JSONResponse(
@@ -168,6 +191,9 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 
 
 app.include_router(api_router)
+from app.character_http import install as install_characters
+install_characters(app)
+app.mount('/static', StaticFiles(directory=BACKEND_DIR / 'app' / 'static'), name='shared-static')
 
 
 @app.get("/healthz", tags=["ops"])

@@ -212,6 +212,7 @@ class ChannelUpdate(BaseModel):
     oauth_client_id: Optional[str] = None
     #: Leer oder "********" lässt das gespeicherte Secret unverändert.
     oauth_client_secret: Optional[str] = None
+    oauth_clear_client_secret: bool = False
     oauth_app_name: Optional[str] = None
     oauth_redirect_base: Optional[str] = None
     #: Wasserzeichen – die Datei selbst kommt über einen eigenen Endpunkt.

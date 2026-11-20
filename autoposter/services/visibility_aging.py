@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from sqlalchemy import select, update
 from autoposter.models import AppSetting, Channel
-from autoposter.config import settings
+from autoposter.services.runtime import runtime as settings
 from autoposter.adapters.base import AdapterError
 from autoposter.adapters.fanvue import FanvueAdapter
 from autoposter.services import appconfig, credentials, chatbot_fanvue
@@ -54,14 +54,8 @@ async def accounts(db):
 
 async def claim(db, account, now, manual):
     key = PREFIX + account
-    if db.bind.dialect.name == 'sqlite':
-        from sqlalchemy.dialects.sqlite import insert
-    else:
-        from sqlalchemy.dialects.postgresql import insert
-    await db.execute(insert(AppSetting).values(key=key, value={}).on_conflict_do_nothing(index_elements=['key']))
-    if db.bind.dialect.name == 'sqlite':
-        await db.execute(update(AppSetting).where(AppSetting.key == key).values(key=key))
-    row = (await db.execute(select(AppSetting).where(AppSetting.key == key).with_for_update().execution_options(populate_existing=True))).scalar_one()
+    from autoposter.services.owned_settings import locked_setting
+    row = await locked_setting(db, key)
     value = dict(row.value or {})
     until = timestamp(value.get('lease_until'))
     today = now.astimezone(ZONE).date().isoformat()
@@ -96,7 +90,8 @@ async def heartbeat(db, account, token, clock):
         await db.rollback()
         raise AdapterError('Sichtbarkeitslauf hat seine Sperre verloren; abgebrochen')
     value['lease_until'] = (now + LEASE).isoformat()
-    result = await db.execute(stmt.values(value=value).execution_options(synchronize_session=False))
+    from autoposter.services.owned_settings import compare_and_set
+    result = await compare_and_set(db, PREFIX + account, 'token', token, value)
     await db.commit()
     if result.rowcount != 1:
         raise AdapterError('Sichtbarkeitslauf hat seine Sperre verloren; abgebrochen')
@@ -226,8 +221,8 @@ async def run(db, *, now=None, manual=False):
             value['completed_slot']=now.astimezone(ZONE).date().isoformat()
         else:
             value.pop('completed_slot', None)
-        await db.execute(update(AppSetting).where(AppSetting.key == PREFIX+account,
-            AppSetting.value['token'].as_string() == token).values(value=value).execution_options(synchronize_session=False))
+        from autoposter.services.owned_settings import compare_and_set
+        await compare_and_set(db, PREFIX+account, 'token', token, value)
         await db.commit()
         results.append(result)
     return {'status':'error' if any(r['status']=='error' for r in results) else 'ok', 'schedule':'00:00 Europe/Berlin', 'accounts':results}

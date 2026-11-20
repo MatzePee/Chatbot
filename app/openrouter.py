@@ -8,6 +8,15 @@ import time
 from typing import Any
 
 import httpx
+from autoposter.adapters.base import ExternalActionBlocked
+from autoposter.services.runtime import assert_autochat_action_allowed
+
+
+def _post(*args, **kwargs):
+    # All six content endpoints share this last pre-transport check.
+    assert_autochat_action_allowed()
+    return httpx.post(*args, **kwargs)
+
 
 from . import db, persona_context
 
@@ -162,7 +171,9 @@ def generate(messages: list[dict[str, str]], model: str = "", api_key: str = "",
     # OpenRouterError abfaengt - ein voruebergehender Timeout fuehrte dann zu
     # GAR KEINEM Wiederholungsversuch, und die Fan-Nachricht blieb unbeantwortet.
     try:
-        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
+        resp = _post(OPENROUTER_URL, headers=headers, json=payload, timeout=60)
+    except ExternalActionBlocked:
+        raise
     except Exception as exc:  # noqa: BLE001 - httpx.TimeoutException, SSLError, ...
         raise OpenRouterError(f"Netzwerkfehler bei OpenRouter: {exc}") from exc
     if resp.status_code != 200:
@@ -288,7 +299,7 @@ def analyze_image(image_url: str, instruction: str = "") -> list[str]:
         "HTTP-Referer": "http://localhost",
         "X-Title": "AutoChat",
     }
-    resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
+    resp = _post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
     if resp.status_code != 200:
         raise OpenRouterError(f"Bildanalyse-Fehler [{resp.status_code}]: {resp.text}")
     data = resp.json()
@@ -337,7 +348,7 @@ def analyze_incoming_image(image_url: str) -> dict:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
                "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
     try:
-        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
+        resp = _post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
         if resp.status_code != 200:
             return {"woman": True, "nude": False, "penis": False, "description": ""}
         full = resp.json()
@@ -430,7 +441,7 @@ def classify_message(text: str, notes: str = "") -> dict:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
                "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
     try:
-        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=45)
+        resp = _post(OPENROUTER_URL, headers=headers, json=payload, timeout=45)
         if resp.status_code != 200:
             return {}
         full = resp.json()
@@ -449,6 +460,8 @@ def classify_message(text: str, notes: str = "") -> dict:
             "emotional_distress": bool(data.get("emotional_distress", False)),
             "preferences": [str(p).strip().lower() for p in (data.get("preferences") or []) if str(p).strip()],
         }
+    except ExternalActionBlocked:
+        raise
     except Exception:  # noqa: BLE001
         return {}
 
@@ -518,7 +531,7 @@ def confirm_ppv(messages_chrono: list, me_uuid: str, reason: str,
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
                "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
     try:
-        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=45)
+        resp = _post(OPENROUTER_URL, headers=headers, json=payload, timeout=45)
         if resp.status_code != 200:
             ergebnis["grund"] = f"HTTP {resp.status_code}"
             return ergebnis
@@ -532,6 +545,8 @@ def confirm_ppv(messages_chrono: list, me_uuid: str, reason: str,
         ergebnis["ok"] = bool(roh.get("ok", False))
         ergebnis["grund"] = str(roh.get("grund", ""))[:300]
         ergebnis["geprueft"] = True
+    except ExternalActionBlocked:
+        raise
     except Exception as exc:  # noqa: BLE001 - Pruefung darf nie den Ablauf sprengen
         ergebnis["grund"] = f"Prüfung fehlgeschlagen: {exc}"[:200]
     return ergebnis
@@ -702,7 +717,7 @@ def consolidate_memory(current: dict, new_messages: list[dict],
                "HTTP-Referer": "http://localhost", "X-Title": "AutoChat"}
     roh = ""      # fuer die Fehlermeldung, siehe unten
     try:
-        resp = httpx.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
+        resp = _post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
         if resp.status_code != 200:
             db.log("warn", "memory", f"Verdichtung: HTTP {resp.status_code}",
                    resp.text[:300])
@@ -752,6 +767,8 @@ def consolidate_memory(current: dict, new_messages: list[dict],
             db.log("warn", "memory", "Verdichtung verworfen: Ergebnis war leer", "")
             return {}
         return out
+    except ExternalActionBlocked:
+        raise
     except Exception as exc:  # noqa: BLE001 - nie den Aufrufer mitreissen
         # Den Anfang der Antwort mitloggen: bei einem Parser-Fehler ist genau
         # das die einzige Spur, an der sich erkennen laesst, was das Modell

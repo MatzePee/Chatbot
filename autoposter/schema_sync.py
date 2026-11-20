@@ -24,7 +24,7 @@ import autoposter.models  # noqa: F401  – registriert alle Tabellen
 logger = logging.getLogger("autoposter.schema")
 
 
-def _default_literal(column) -> str:
+def _default_literal(column, dialect=None) -> str:
     """SQL-Literal für den Vorgabewert einer neuen Spalte.
 
     Nicht-nullbare Spalten brauchen bei ADD COLUMN zwingend einen Default,
@@ -64,6 +64,14 @@ def _default_literal(column) -> str:
         else:
             value = ""
 
+    from uuid import UUID
+    if isinstance(value, UUID):
+        # GUID's bind processor is dialect-specific (SQLite CHAR(32), PG UUID).
+        if dialect is not None:
+            processor = column.type.dialect_impl(dialect).bind_processor(dialect)
+            value = processor(value) if processor else str(value)
+        else:
+            value = value.hex
     if isinstance(value, bool):
         return "1" if value else "0"
     if isinstance(value, (int, float)):
@@ -120,7 +128,7 @@ async def sync(engine: AsyncEngine, *, dry_run: bool = False) -> Dict[str, Any]:
             except Exception:
                 type_sql = "TEXT"
             nullable = "" if column.nullable else " NOT NULL"
-            default_sql = _default_literal(column)
+            default_sql = _default_literal(column, dialect)
             ddl = (
                 f'ALTER TABLE "{table_name}" ADD COLUMN "{column.name}" '
                 f"{type_sql}{nullable} DEFAULT {default_sql}"

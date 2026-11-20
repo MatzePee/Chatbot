@@ -1,7 +1,6 @@
 {% extends "settings_shell.html" %}
 {% block settings_content %}
-<div id="autopost-settings" data-live-preserve data-settings-page="{{ settings_section }}" aria-live="polite"><p class="muted">{{ {'channels': 'Kanäle', 'personas': 'Personas'}.get(settings_section, 'AutoPost-Einstellungen') }} werden geladen …</p></div>
-<div id="toasts" data-live-preserve aria-live="polite"></div>
-<div id="modals" data-live-preserve></div>
-<script type="module" src="/static/settings-autopost.js?v=settings-navigation-20261101"></script>
+{% if settings_view == 'accounts' %}{% include "_fanvue_settings.html" %}{% endif %}
+<div id="autopost-settings" data-live-preserve data-settings-page="{{ settings_section }}" aria-live="polite"><p class="muted">Einstellungen werden geladen …</p></div>
+<script type="module" src="/static/settings-autopost.js?v=settings-structure-20261120-2"></script>
 {% endblock %}

@@ -34,23 +34,31 @@ def _engine_kwargs() -> dict:
     return {"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20}
 
 
-engine = create_async_engine(settings.database_url, echo=settings.debug, **_engine_kwargs())
+def make_engine():
+    """Normal application factory, also used to reopen offline-converted copies."""
+    instance = create_async_engine(settings.database_url, echo=settings.debug, **_engine_kwargs())
+    if settings.is_sqlite:
+        event.listen(instance.sync_engine, 'connect', _sqlite_pragmas)
+    return instance
 
 
-if settings.is_sqlite:
-
-    @event.listens_for(engine.sync_engine, "connect")
-    def _sqlite_pragmas(dbapi_connection, _record) -> None:
-        """WAL erlaubt gleichzeitiges Lesen und Schreiben – ohne das wird SQLite
-        sofort zum Flaschenhals, sobald der Scheduler nebenher arbeitet."""
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA busy_timeout=60000")
+def _sqlite_pragmas(dbapi_connection, _record) -> None:
+    from app.sqlite_layout import configure
+    cursor = dbapi_connection.cursor()
+    try:
+        configure(cursor, legacy_sync='NORMAL')
+        cursor.execute('PRAGMA foreign_keys=ON')
+        cursor.execute('PRAGMA busy_timeout=60000')
+    finally:
         cursor.close()
 
-SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+engine = make_engine()
+
+def SessionLocal(**kwargs):
+    # Lazy import avoids db → models → workspaces → db during metadata setup.
+    from autoposter.workspaces import WorkspaceAsyncSession
+    return WorkspaceAsyncSession(engine, expire_on_commit=False, **kwargs)
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:

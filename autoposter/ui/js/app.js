@@ -3,13 +3,13 @@ import '/static/live-refresh.js?v=creatorstudio-mobile-system-20260909'
 import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
 import { h, clear, append, toast } from './ui.js?v=creatorstudio-preview-bounds-20261006'
 
-import renderDashboard from './pages/dashboard.js?v=creatorstudio-dashboard-20261011'
-import renderLibrary from './pages/library.js?v=creatorstudio-library-autosave-20261101'
+import renderDashboard from './pages/dashboard.js?v=settings-structure-20261120-2'
+import renderLibrary from './pages/library.js?v=settings-structure-20261120-2'
 import renderAssign from './pages/assign.js?v=creatorstudio-preview-bounds-20261006'
 import renderMatrix from './pages/matrix.js?v=creatorstudio-preview-bounds-20261006'
 import renderTopPostsX from './pages/top-posts-x.js?v=top-posts-manual-20261108'
-import renderCalendar from './pages/calendar.js?v=creatorstudio-translation-20260910'
-import renderSettings from './pages/settings.js?v=post-retention-limits-1'
+import renderCalendar from './pages/calendar.js?v=settings-structure-20261120-2'
+import renderSettings from './pages/settings.js?v=settings-structure-20261120-2'
 
 
 const ROUTES = [
@@ -122,10 +122,12 @@ async function route() {
 
   const path = currentPath()
   const entry = ROUTES.find((r) => r.path === path) || ROUTES[0]
-  const settingsSection = { settings: 'autopost', channels: 'channels', personas: 'personas' }[path]
+  const settingsSection = {settings:'autopost',channels:'channels',personas:'autochat'}[path]
   if (settingsSection) {
     const query = currentQuery().toString()
-    location.replace('/settings/shared?section=' + settingsSection + (query ? '&' + query : ''))
+    const view = {settings:'autopost',channels:'accounts',personas:'profile'}[path]
+    const target = '/settings/shared?section=' + settingsSection + '&view=' + view + (query ? '&' + query : '')
+    location.replace(window.CreatorStudioCharacters?.url(target) || target)
     return
   }
   const view = shell.view

@@ -75,4 +75,12 @@ celery_app.conf.beat_schedule = {
     },
 }
 
+# A Beat tick is control-plane only. Productive tasks never infer an owner.
+import os
+if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+    for entry in celery_app.conf.beat_schedule.values():
+        job_name = entry['task'].removeprefix('autoposter.')
+        entry['task'] = 'autoposter.fanout'
+        entry['kwargs'] = {'job_name':job_name}
+
 import autoposter.tasks  # noqa: E402,F401  (Registrierung der Tasks)

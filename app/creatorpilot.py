@@ -5,6 +5,8 @@ from pathlib import Path
 
 
 def install_content_studio(app):
+    from .character_http import install as install_characters
+    install_characters(app)
     from . import deployment
     from autoposter.main import app as studio, lifespan
     from autoposter.api import api_router
@@ -24,9 +26,17 @@ def install_content_studio(app):
     @app.get('/api/creatorpilot/health')
     def health():
         from . import poller
+        if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+            from autoposter.workspaces import character_context
+            alive = False
+            for owner in getattr(app.state, 'character_workers', []):
+                with character_context(owner):
+                    alive = alive or poller.is_alive()
+        else:
+            alive = bool(poller.status().get('alive'))
         return {'application': 'MP CreatorStudio', 'status': 'ok', 'preview': os.environ.get('MP_PREVIEW') == '1',
                 'preview_policy': 'read-and-draft', 'deployment_pending': deployment.pending(),
-                'revision': revision, 'autochat_worker': bool(poller.status().get('alive'))}
+                'revision': revision, 'autochat_worker': alive}
 
     try:
         revision = subprocess.check_output(['git', '-C', str(deployment.ROOT), 'rev-parse', 'HEAD'], stderr=subprocess.DEVNULL, text=True, timeout=5).strip()
@@ -39,6 +49,17 @@ def install_content_studio(app):
 
     @app.on_event('startup')
     async def start_studio():
+        if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+            app.state.character_workers = []
+            app.state.studio_lifespan = lifespan(studio)
+            await app.state.studio_lifespan.__aenter__()
+            if deployment.pending() or os.environ.get('MP_PREVIEW') == '1':
+                return
+            from .character_workers import CharacterPollers
+            app.state.character_poller_manager = CharacterPollers()
+            await app.state.character_poller_manager.start()
+            app.state.character_workers = app.state.character_poller_manager.owners
+            return
         if os.environ.get('MP_PREVIEW') == '1' or deployment.pending():
             settings.scheduler_mode = 'off'
             settings.dry_run = True
@@ -76,6 +97,12 @@ def install_content_studio(app):
 
     @app.on_event('shutdown')
     async def stop_studio():
+        if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+            manager = getattr(app.state, 'character_poller_manager', None)
+            if manager is not None:
+                await manager.stop()
+            await app.state.studio_lifespan.__aexit__(None, None, None)
+            return
         cleanup_stop = getattr(app.state, "update_cleanup_stop", None)
         if cleanup_stop is not None:
             cleanup_stop.set()

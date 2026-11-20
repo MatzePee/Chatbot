@@ -1,3 +1,4 @@
+import { plannedPostsCard } from './settings.js?v=settings-structure-20261120-2'
 // Kalender: ganzer Monat auf einer Seite, mit Planer, Tagesdetail und Sammelaktionen.
 import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
 import {
@@ -786,6 +787,7 @@ export default async function renderCalendar() {
     ),
   )
   livePage.refresh = async () => { if (state.selection.size || attached) return false; await load() }
+  livePage.appendChild(h('details', {class:'card calendar-actions'}, h('summary', {}, 'Kalenderaktionen'), plannedPostsCard()))
   return livePage
 
 }

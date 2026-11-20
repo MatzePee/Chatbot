@@ -24,3 +24,5 @@ _to_delete/
 .pytest_cache/
 .fuse_hidden*
 .askpass-*
+.character-upgrade.lock
+

@@ -1,0 +1,42 @@
+<div class="card" id="fanvue">
+  <h2>Fanvue-Verbindung dieses Charakters</h2>
+  <p class="muted">AutoChat und AutoPost dieses Charakters verwenden dieselbe Anmeldung. Andere Charaktere bleiben getrennt.</p>
+  {% if connected %}
+    <p><span class="dot green"></span> Verbunden{% if tokens and tokens['account_handle'] %} als <strong>{{ tokens['account_handle'] }}</strong>{% endif %}.</p>
+    {% if tokens and tokens['scope'] %}
+    <p class="small muted">Gewährte Scopes: <code>{{ tokens['scope'] }}</code></p>
+    {% set granted = tokens['scope'] %}
+    {% set missing = [] %}
+    {% for need in ['read:fan','read:insights','read:media','write:media','read:post','write:post','read:chat','write:chat'] %}
+      {% if need not in granted %}{% set _ = missing.append(need) %}{% endif %}
+    {% endfor %}
+    {% if missing %}
+    <p class="small" style="color:#e0b050">⚠ Fehlende Scopes: <code>{{ missing | join(', ') }}</code>.
+    Hinweis: <code>read:fan</code> und <code>read:insights</code> gibt Fanvue nur für
+    <strong>Creator-/Agentur-Konten</strong> frei – bei anderen Kontotypen bleiben sie ungewährt
+    (Bot funktioniert trotzdem, nur ohne Fan-Insights und volle Mitgliederliste).</p>
+    {% if 'write:media' in missing or 'write:post' in missing %}
+    <p class="small" style="color:#e0b050"><strong>AutoPost ist ohne diese Schreibrechte gesperrt.</strong>
+    Trenne die Fanvue-Verbindung und verbinde sie anschließend erneut, um die neuen Rechte freizugeben.</p>
+    {% endif %}
+    {% endif %}
+    {% endif %}
+    <form method="post" action="/oauth/disconnect"><button class="btn-danger">Verbindung trennen</button></form>
+  {% else %}
+    <p><span class="dot red"></span> Nicht verbunden. Trage unten Client-ID, Secret und Redirect-URI ein, speichere, dann verbinde.</p>
+    {% if not preview %}<a class="btn-primary" href="/oauth/start">Mit Fanvue verbinden</a>{% endif %}
+  {% endif %}
+</div>
+
+<form method="post" action="/settings/shared/fanvue">
+  <details class="card sect"{% if not connected %} open{% endif %}>
+    <summary>Fanvue-Zugangsdaten</summary>
+    <label>Client-ID <input name="fanvue_client_id" value="{{ s['fanvue_client_id'] }}"></label>
+    <label>Client-Secret <input name="fanvue_client_secret" type="password" value="{{ '********' if s['fanvue_client_secret'] else '' }}"></label>
+    <label class="chk"><input type="checkbox" name="clear_fanvue_client_secret"> Gespeichertes Client-Secret beim Speichern entfernen</label>
+    <label>Redirect-URI (exakt in Fanvue-App hinterlegen)
+      <input name="fanvue_redirect_uri" value="{{ s['fanvue_redirect_uri'] }}"></label>
+    <label>API-Version <input name="fanvue_api_version" value="{{ s['fanvue_api_version'] }}"></label>
+    <p><button class="btn-primary">Fanvue-Einstellungen speichern</button></p>
+  </details>
+</form>

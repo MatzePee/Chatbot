@@ -51,7 +51,12 @@ async def ensure_channels(db):
             if channel:
                 channel.fanvue_account_uuid = account
         if channel is None:
-            channel_id = uuid.uuid5(uuid.NAMESPACE_URL, f'mp-creatorstudio/fanvue/{account or "pending"}/{audience}')
+            from autoposter.workspaces import current_character
+            owner = current_character()
+            # Keep legacy IDs stable; new workspaces must not collide on pending
+            # (or deliberately identical synthetic/provider) account identities.
+            namespace = f'mp-creatorstudio/characters/{owner}/fanvue' if owner else 'mp-creatorstudio/fanvue'
+            channel_id = uuid.uuid5(uuid.NAMESPACE_URL, f'{namespace}/{account or "pending"}/{audience}')
             try:
                 async with db.begin_nested():
                     policy = PostingPolicy(free_post_ratio=1.0 if audience == 'followers-and-subscribers' else 0.0,
@@ -62,6 +67,8 @@ async def ensure_channels(db):
                                       handle=handle, default_audience=audience, fanvue_audience=audience,
                                       fanvue_account_uuid=account, policy_id=policy.id,
                                       color='#007aff' if audience == 'subscribers' else '#34a853',
+                                      auto_plan_enabled=False if owner else True,
+                                      is_active=False if owner else True,
                                       health='needs_reauth', health_note='Gemeinsame Fanvue-Verbindung')
                     db.add(channel)
                     await db.flush()

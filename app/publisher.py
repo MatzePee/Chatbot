@@ -407,6 +407,6 @@ def _publish(message: str, tag: str = "", do_push: bool = True) -> dict[str, Any
                 pass
 
     result["ok"] = True
-    db.log("info", "upload", f"Stand veröffentlicht{f' als {tag}' if tag else ''}",
+    db.log_global("info", "upload", f"Stand veröffentlicht{f' als {tag}' if tag else ''}",
            " · ".join(log))
     return result

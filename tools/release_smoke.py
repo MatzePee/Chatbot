@@ -38,6 +38,9 @@ def fingerprint(connection, table, columns=None, *, expected_migrations=False):
 
 def run(source: Path):
     assert source.resolve() != ROOT.resolve(), 'Use a separate candidate checkout.'
+    if (source / 'data/character-active.json').exists():
+        from tools.character_release_smoke import run_active
+        return run_active(source)
     with tempfile.TemporaryDirectory(prefix='creatorstudio-smoke-') as temp:
         root = Path(temp)
         (root / 'data').mkdir()

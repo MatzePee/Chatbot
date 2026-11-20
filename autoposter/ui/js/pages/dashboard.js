@@ -1,7 +1,8 @@
+import { runtimeCard } from './settings.js?v=settings-structure-20261120-2'
 import { historyChart } from '../account-history.js?v=analytics-20261019'
 import { renderUpcoming } from '../upcoming-posts.js?v=creatorstudio-translation-20260910'
 import { api } from '../api.js?v=creatorstudio-dashboard-20261011'
-import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard, append, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard } from '../ui.js?v=creatorstudio-mobile-system-20260909'
 
 export function problemTime(raw) {
   if (!raw) return 'Zeitpunkt unbekannt'
@@ -30,38 +31,14 @@ export default async function renderDashboard() {
     }
   }))
 
-  // Nach Änderungen an der .env und wenn ein Job hängt – erspart die
-  // SSH-Sitzung auf dem Server.
-  const restartBtn = h('button', { title: 'Dienst neu starten' }, 'Neu starten')
-  restartBtn.addEventListener('click', guard(async () => {
-    const ok = await confirmDialog('Dienst neu starten',
-      'Der Dienst startet neu und ist dabei einige Sekunden nicht erreichbar. '
-      + 'Bereits geplante Posts bleiben erhalten; ein gerade laufender '
-      + 'Veröffentlichungsvorgang wird sauber zu Ende geführt.',
-      { okLabel: 'Neu starten', danger: true })
-    if (!ok) return
-    clear(restartBtn).appendChild(spinner())
-    append(restartBtn, [' starte neu …'])
-    restartBtn.disabled = true
-    try {
-      const r = await api.restartService()
-      toast.ok(r.message || 'Neustart angestoßen')
-      // Erst laden, wenn der Dienst wieder da sein kann – sonst zeigt der
-      // Browser einen Verbindungsfehler und es sieht kaputt aus.
-      setTimeout(() => location.reload(), 12000)
-    } catch (err) {
-      restartBtn.disabled = false
-      clear(restartBtn).appendChild(document.createTextNode('Neu starten'))
-      throw err
-    }
-  }))
-
   page.appendChild(h('div', { class: 'page-head' },
     h('h1', {}, 'Übersicht'),
     h('div', { class: 'spacer' }),
     h('button', { onClick: () => location.reload() }, 'Aktualisieren'),
     fillBtn,
   ))
+
+  page.appendChild(await runtimeCard())
 
   // ------------------------------------------------------------ Reichweite
   const inv = h('div', { class: 'grid c3' })
