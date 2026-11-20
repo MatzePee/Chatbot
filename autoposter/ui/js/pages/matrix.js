@@ -1,6 +1,6 @@
 // Matrix: Bilder × Kanäle. Beantwortet auf einen Blick "was fehlt wo noch".
-import { api } from '../api.js?v=creatorstudio-matrix-reuse-20261006'
-import { h, clear, empty, toast, guard, attachPreview, fmtDate, spinner } from '../ui.js?v=creatorstudio-preview-bounds-20261006'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { h, clear, empty, toast, guard, attachPreview, fmtDate, spinner, openMediaEditor } from '../ui.js?v=image-warning-20261121-1'
 
 const CELL = {
   none: {
@@ -154,7 +154,7 @@ export default async function renderMatrix() {
 
     const body = rows.map((row) => {
       const thumb = h('img', {
-        src: row.asset.thumb_url, alt: '', class: 'mthumb', loading: 'lazy',
+        src: row.asset.thumb_url, alt: '', class: 'mthumb', loading: 'lazy',title:'Bild bearbeiten / zuschneiden',tabIndex:0,onClick:guard(()=>openMediaEditor(row.asset)),
       })
       attachPreview(thumb, row.asset.url, { size: 380 })
 

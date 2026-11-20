@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from autoposter.adapters import Credentials, AdapterError, get_adapter
 from autoposter.adapters.base import OAuthApp
-from autoposter.models import ChannelCredential
+from autoposter.models import Channel, ChannelCredential
+from sqlalchemy import select
 from autoposter.services import credentials
 
 async def save(db, channel, payload):
@@ -37,6 +38,13 @@ async def save(db, channel, payload):
         credentials.store_credentials(row, cred)
     else:
         row.raw_meta = dict(cred.raw_meta)
+    siblings = (await db.execute(select(Channel).where(Channel.credential_id == row.id))).scalars().all()
+    for sibling in siblings:
+        if sibling.id == channel.id: continue
+        sibling.handle = destination
+        sibling.last_verified_at = None
+        sibling.health = 'needs_reauth'
+        sibling.health_note = 'Gemeinsamer Bot-Zugang gespeichert; Kanalrechte erneut testen.'
     db.add_all([channel,row])
     await db.flush()
 
@@ -50,6 +58,8 @@ async def test(db, channel):
         if cred.raw_meta.get('destination') != channel.handle:
             raise AdapterError('Telegram: Ziel geändert; Bot-Zugang erneut speichern.')
         info = await get_adapter('telegram').verify(OAuthApp(''), cred)
+        if channel.telegram_mode == 'paid' and info.raw.get('can_send_paid_media') is not True:
+            raise AdapterError('Telegram: Kostenpflichtige Medien sind in diesem Zielkanal nicht verfügbar.')
         if not info.ok:
             raise AdapterError('Telegram: Verbindung nicht bestätigt.')
         row.external_user_id = info.account_id

@@ -287,10 +287,52 @@ export function channelChips(asset, channels, max = 4) {
   return box
 }
 
+export async function openMediaEditor(asset, options = {}) {
+  const module = await import('./image-editor.js?v=image-warning-20261121-1')
+  return module.openImageEditor(asset, options)
+}
+
+export function instagramCropWarning(asset, channels = []) {
+  if(!['image/jpeg','image/png','image/webp'].includes(asset.mime))return false
+  const assigned=new Set([...(asset.assigned_channel_ids||[]),...(asset.scheduled_channel_ids||[])])
+  const hasInstagram=channels.some(c=>c.platform==='instagram'&&assigned.has(c.id))
+  const dims=asset.image_crops?.instagram || {width:asset.width,height:asset.height}
+  return hasInstagram && dims.height>0 && (typeof dims.valid==='boolean'?!dims.valid:(dims.width<.75*dims.height-1||dims.width>1.91*dims.height+1))
+}
+
+function cropDecoration(element, warning) {
+  element.style.outline=warning?'3px solid #dc2626':''
+  const badge=element.querySelector('.image-crop-warning')
+  if(badge)badge.hidden=!warning
+}
+
+window.addEventListener('creatorstudio:media-edited',event=>{
+  const asset=event.detail
+  for(const img of document.querySelectorAll('img')){
+    const url=new URL(img.src,location.origin)
+    if(!url.pathname.startsWith(`/api/v1/media/${asset.id}/`))continue
+    const instagram=url.searchParams.get('variant')==='instagram'
+    const variant=asset.image_crops?.variants?.[instagram?'instagram':'all'] || (instagram?asset.image_crops?.variants?.all:null)
+    url.searchParams.set('v',variant?.id || 'original');img.src=url.pathname+url.search
+  }
+  for(const tile of document.querySelectorAll('[data-crop-asset]')){
+    if(tile.dataset.cropAsset!==asset.id)continue
+    const warning=tile.dataset.instagramAssigned==='true'&&!asset.image_crops?.instagram?.valid
+    cropDecoration(tile,warning)
+    if(!warning&&tile.title?.startsWith('⚠'))tile.title='Bild bearbeiten / zuschneiden'
+  }
+})
+
 export function mediaPreview(asset, props = {}) {
-  return asset.mime === 'video/mp4'
-    ? h('video', {src:asset.url, poster:asset.thumb_url, controls:true, preload:'metadata', ...props})
-    : h('img', {src:asset.url, alt:'', ...props})
+  const {onEdited,editPlatform,editable=true,...rest}=props
+  if(asset.mime==='video/mp4')return h('video',{src:asset.url,poster:asset.thumb_url,controls:true,preload:'metadata',...rest})
+  const image=h('img',{src:asset.url,alt:'',...rest})
+  if(editable&&['image/jpeg','image/png','image/webp'].includes(asset.mime)){
+    image.title='Bild bearbeiten / zuschneiden';image.tabIndex=0;image.setAttribute('role','button');image.setAttribute('aria-label','Bild bearbeiten / zuschneiden');image.style.cursor='zoom-in'
+    const open=guard(()=>openMediaEditor(asset,{platform:editPlatform,onSaved:onEdited}))
+    image.addEventListener('click',open);image.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}})
+  }
+  return image
 }
 
 export function mediaTile(asset, channels, opts = {}) {
@@ -300,11 +342,14 @@ export function mediaTile(asset, channels, opts = {}) {
     class: `tile lc-${asset.lifecycle}${consumed ? ' consumed' : ''}${opts.selected ? ' selected' : ''}`,
     title: `${asset.filename} — ${meta.label}`,
     draggable: !!opts.draggable,
-    onClick: opts.onClick,
+    onClick: opts.onClick || guard(()=>openMediaEditor(asset,{platform:instagramCropWarning(asset,channels)?'instagram':null})),
+    dataset:{cropAsset:asset.id,instagramAssigned:String(channels.some(c=>c.platform==='instagram'&&[...(asset.assigned_channel_ids||[]),...(asset.scheduled_channel_ids||[])].includes(c.id)))},
     ondragstart: opts.onDragStart,
   },
     h('img', { src: asset.thumb_url, alt: asset.caption_hint || asset.filename, loading: 'lazy' }),
     channelChips(asset, channels),
+    h('span',{class:'image-crop-warning',hidden:!instagramCropWarning(asset,channels),role:'img','aria-label':'Achtung: Instagram-Bildformat passt nicht',title:'Instagram-Bildformat passt nicht. Bitte im Bildeditor zuschneiden.',style:{position:'absolute',top:'7px',right:'7px',background:'#b91c1c',color:'white',borderRadius:'50%',width:'26px',height:'26px',textAlign:'center',fontSize:'20px',lineHeight:'26px',zIndex:'2'}},'⚠'),
+    ['image/jpeg','image/png','image/webp'].includes(asset.mime)?h('button',{type:'button',title:'Bild bearbeiten / zuschneiden','aria-label':'Bild bearbeiten / zuschneiden',style:{position:'absolute',right:'6px',bottom:'28px',padding:'4px 7px',background:'white',color:'#263449',zIndex:'3'},onClick:guard(async e=>{e.stopPropagation();await openMediaEditor(asset,{platform:instagramCropWarning(asset,channels)?'instagram':null})})},'✎'):null,
     // Gehört das Bild zu einem Set, muss man das auf einen Blick sehen –
     // sonst wundert man sich, warum es nie allein gepostet wird.
     (asset.set_names || []).length
@@ -313,12 +358,14 @@ export function mediaTile(asset, channels, opts = {}) {
           title: 'Set: ' + asset.set_names.join(', ') + ' – wird gemeinsam gepostet',
         }, '▣ ' + asset.set_names[0])
       : null,
+    asset.telegram_price_stars ? h('span',{class:'count',style:{left:'8px',right:'auto',top:'8px',bottom:'auto'}}, '⭐ ' + asset.telegram_price_stars) : null,
     asset.usage_count > 0 ? h('span', { class: 'count' }, asset.usage_count + '×') : null,
     h('span', { class: 'cap' },
       h('i', { class: 'dot', style: { background: meta.color } }),
       asset.filename,
     ),
   )
+  cropDecoration(el,instagramCropWarning(asset,channels))
   if (opts.onDragStart) el.addEventListener('dragstart', opts.onDragStart)
   // Beim Verweilen das Bild groß zeigen – in dichten Rastern der schnellste Weg,
   // ein Motiv zu erkennen, ohne es anzuklicken.

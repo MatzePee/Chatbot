@@ -1,7 +1,7 @@
 // Bilder-Upload per Drag & Drop, mit Fortschritt je Datei und
 // anschließender Zuordnung zu Kanälen.
-import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
-import { h, clear, append, field, modal, toast, guard, spinner, fmtBytes } from './ui.js?v=creatorstudio-mobile-system-20260909'
+import { api } from './api.js?v=image-warning-20261121-1'
+import { h, clear, append, field, modal, toast, guard, spinner, fmtBytes } from './ui.js?v=image-warning-20261121-1'
 
 const ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4']
 //: Wie viele Dateien pro Anfrage. Kleine Bündel halten die Rückmeldung flüssig
@@ -135,7 +135,7 @@ export function createDropZone({ channels = [], onDone = () => {}, compact = fal
     h('div', { class: 'dropzone-icon' }, '⇪'),
     h('div', {}, h('b', {}, 'Bilder oder MP4 hierher ziehen'), ' oder ',
       h('button', { class: 'ghost', onClick: () => fileInput.click() }, 'Dateien auswählen')),
-    h('div', { class: 'hint' }, 'JPEG, PNG, WebP, MP4 (H.264/AAC, Telegram) oder Bild-ZIP · ganze Ordner sind möglich'),
+    h('div', { class: 'hint' }, 'JPEG, PNG, WebP, MP4 (H.264/AAC, bis 50 MB; X, Fanvue und Telegram) oder Bild-ZIP · ganze Ordner sind möglich. Videos werden ohne zusätzliches Bildwasserzeichen veröffentlicht.'),
     fileInput,
   )
 

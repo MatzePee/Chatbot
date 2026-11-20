@@ -1,11 +1,12 @@
-import { libraryCleanupCard } from './settings.js?v=settings-structure-20261120-2'
-import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
-import { openUploadDialog } from '../upload.js?v=creatorstudio-mobile-system-20260909'
-import { openCreateSetDialog, openSetDialog } from '../sets.js?v=creatorstudio-mobile-system-20260909'
+import { platformIcon } from '../platform-icon.js?v=image-warning-20261121-1'
+import { libraryCleanupCard } from './settings.js?v=image-warning-20261121-1'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { openUploadDialog } from '../upload.js?v=image-warning-20261121-1'
+import { openCreateSetDialog, openSetDialog } from '../sets.js?v=image-warning-20261121-1'
 import {
-  h, append, clear, card, empty, field, modal, toast, guard, spinner,
-  mediaPreview, mediaTile, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, fmtDateTime, fmtBytes, debounce, attachPreview,
-} from '../ui.js?v=creatorstudio-library-autosave-20261101'
+  h, append, clear, card, empty, field, modal, toast, guard, spinner, confirmDialog,
+  mediaPreview, mediaTile, openMediaEditor, instagramCropWarning, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, fmtDateTime, fmtBytes, debounce, attachPreview,
+} from '../ui.js?v=image-warning-20261121-1'
 
 export default async function renderLibrary({ query }) {
   const [channels, views, tagList] = await Promise.all([api.channels(), api.views(), api.tags()])
@@ -87,7 +88,7 @@ export default async function renderLibrary({ query }) {
         },
           h('span', { style: { flex: '1', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
             '▣ ' + mediaSet.name),
-          h('span', { class: 'hint num' }, String(mediaSet.asset_ids.length)),
+          h('span', { class: 'hint num' }, String(mediaSet.asset_ids.length) + (mediaSet.telegram_price_stars ? ' · ⭐ ' + mediaSet.telegram_price_stars : '')),
         ),
         h('button', {
           class: 'ghost small', style: { border: 'none' }, title: 'Set bearbeiten',
@@ -202,7 +203,7 @@ export default async function renderLibrary({ query }) {
       onClick: () => openDetail(a.id),
     },
       h('td', {}, h('span', { class: 'row', style: { gap: '8px' } },
-        h('img', { src: a.thumb_url, alt: '', style: { width: '32px', height: '32px', objectFit: 'cover', borderRadius: '5px' } }),
+        h('img', { src: a.thumb_url, alt: '',title:instagramCropWarning(a,channels)?'⚠ Instagram-Bildformat passt nicht – Bild bearbeiten':'Bild bearbeiten',onClick:guard(async e=>{e.stopPropagation();await openMediaEditor(a,{platform:instagramCropWarning(a,channels)?'instagram':null,onSaved:()=>load(true)})}), style: { width: '32px', height: '32px', objectFit: 'cover', borderRadius: '5px',outline:instagramCropWarning(a,channels)?'3px solid #dc2626':'' } }),instagramCropWarning(a,channels)?h('span',{role:'img','aria-label':'Achtung: Instagram-Bildformat passt nicht',style:{color:'#b91c1c'}},'⚠'):null,
         a.filename)),
       h('td', { style: { color: LIFECYCLE[a.lifecycle].color } }, LIFECYCLE[a.lifecycle].label),
       h('td', { class: 'hint' }, a.assigned_channel_ids.map((id) => {
@@ -301,16 +302,19 @@ export default async function renderLibrary({ query }) {
     // Keep the current search order even when edits change filter membership.
     const ids = state.items.map((asset) => asset.id)
     let d = await api.mediaDetail(id)
-    let dialog, tags, nsfw, saveStatus, saved, timer
+    let dialog, tags, nsfw, stars, saveStatus, saved, timer
     let queue = Promise.resolve()
     let busy = false
     let removed = false
+    let assignmentMessage = ''
     const values = () => ({
       tags: tags.value.split(',').map((tag) => tag.trim()).filter(Boolean),
       nsfw_level: nsfw.value,
+      telegram_price_stars: stars.value ? Number(stars.value) : null,
     })
     const saveNow = () => {
       clearTimeout(timer)
+      if (!stars.checkValidity()) return Promise.reject(new Error("Telegram-Preis: ganze Zahl von 1 bis 25000 Sternen."))
       const payload = values()
       const assetId = d.id
       const serialized = JSON.stringify(payload)
@@ -349,6 +353,38 @@ export default async function renderLibrary({ query }) {
         dialog.body.inert = false
       }
     }
+    const removeChannel = async (channel) => {
+      await changeAsset(async () => {
+        // Set membership belongs to the whole sale unit. Never silently detach
+        // its other images or change the global set composition.
+        const sets = (d.sets || []).length ? await api.sets() : []
+        const inherited = sets.filter(set => (d.sets || []).includes(set.id)
+          && (set.assigned_channel_ids || []).includes(channel.id))
+        if (inherited.length && !(await confirmDialog('Set-Zuordnung aufheben',
+          `Dieses Bild ist über ${inherited.map(set => '„' + set.name + '“').join(', ')} zu ${channel.display_name} zugeordnet. `
+          + 'Die Zuordnung dieser Sets zu diesem Kanal wird für alle enthaltenen Bilder aufgehoben. Die Sets selbst bleiben erhalten.',
+          { okLabel: 'Set-Zuordnung aufheben' }))) return
+        const affectedIds = [...new Set([d.id, ...inherited.flatMap(set => set.asset_ids)])]
+        const check = await api.checkRemove({ asset_ids: affectedIds, channel_ids: [channel.id] })
+        let cascade = false
+        if (check.count > 0) {
+          cascade = await new Promise(resolve => {
+            modal('Geplante Posts betroffen', close => h('div', { class: 'col' },
+              h('p', {}, `${check.count} offene Posts verwenden diese Bilder auf ${channel.display_name}. Wie möchtest du vorgehen?`),
+              h('div', { class: 'row' },
+                h('button', { type: 'button', onClick: () => { resolve(false); close() } }, 'Nur Zuordnung aufheben'),
+                h('button', { type: 'button', class: 'danger', onClick: () => { resolve(true); close() } }, 'Auch geplante Posts abbrechen'),
+                h('button', { type: 'button', onClick: close }, 'Abbrechen'),
+              ),
+            ), { beforeClose: () => { resolve(null) } })
+          })
+          if (cascade === null) return
+        }
+        await api.unassign({ asset_ids: [d.id], set_ids: inherited.map(set => set.id),
+          channel_ids: [channel.id], cascade_posts: cascade })
+        assignmentMessage = '✓ Zuordnung zu ' + channel.display_name + ' aufgehoben'
+      })
+    }
     const navigate = async (direction) => {
       if (busy) return
       busy = true
@@ -363,6 +399,7 @@ export default async function renderLibrary({ query }) {
         const nextId = ids[index + direction]
         if (nextId) {
           d = await api.mediaDetail(nextId)
+          assignmentMessage = ''
           renderCurrent()
           dialog.body.scrollTop = 0
           dialog.body.closest('.modal-bg').scrollTop = 0
@@ -376,6 +413,7 @@ export default async function renderLibrary({ query }) {
     }
     function buildDetail(close) {
       tags = h('input', { value: (d.tags || []).join(', ') })
+      stars = h('input', {type:'number',min:1,max:25000,step:1,value:d.telegram_price_stars || '',placeholder:'Kein Pay-Angebot'})
       nsfw = h('select', {},
         ...['sfw', 'explicit'].map((v) => h('option', { value: v, selected: v === (d.nsfw_level === 'suggestive' ? 'explicit' : d.nsfw_level) }, v === 'sfw' ? 'SFW' : 'Explizit')))
 
@@ -388,6 +426,7 @@ export default async function renderLibrary({ query }) {
       })
       tags.addEventListener('change', () => { saveNow().catch(saveError) })
       nsfw.addEventListener('change', () => { saveNow().catch(saveError) })
+      stars.addEventListener('change', () => { saveNow().catch(saveError) })
 
       const history = d.history.length
         ? h('div', { class: 'col' }, ...d.history.map((e) => {
@@ -407,22 +446,27 @@ export default async function renderLibrary({ query }) {
       const openChannels = d.open_channels.length
         ? h('div', { class: 'row' }, ...d.open_channels.map((id2) => {
             const c = channels.find((x) => x.id === id2)
-            return h('span', { class: 'chip', style: { color: c ? c.color : null } }, c ? c.display_name : id2)
+            return h('button', { type: 'button', class: 'chip', style: { color: c ? c.color : null },
+              title: 'Zuordnung aufheben', 'aria-label': 'Zuordnung zu ' + (c ? c.display_name : id2) + ' aufheben',
+              onClick: guard(() => removeChannel(c || { id: id2, display_name: id2 })),
+            }, platformIcon(c?.platform), c ? c.display_name : id2,
+              c && instagramCropWarning(d,[c]) ? h('span',{role:'img','aria-label':'Achtung: Instagram-Bildformat passt nicht',title:'Instagram-Bildformat passt nicht. Bitte das Bild zuschneiden.',style:{color:'#b91c1c',fontWeight:'700'}},'⚠') : null,
+              h('span', { 'aria-hidden': 'true' }, ' ×'))
           }))
-        : h('p', { class: 'hint' }, 'Auf allen zugeordneten Kanälen gelaufen.')
+        : h('p', { class: 'hint' }, d.assigned_channel_ids.length ? 'Auf allen zugeordneten Kanälen gelaufen.' : 'Keinem Kanal zugeordnet.')
 
       const addChips = h('div', { class: 'row' }, ...channels
         .filter((c) => !d.assigned_channel_ids.includes(c.id))
         .map((c) => h('button', {
-          class: 'chip',
+          type: 'button', class: 'chip', 'aria-label': '+ ' + c.display_name,
           onClick: guard(async () => {
             await changeAsset(async () => {
               const r = await api.assign({ asset_ids: [d.id], channel_ids: [c.id] })
               if (r.rejected.length) throw new Error(r.rejected[0].reason)
-              toast.ok('Zu ' + c.display_name + ' zugeordnet')
+              assignmentMessage = '✓ Zu ' + c.display_name + ' zugeordnet'
             })
           }),
-        }, '+ ' + c.display_name)))
+        }, platformIcon(c.platform), '+ ' + c.display_name)))
 
       const index = ids.indexOf(d.id)
       return h('div', { class: 'library-detail' },
@@ -433,11 +477,15 @@ export default async function renderLibrary({ query }) {
         ),
         h('div', { class: 'grid c2' },
           h('div', {},
-            mediaPreview(d, { style: { width: '100%', borderRadius: '10px', border: '1px solid var(--line)' } }),
+            h('div', { class:'library-detail-image', dataset:{cropAsset:d.id,instagramAssigned:String(channels.some(c=>c.platform==='instagram'&&[...(d.assigned_channel_ids||[]),...(d.scheduled_channel_ids||[])].includes(c.id)))},
+              style:{position:'relative',borderRadius:'10px',outline:instagramCropWarning(d,channels)?'3px solid #dc2626':''} },
+              mediaPreview(d, { style: { display:'block',width: '100%', borderRadius: '10px', border: '1px solid var(--line)' },editPlatform:instagramCropWarning(d,channels)?'instagram':null,onEdited:async()=>{await saveNow();d=await api.mediaDetail(d.id);renderCurrent();await load(true)} }),
+              h('span',{class:'image-crop-warning',hidden:!instagramCropWarning(d,channels),role:'img','aria-label':'Achtung: Instagram-Bildformat passt nicht',title:'Instagram-Bildformat passt nicht. Bild anklicken und zuschneiden.',style:{position:'absolute',top:'8px',right:'8px',background:'#b91c1c',color:'white',borderRadius:'50%',width:'30px',height:'30px',textAlign:'center',fontSize:'22px',lineHeight:'30px',pointerEvents:'none'}},'⚠')),
             h('div', { class: 'hint', style: { margin: '8px 0' } },
-              `${d.width}×${d.height} · ${fmtBytes(d.bytes)} · ${d.mime}`),
+              `${d.image_crops?.variants?.all?.width || d.width}×${d.image_crops?.variants?.all?.height || d.height} · ${fmtBytes(d.bytes)} · ${d.mime}` + (d.image_crops?.variants?.instagram ? ` · Instagram: ${d.image_crops.variants.instagram.width}×${d.image_crops.variants.instagram.height}` : '')),
             field('Tags (kommagetrennt)', tags),
             field('Bildkategorie', nsfw),
+            field('Telegram-Einzelpreis in Sternen', stars, 'Leer = nicht einzeln im Pay-Kanal planbar. Setpreise werden separat am Set festgelegt.'),
             d.ai_description ? field('KI-Beschreibung', h('p', { class: 'hint', style: { margin: 0 } }, d.ai_description)) : null,
             h('div', { class: 'row' },
               h('button', { class: 'primary', onClick: close }, 'Schließen'),
@@ -482,7 +530,10 @@ export default async function renderLibrary({ query }) {
             ),
             h('div', {}, h('label', { class: 'lbl' }, 'Verwendungs-Historie'), history),
             h('div', {}, h('label', { class: 'lbl' }, 'Zugeordnet, aber noch offen'), openChannels),
-            h('div', {}, h('label', { class: 'lbl' }, 'Weitere Kanäle zuordnen'), addChips),
+            h('div', {}, h('label', { class: 'lbl' }, 'Weitere Kanäle zuordnen'), addChips,
+              h('div', { class: 'hint library-assignment-feedback', role: 'status', 'aria-live': 'polite',
+                style: { marginTop: '8px', minHeight: '1.4em', color: 'var(--ok)', overflowWrap: 'anywhere' },
+              }, assignmentMessage)),
           ),
         ),
       )
@@ -541,6 +592,9 @@ export default async function renderLibrary({ query }) {
     draw()
   })
 
+  const priceFilter = h('select', {'aria-label':'Telegram-Preisfilter'},
+    h('option',{value:''},'Alle Einzelbilder und Videos'), h('option',{value:'yes'},'Mit Telegram-Einzelpreis'), h('option',{value:'no'},'Ohne Telegram-Einzelpreis'))
+  priceFilter.addEventListener('change', () => {state.q.has_telegram_price = priceFilter.value === '' ? null : priceFilter.value === 'yes'; load()})
   const tagSelect = h('select', {},
     h('option', { value: '' }, 'Alle Tags'),
     ...tagList.map((t) => h('option', { value: t.tag }, `${t.tag} (${t.count})`)))
@@ -574,6 +628,7 @@ export default async function renderLibrary({ query }) {
     h('label', { class: 'lbl', style: { marginTop: '14px' } }, 'Gespeicherte Ansichten'), viewButtons,
     h('label', { class: 'lbl', style: { marginTop: '14px' } }, 'Kanal-Filter'), channelFilters,
     h('label', { class: 'lbl', style: { marginTop: '14px' } }, 'Tags'), tagSelect,
+    h('label',{class:'lbl',style:{marginTop:'14px'}},'Telegram-Sternepreis'), priceFilter,
   )
 
   const filtersToggle = h('button', { class: 'library-filter-toggle', type: 'button', 'aria-expanded': 'false', 'aria-controls': 'library-filters',

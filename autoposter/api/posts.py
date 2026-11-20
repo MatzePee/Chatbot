@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional
 
+from autoposter.adapters import AdapterError
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +45,7 @@ from autoposter.schemas import (
     PreflightIssue,
     PreflightResult,
 )
+from autoposter.services.buffer_channels import editable as buffer_editable
 from autoposter.services import lifecycle, media as media_service, planner, publisher, runs
 from autoposter.services.llm import llm
 from autoposter.services.fanvue_channels import audience_for, fixed_audience
@@ -151,6 +153,8 @@ async def create_post(
         pin_after_publish=payload.pin_after_publish,
         created_by=user.id,
     )
+    from autoposter.services import telegram_paid
+    await telegram_paid.prepare(db, channel, post)
     db.add(post)
     await db.flush()
     await lifecycle.refresh_assets(db, payload.media_asset_ids)
@@ -177,6 +181,7 @@ async def update_post(
     post = (await db.execute(select(Post).where(Post.id == post_id))).scalar_one_or_none()
     if not post:
         raise HTTPException(404, "Post nicht gefunden")
+    buffer_editable(post)
     if post.status == PostStatus.published.value:
         raise HTTPException(409, "Veröffentlichte Posts können nicht geändert werden")
 
@@ -198,6 +203,15 @@ async def update_post(
         diff[key] = {"from": str(old)[:200], "to": str(value)[:200]}
         setattr(post, key, value)
 
+    from autoposter.services import telegram_paid
+    channel = await db.get(Channel, post.channel_id)
+    if telegram_paid.is_paid(channel):
+        if 'media_asset_ids' in changes or 'media_set_id' in changes:
+            await telegram_paid.prepare(db, channel, post)
+            post.status = PostStatus.needs_review.value
+        if post.status == PostStatus.scheduled.value:
+            issue = await telegram_paid.validate(db, channel, post)
+            if issue: raise HTTPException(422, issue)
     if diff:
         db.add(PostRevision(post_id=post.id, editor_id=user.id, diff=diff))
     db.add(post)
@@ -217,6 +231,7 @@ async def delete_post(
 ) -> None:
     post = (await db.execute(select(Post).where(Post.id == post_id))).scalar_one_or_none()
     if post:
+        buffer_editable(post, deleting=True)
         assets = [uuid.UUID(str(a)) for a in (post.media_asset_ids or [])]
         await db.delete(post)
         await db.flush()
@@ -232,6 +247,8 @@ async def bulk_move(
     posts = (
         await db.execute(select(Post).where(Post.id.in_(payload.post_ids)))
     ).scalars().all()
+    for post in posts:
+        buffer_editable(post)
     changed = 0
     for post in posts:
         if post.status == PostStatus.published.value:
@@ -263,9 +280,12 @@ async def bulk_delete(
     posts = (
         await db.execute(select(Post).where(Post.id.in_(payload.post_ids)))
     ).scalars().all()
+    for post in posts:
+        buffer_editable(post, deleting=True)
     assets: set = set()
     deleted = skipped = 0
     for post in posts:
+        buffer_editable(post)
         if post.status == PostStatus.published.value:
             skipped += 1
             continue
@@ -321,6 +341,8 @@ async def duplicate_post(
             generation_meta={"duplicated_from": str(source.id)},
             created_by=user.id,
         )
+        from autoposter.services import telegram_paid
+        await telegram_paid.prepare(db, channel, clone)
         db.add(clone)
         made.append(clone)
 
@@ -329,6 +351,27 @@ async def duplicate_post(
         db, [uuid.UUID(str(a)) for a in (source.media_asset_ids or [])]
     )
     return [PostOut.model_validate(p) for p in made]
+
+
+@router.post('/{post_id}/refresh-paid', response_model=PostOut)
+async def refresh_paid(post_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
+    from autoposter.services import telegram_paid
+    from autoposter.models import MediaSetItem
+    post = await db.get(Post, post_id)
+    if not post or post.status not in ('draft', 'needs_review', 'scheduled', 'failed'):
+        raise HTTPException(409, 'Nur unveröffentlichte Posts können aktualisiert werden.')
+    channel = await db.get(Channel, post.channel_id)
+    if not telegram_paid.is_paid(channel): raise HTTPException(422, 'Kein Pay-Post.')
+    old_ids = list(post.media_asset_ids or [])
+    if post.media_set_id:
+        ids = (await db.execute(select(MediaSetItem.media_asset_id).where(MediaSetItem.media_set_id == post.media_set_id).order_by(MediaSetItem.position, MediaSetItem.id))).scalars().all()
+        post.media_asset_ids = [str(i) for i in ids]
+    await telegram_paid.prepare(db, channel, post)
+    post.status = 'needs_review'
+    post.error_message = ''
+    await db.flush()
+    await lifecycle.refresh_assets(db, [uuid.UUID(i) for i in set(old_ids + post.media_asset_ids)])
+    return PostOut.model_validate(post)
 
 
 @router.get("/{post_id}/revisions")
@@ -376,6 +419,19 @@ async def attempts(
 # --------------------------------------------------------------------------- #
 # Preflight, Generierung, Veröffentlichung
 # --------------------------------------------------------------------------- #
+@router.post("/{post_id}/buffer-status")
+async def buffer_status(post_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
+    from autoposter.services import buffer_channels
+    post = await db.get(Post, post_id)
+    if not post or not buffer_channels.delivery(post):
+        raise HTTPException(404, "Kein Buffer-Versandvorgang")
+    try:
+        message = await buffer_channels.reconcile(db, post)
+    except AdapterError as exc:
+        raise HTTPException(502, str(exc)) from None
+    return {"ok": True, "message": message}
+
+
 @router.get("/{post_id}/preflight", response_model=PreflightResult)
 async def preflight(
     post_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(current_user)
@@ -425,6 +481,7 @@ async def generate(
         ).scalar_one_or_none()
         if not post:
             raise HTTPException(404, "Post nicht gefunden")
+        buffer_editable(post)
         channel_id = post.channel_id
         asset_ids = [uuid.UUID(str(a)) for a in (post.media_asset_ids or [])]
 
@@ -667,6 +724,7 @@ async def approve(
     post = (await db.execute(select(Post).where(Post.id == post_id))).scalar_one_or_none()
     if not post:
         raise HTTPException(404, "Post nicht gefunden")
+    buffer_editable(post)
     issues = await planner.preflight(db, post)
     blocking = [i for i in issues if i["level"] == "error"]
     if blocking:

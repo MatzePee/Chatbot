@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=post-retention-1'
-import { h, card, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { h, card, confirmDialog } from '../ui.js?v=image-warning-20261121-1'
 
 export async function postRetentionCard(values) {
   let status={active:false}, backendReady=false

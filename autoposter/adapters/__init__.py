@@ -14,8 +14,10 @@ from autoposter.adapters.base import (  # noqa: F401
 from autoposter.adapters.fanvue import FanvueAdapter
 from autoposter.adapters.telegram import TelegramAdapter
 from autoposter.adapters.x import XAdapter
+from autoposter.adapters.buffer import BufferAdapter
 
 _REGISTRY: Dict[str, object] = {
+    "instagram": BufferAdapter(),
     "telegram": TelegramAdapter(),
     "x": XAdapter(),
     "fanvue": FanvueAdapter(),

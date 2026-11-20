@@ -65,6 +65,10 @@ async def get_valid_credentials(db: AsyncSession, channel: Channel) -> Credentia
         )
 
     cred = to_credentials(row)
+    if channel.platform == "instagram":
+        if row.platform != "instagram" or not cred.external_user_id or cred.raw_meta.get("destination") != channel.handle or not channel.last_verified_at:
+            raise AdapterError("Instagram: Verbindung und Zielkonto zuerst in den Kanal-Einstellungen testen.")
+        return cred
     if channel.platform == "telegram":
         if row.platform != "telegram" or not cred.raw_meta.get("chat_id") or cred.raw_meta.get("destination") != channel.handle or not channel.last_verified_at:
             raise AdapterError("Telegram: Zielkanal und Bot-Rechte zuerst testen.")
@@ -122,7 +126,7 @@ async def token_expiry(db: AsyncSession, channel: Channel) -> Optional[datetime]
 
 
 def is_connected(channel):
-    if channel.platform == 'telegram':
+    if channel.platform in ('telegram', 'instagram'):
         return bool(channel.credential_id and channel.last_verified_at)
     if channel.platform == 'fanvue':
         from . import chatbot_fanvue

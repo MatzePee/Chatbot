@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
-import { h, field, spinner, clear } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { h, field, spinner, clear } from '../ui.js?v=image-warning-20261121-1'
 
 export default function renderLogin({ onLogin }) {
   const email = h('input', { type: 'email', required: true, autofocus: true, autocomplete: 'username' })

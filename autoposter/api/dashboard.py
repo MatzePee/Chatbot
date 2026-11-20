@@ -106,6 +106,20 @@ async def dashboard(
         )
     ).scalars().all()
 
+    # Resolve the real channel of each notification; never infer a platform
+    # from a human-readable title or make external provider requests.
+    platforms = {str(channel.id): channel.platform for channel in channels}
+    note_post_ids = set()
+    for note in notes:
+        if note.entity == 'post':
+            try:
+                note_post_ids.add(uuid.UUID(str(note.entity_id)))
+            except (ValueError, TypeError, AttributeError):
+                pass
+    note_post_channels = dict((str(post_id), str(channel_id)) for post_id, channel_id in (
+        await db.execute(select(Post.id, Post.channel_id).where(Post.id.in_(list(note_post_ids))))
+    ).all()) if note_post_ids else {}
+
     return DashboardOut(
         inventory=await inventory.overview(db),
         lifecycle_counts=await library.lifecycle_counts(db),
@@ -120,6 +134,8 @@ async def dashboard(
                 "body": assessments[n.entity_id].error_message if n.entity == "post" and n.entity_id in assessments and problems.kind(n) == "post" else n.body,
                 "entity": n.entity,
                 "entity_id": n.entity_id,
+                "platform": platforms.get(str(n.entity_id)) if n.entity == 'channel' else
+                    platforms.get(note_post_channels.get(str(n.entity_id))) if n.entity == 'post' else None,
                 "created_at": n.created_at.isoformat(),
             }
             for n in notes

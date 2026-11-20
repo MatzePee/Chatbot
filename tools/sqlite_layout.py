@@ -42,7 +42,7 @@ def _assert_stopped(root):
     proc = Path('/proc')
     if not (proc / 'self/fd').is_dir():
         raise ValueError('Offline source verification requires Linux /proc')
-    from app.sqlite_layout import stopped_authority
+    from app.sqlite_layout import stopped_authority, stopped_process_verified
     authorized = stopped_authority(root)
     identities = {(p.stat().st_dev, p.stat().st_ino) for p in root.rglob('*') if p.is_file()}
     for process in proc.iterdir():
@@ -53,7 +53,8 @@ def _assert_stopped(root):
         except FileNotFoundError:
             continue
         except PermissionError as exc:
-            if authorized and process.stat().st_uid != os.geteuid():
+            if authorized and (process.stat().st_uid != os.geteuid()
+                               or stopped_process_verified(root, process)):
                 continue
             raise ValueError('Cannot verify stopped sources; process descriptors inaccessible') from exc
         for descriptor in descriptors:
@@ -62,7 +63,8 @@ def _assert_stopped(root):
             except FileNotFoundError:
                 continue
             except PermissionError as exc:
-                if authorized and process.stat().st_uid != os.geteuid():
+                if authorized and (process.stat().st_uid != os.geteuid()
+                               or stopped_process_verified(root, process)):
                     continue
                 raise ValueError('Cannot verify stopped sources; descriptor inaccessible') from exc
             if (stat.st_dev, stat.st_ino) in identities:

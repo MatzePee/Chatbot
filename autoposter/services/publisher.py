@@ -64,6 +64,10 @@ async def _reset_quota_if_needed(db: AsyncSession, channel: Channel) -> None:
 async def _upload_all(
     db: AsyncSession, adapter, cred, channel: Channel, assets: Sequence[MediaAsset]
 ) -> List[MediaRef]:
+    from autoposter.services.media_rules import combination_issue
+    issue = combination_issue(channel.platform, assets)
+    if issue:
+        raise AdapterError(issue)
     if channel.platform == "telegram":
         if len(assets) > 10 or sum(asset.bytes or 0 for asset in assets) > 100_000_000:
             raise AdapterError("Telegram: maximal 10 Medien und 100 MB pro Album.")
@@ -92,13 +96,14 @@ async def _upload_all(
         # Explicit X uploads must carry the current adult-content label.
         needs_label = channel.platform == "x" and asset.nsfw_level in ("explicit", "suggestive")
         if cached and not needs_label and (cached.expires_at is None or cached.expires_at > now):
-            refs.append(MediaRef(asset_id=str(asset.id), external_id=cached.external_id))
+            refs.append(MediaRef(asset_id=str(asset.id), external_id=cached.external_id, mime=asset.mime))
             continue
 
         data = media_service.read_bytes(asset)
         # Wasserzeichen erst hier: Das Original bleibt unangetastet, und
         # dasselbe Bild kann auf zwei Kanälen mit verschiedenen Zeichen laufen.
-        data = await asyncio.to_thread(watermark.apply_bytes, data, channel, mime=asset.mime)
+        if asset.mime != "video/mp4":
+            data = await asyncio.to_thread(watermark.apply_bytes, data, channel, mime=asset.mime)
         if channel.platform == 'x':
             ref = await adapter.upload_media(cred, asset, data, include_alt_text=channel.x_send_alt_text)
         else:
@@ -123,10 +128,16 @@ async def _upload_all(
 
 async def split_thread_if_needed(db: AsyncSession, post: Post, channel: Channel) -> List[Post]:
     """Bildersets mit mehr Bildern als die Plattform erlaubt als Self-Thread zerlegen."""
-    if channel.platform == "telegram":
+    if channel.platform in ("telegram", "instagram"):
         return [post]  # Reject over-limit albums as one post, never partial threads.
     limits = get_adapter(channel.platform).limits()
     asset_ids = [str(a) for a in (post.media_asset_ids or [])]
+    if channel.platform == 'x' and asset_ids:
+        special = (await db.execute(select(MediaAsset.id).where(
+            MediaAsset.id.in_([uuid.UUID(value) for value in asset_ids]),
+            MediaAsset.mime.in_(['video/mp4', 'image/gif'])))).first()
+        if special:
+            return [post]  # Preflight rejects incompatible mixtures without splitting away media.
     if len(asset_ids) <= limits.max_images_per_post:
         return [post]
 
@@ -182,6 +193,10 @@ async def publish_post(
         db.add(post)
         return False, post.error_message
 
+    if channel.platform == "instagram":
+        from autoposter.services import buffer_channels
+        if buffer_channels.locked(post):
+            return False, "Instagram-Versand läuft oder ist unklar. Status prüfen; nicht erneut senden."
     if channel.platform == "telegram" and (post.generation_meta or {}).get("telegram_delivery", {}).get("state") in ("pending", "uncertain"):
         return False, "Telegram-Versand unklar; vor weiteren Aktionen Zielkanal manuell prüfen. Nicht erneut senden."
 
@@ -200,12 +215,31 @@ async def publish_post(
         post.generation_meta = pending_meta
         await db.commit()  # Claim before any preflight/status/metadata write, including stale sessions.
 
+    if channel.platform == "instagram" and not settings.dry_run:
+        original = dict(post.generation_meta or {})
+        from autoposter.services import upload_post
+        provider = await upload_post.provider(db, channel)
+        delivery = {**original.get("buffer_delivery", {}), "state": "preparing", "provider": provider}
+        if provider == "upload_post":
+            from autoposter.models import ChannelCredential
+            credential = await db.get(ChannelCredential, channel.credential_id)
+            delivery.update(request_id=str(uuid.uuid5(uuid.NAMESPACE_URL, "mp-creatorstudio:" + str(channel.id) + ":" + str(post.id))), profile=credential.external_user_id)
+        claimed = {**original, "buffer_delivery": delivery}
+        claim = await db.execute(update(Post).where(Post.id == post.id, Post.generation_meta == original)
+            .values(generation_meta=claimed).execution_options(synchronize_session=False))
+        if claim.rowcount != 1:
+            await db.rollback()
+            return False, "Instagram-Versand bereits beansprucht."
+        post.generation_meta = claimed
+        await db.commit()
     issues = await planner.preflight(db, post)
     blocking = [i for i in issues if i["level"] == "error"]
-    if blocking and not force:
+    if blocking and (not force or channel.platform == "instagram"):
         post.status = PostStatus.failed.value
         post.error_message = "; ".join(i["message"] for i in blocking)[:900]
         post.generation_meta = {**(post.generation_meta or {}), "preflight_failure": True}
+        if channel.platform == "instagram":
+            post.generation_meta = {**post.generation_meta, "buffer_delivery": {**post.generation_meta.get("buffer_delivery", {}), "state": "rejected"}}
         if channel.platform == "telegram":
             post.generation_meta = {**post.generation_meta,"telegram_delivery":{"state":"rejected"}}
         db.add(post)
@@ -226,6 +260,8 @@ async def publish_post(
     if channel.quota_used_today >= policy.daily_api_quota and not force:
         if channel.platform == "telegram":
             post.generation_meta = {**(post.generation_meta or {}),"telegram_delivery":{"state":"rejected"}}
+        if channel.platform == "instagram":
+            post.generation_meta = {**(post.generation_meta or {}), "buffer_delivery": {**(post.generation_meta or {}).get("buffer_delivery", {}), "state": "rejected"}}
         post.error_message = "Tageskontingent des Kanals erschöpft"
         post.scheduled_at = datetime.now(timezone.utc) + timedelta(hours=6)
         db.add(post)
@@ -274,11 +310,34 @@ async def publish_post(
     # ---------------- Echter Versand ---------------- #
     try:
         cred = await cred_service.get_valid_credentials(db, channel)
-        refs = await _upload_all(db, adapter, cred, channel, assets)
+        if channel.platform == "instagram":
+            if cred.raw_meta.get("provider") == "upload_post":
+                from autoposter.services import upload_post
+                from autoposter.adapters.upload_post import UploadPostAdapter
+                adapter = UploadPostAdapter()
+                refs = await upload_post.prepare(db, post, channel, cred, assets)
+            else:
+                from autoposter.services import buffer_storage
+                refs = await buffer_storage.prepare(db, post, channel, cred, assets)
+            post.generation_meta = {**(post.generation_meta or {}), "buffer_delivery": {
+                **(post.generation_meta or {}).get("buffer_delivery", {}), "state": "pending"}}
+            await db.commit()
+        else:
+            refs = await _upload_all(db, adapter, cred, channel, assets)
         if channel.platform == "telegram":
             if len(assets) != len(post.media_asset_ids or []):
                 raise AdapterError("Telegram: Medien fehlen oder sind doppelt ausgewählt.")
             await db.commit()  # Durable before send: crash recovery must not resend blindly.
+            from autoposter.services import telegram_paid
+            if telegram_paid.is_paid(channel):
+                # Serialize committed price/set edits with this sale. The durable
+                # delivery claim above still prevents retries after a crash.
+                await db.execute(update(Post).where(Post.id == post.id).values(
+                    id=Post.id, updated_at=Post.updated_at).execution_options(synchronize_session=False))
+                await db.refresh(post)
+                issue = await telegram_paid.validate(db, channel, post)
+                if issue:
+                    raise AdapterError(issue)
         outcome = await adapter.publish(cred, channel, post, refs)
     except AdapterError as exc:
         attempt.finished_at = datetime.now(timezone.utc)
@@ -290,6 +349,11 @@ async def publish_post(
             post.generation_meta = {**(post.generation_meta or {}), "telegram_delivery": {"state":"uncertain" if uncertain else "rejected", "message_ids":getattr(exc,"confirmed",[])}}
             if uncertain:
                 attempt.outcome = "uncertain"
+        if channel.platform == "instagram":
+            from autoposter.adapters.buffer import BufferUncertain
+            post.generation_meta = {**(post.generation_meta or {}), "buffer_delivery": {
+                **(post.generation_meta or {}).get("buffer_delivery", {}),
+                "state": "uncertain" if isinstance(exc, BufferUncertain) else "rejected"}}
         attempt.response_excerpt = str(exc)[:1000]
         db.add(attempt)
 
@@ -304,7 +368,7 @@ async def publish_post(
                 entity_id=str(channel.id),
             )
 
-        if exc.retryable and post.attempt_count < 5:
+        if exc.retryable and post.attempt_count < 5 and channel.platform != "instagram":
             delay = exc.retry_after or 60 * post.attempt_count
             post.status = PostStatus.scheduled.value
             post.scheduled_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
@@ -333,6 +397,10 @@ async def publish_post(
         if channel.platform == "telegram":
             exc = RuntimeError("Telegram: unerwarteter Fehler; Versand unklar. Zielkanal manuell prüfen; nicht erneut senden.")
             post.generation_meta = {**(post.generation_meta or {}), "telegram_delivery":{"state":"uncertain"}}
+        if channel.platform == "instagram":
+            exc = RuntimeError("Instagram: unerwarteter Fehler. Status beim Anbieter prüfen; nicht erneut senden.")
+            post.generation_meta = {**(post.generation_meta or {}), "buffer_delivery": {
+                **(post.generation_meta or {}).get("buffer_delivery", {}), "state": "uncertain"}}
         attempt.finished_at = datetime.now(timezone.utc)
         attempt.outcome = "error"
         attempt.response_excerpt = str(exc)[:1000]
@@ -346,6 +414,23 @@ async def publish_post(
         )
         return False, post.error_message
 
+    if channel.platform == "instagram":
+        from autoposter.services import buffer_channels
+        post.external_post_id = outcome.external_post_id
+        post.status = PostStatus.publishing.value
+        post.generation_meta = {**(post.generation_meta or {}), "buffer_delivery": {
+            **(post.generation_meta or {}).get("buffer_delivery", {}), "state": "queued"}}
+        provider_name = "Upload-Post" if cred.raw_meta.get("provider") == "upload_post" else "Buffer"
+        post.error_message = f"An {provider_name} übergeben – Instagram-Bestätigung steht aus."
+        attempt.finished_at = datetime.now(timezone.utc)
+        attempt.outcome = "upload_post_accepted" if provider_name == "Upload-Post" else "buffer_accepted"
+        attempt.http_status = outcome.http_status
+        attempt.response_excerpt = f"{provider_name} hat die Übernahme bestätigt."
+        channel.quota_used_today += 1
+        db.add_all([post, attempt, channel])
+        await db.commit()
+        message = await buffer_channels.apply_remote(db, post, channel, outcome.raw)
+        return True, message
     post.status = PostStatus.published.value
     post.published_at = datetime.now(timezone.utc)
     post.external_post_id = outcome.external_post_id
@@ -404,7 +489,7 @@ async def retry_failed(db: AsyncSession, hours: int = 2) -> int:
             await db.execute(select(Channel).where(Channel.id == post.channel_id))
         ).scalar_one_or_none()
         policy = channel.policy if channel else None
-        if channel and channel.platform == "telegram":
+        if channel and channel.platform in ("telegram", "instagram"):
             continue  # No Bot API idempotency/readback; retries require deliberate review.
         if not policy or not policy.auto_retry_on_fail or post.attempt_count >= 3:
             continue

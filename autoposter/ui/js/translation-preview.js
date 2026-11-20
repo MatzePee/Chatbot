@@ -1,5 +1,5 @@
-import { h } from './ui.js?v=creatorstudio-mobile-system-20260909'
-import { api } from './api.js?v=creatorstudio-translation-20260910'
+import { h } from './ui.js?v=image-warning-20261121-1'
+import { api } from './api.js?v=image-warning-20261121-1'
 
 let nextId = 0
 

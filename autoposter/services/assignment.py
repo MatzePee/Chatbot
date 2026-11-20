@@ -44,7 +44,8 @@ def check_compatibility(asset: MediaAsset, channel: Channel) -> Optional[str]:
     limits = get_adapter(channel.platform).limits()
     if asset.mime not in limits.mime_whitelist:
         return f"Dateityp {asset.mime} wird von {channel.platform} nicht unterstützt"
-    if asset.bytes > limits.max_image_bytes:
+    max_bytes = limits.max_video_bytes if asset.mime == "video/mp4" else limits.max_image_bytes
+    if asset.bytes > max_bytes:
         return f"Datei zu groß für {channel.platform}"
     return None
 
@@ -271,6 +272,9 @@ async def _cancel_dependent_posts(
     db: AsyncSession, asset_ids: Iterable[uuid.UUID], channel_ids: Sequence[uuid.UUID]
 ) -> int:
     posts = await dependent_posts(db, asset_ids, channel_ids)
+    from autoposter.services.buffer_channels import editable
+    for post in posts:
+        editable(post)
     for post in posts:
         post.status = PostStatus.cancelled.value
         post.error_message = "Zuordnung des Bildes wurde entfernt"

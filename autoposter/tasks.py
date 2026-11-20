@@ -22,7 +22,7 @@ def _run(name, function, *args, character_id=None, **kwargs):
 def fanout(job_name):
     names = {'dispatch_due_posts','generate_plan','describe_assets','refresh_metrics',
              'delete_old_fanvue_posts','age_fanvue_visibility','collect_daily_followers',
-             'inventory_check','nightly_maintenance','token_health'}
+             'inventory_check','nightly_maintenance','token_health','reconcile_buffer_posts','reconcile_upload_post_posts'}
     if job_name not in names:
         raise ValueError('Unknown scheduled job')
     from autoposter.character_dispatch import active_ids
@@ -95,6 +95,16 @@ def inventory_check(*, character_id=None):
 @shared_task(name='autoposter.nightly_maintenance')
 def nightly_maintenance(*, character_id=None):
     return _run('nightly_maintenance', jobs.nightly_maintenance, character_id=character_id)
+
+
+@shared_task(name='autoposter.reconcile_upload_post_posts')
+def reconcile_upload_post_posts(*, character_id=None):
+    return _run('reconcile_upload_post_posts', jobs.reconcile_upload_post_posts, character_id=character_id)
+
+
+@shared_task(name='autoposter.reconcile_buffer_posts')
+def reconcile_buffer_posts(*, character_id=None):
+    return _run('reconcile_buffer_posts', jobs.reconcile_buffer_posts, character_id=character_id)
 
 
 @shared_task(name='autoposter.token_health')

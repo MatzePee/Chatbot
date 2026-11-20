@@ -64,6 +64,14 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=3, minute=15),
     },
     # Alle 15 Minuten: Token-Gültigkeit prüfen.
+    "reconcile-upload-post-posts": {
+        "task": "autoposter.reconcile_upload_post_posts",
+        "schedule": 300.0,
+    },
+    "reconcile-buffer-posts": {
+        "task": "autoposter.reconcile_buffer_posts",
+        "schedule": 3600.0,
+    },
     "token-health": {
         "task": "autoposter.token_health",
         "schedule": crontab(minute="*/15"),

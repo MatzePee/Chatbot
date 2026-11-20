@@ -47,6 +47,8 @@ def default_jobs() -> List[Job]:
         Job("describe_assets", lambda: jobs.describe_assets(10), 900, 120),
         Job("inventory_check", lambda: jobs.inventory_check(), 3600, 180),
         Job("nightly_maintenance", lambda: jobs.nightly_maintenance(), 24 * 3600, 600),
+        Job("reconcile_upload_post_posts", jobs.reconcile_upload_post_posts, 300, 30),
+        Job("reconcile_buffer_posts", jobs.reconcile_buffer_posts, 3600, 60),
         Job("token_health", lambda: jobs.token_health(), 900, 90),
         # Stündlich aufrufen, die eigentliche Drosselung (Standard 6 h) sitzt
         # in updater.is_due() – so lässt sie sich zur Laufzeit ändern.

@@ -83,6 +83,7 @@ class MediaRef:
     asset_id: str
     external_id: str
     expires_at: Optional[datetime] = None
+    mime: str = ""
 
 
 @dataclass
@@ -104,6 +105,7 @@ class ChannelLimits:
     supports_platform_scheduling: bool
     supports_price: bool
     max_image_bytes: int
+    max_video_bytes: int = 50_000_000
 
 
 @dataclass

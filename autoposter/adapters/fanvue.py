@@ -166,7 +166,7 @@ class FanvueAdapter:
         return ChannelLimits(
             max_chars=MAX_TEXT,
             max_images_per_post=20,
-            mime_whitelist=["image/jpeg", "image/png", "image/webp"],
+            mime_whitelist=["image/jpeg", "image/png", "image/webp", "video/mp4"],
             supports_text_only=True,
             supports_alt_text=False,
             supports_platform_scheduling=True,
@@ -306,6 +306,8 @@ class FanvueAdapter:
     # Medien
     # ------------------------------------------------------------------ #
     async def upload_media(self, cred: Credentials, asset: MediaAsset, data: bytes) -> MediaRef:
+        if not data or len(data) > (self.limits().max_video_bytes if asset.mime == 'video/mp4' else self.limits().max_image_bytes):
+            raise AdapterError('Fanvue: leere oder zu große Mediendatei (Videos maximal 50 MB).')
         headers = self._headers(cred)
         parts_count = max(1, -(-len(data) // PART_SIZE))
         media_type = asset.mime.split("/", 1)[0].lower()
@@ -435,8 +437,10 @@ class FanvueAdapter:
                 if status.status_code >= 400:
                     await asyncio.sleep(3)
                     continue
-                state = str(status.json().get("status", "")).lower()
-                if state in ("ready", "processed", "available", "active", ""):
+                status_body = status.json()
+                status_body = status_body.get('data', status_body)
+                state = str(status_body.get("status", "")).lower()
+                if state == 'ready' or (asset.mime != 'video/mp4' and state in ('processed', 'available', 'active', '')):
                     break
                 if state in ("failed", "error"):
                     raise AdapterError(f"Fanvue Medienverarbeitung fehlgeschlagen: {media_uuid}")
@@ -444,7 +448,7 @@ class FanvueAdapter:
             else:
                 raise AdapterError("Fanvue Medienverarbeitung dauert zu lange", retryable=True)
 
-        return MediaRef(asset_id=str(asset.id), external_id=media_uuid)
+        return MediaRef(asset_id=str(asset.id), external_id=media_uuid, mime=asset.mime)
 
     # ------------------------------------------------------------------ #
     # Publish

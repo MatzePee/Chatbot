@@ -1,7 +1,7 @@
-import { postRetentionCard } from './post-retention.js?v=post-retention-limits-1'
-import { visibilityAgingCard } from './visibility-aging.js?v=ppv-restore-1'
-import { api } from '../api.js?v=post-retention-1'
-import { h, clear, card, field, empty, toast, guard, spinner, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { postRetentionCard } from './post-retention.js?v=image-warning-20261121-1'
+import { visibilityAgingCard } from './visibility-aging.js?v=image-warning-20261121-1'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { h, clear, card, field, empty, toast, guard, spinner, confirmDialog } from '../ui.js?v=image-warning-20261121-1'
 
 export async function commonOverview() {
   const response = await fetch(window.CreatorStudioCharacters.url('/settings/shared/ai-usage'))
@@ -112,7 +112,7 @@ export async function connectionCard(channels) {
       btn,
     ))
     container.appendChild(h('div', { class: 'hint', style: { fontSize: '11px', marginTop: '4px' } },
-      channel.platform === 'telegram' ? 'Eigener Telegram-Publikationsbot' : channel.platform === 'fanvue' ? 'Verbindung dieses Charakters · AutoChat' : channel.uses_own_app
+      channel.platform === 'instagram' ? (channel.instagram_provider === 'upload_post' ? 'Instagram über Upload-Post · Direktupload' : 'Instagram über Buffer · FTPS-Webspace') : channel.platform === 'telegram' ? 'Eigener Telegram-Publikationsbot' : channel.platform === 'fanvue' ? 'Verbindung dieses Charakters · AutoChat' : channel.uses_own_app
         ? 'eigene App' + (channel.oauth_app_name ? ` „${channel.oauth_app_name}"` : '')
         : 'globale App',
       channel.oauth_client_id ? ` · ${channel.oauth_client_id.slice(0, 14)}…` : '',
@@ -294,7 +294,7 @@ function planningCard(integrations, channels) {
     return h('label', { class: 'inline', style: { padding: '10px 0', alignItems: 'center' } }, toggle,
       h('span', {}, h('b', {}, channel.display_name),
         h('span', { class: 'hint', style: { display: 'block' } },
-          `${channel.platform === 'telegram' ? 'Telegram' : channel.platform === 'x' ? 'X' : 'Fanvue'}${channel.handle ? ' · ' + channel.handle : ''}`,
+          `${channel.platform === 'instagram' ? 'Instagram' : channel.platform === 'telegram' ? 'Telegram' : channel.platform === 'x' ? 'X' : 'Fanvue'}${channel.handle ? ' · ' + channel.handle : ''}`,
           !channel.is_active ? ' · Kanal pausiert – wird nicht befüllt' : '')))
   })
 

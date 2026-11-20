@@ -1,6 +1,7 @@
-import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
-import { h, clear, empty, fmtDateTime, guard } from './ui.js?v=creatorstudio-mobile-system-20260909'
-import { openPostEditor } from './posteditor.js?v=creatorstudio-translation-20260910'
+import { platformIcon, platformLabel } from './platform-icon.js?v=image-warning-20261121-1'
+import { api } from './api.js?v=image-warning-20261121-1'
+import { h, clear, empty, fmtDateTime, guard, openMediaEditor } from './ui.js?v=image-warning-20261121-1'
+import { openPostEditor } from './posteditor.js?v=image-warning-20261121-1'
 
 let preview, owner, timer
 const observer = new MutationObserver(() => { if (owner && !owner.isConnected) hide() })
@@ -22,10 +23,10 @@ function show(row, post, channel) {
   hide()
   owner = row
   preview = h('div', { class: 'upcoming-preview', id: 'upcoming-preview', role: 'tooltip' },
-    h('strong', {}, channel?.display_name || 'Post'),
+    h('strong', {}, platformLabel(channel?.platform, channel?.display_name || 'Post')),
     h('span', { class: 'hint' }, fmtDateTime(post.scheduled_at)),
     ...(post.media_asset_ids || []).map(id => h('img', {
-      src: `/api/v1/media/${encodeURIComponent(id)}/file`, alt: 'Bild des geplanten Posts', loading: 'lazy',
+      src: `/api/v1/media/${encodeURIComponent(id)}/thumb?size=512&variant=${channel?.platform==='instagram'?'instagram':'all'}`, alt: 'Bild des geplanten Posts', loading: 'lazy',title:'Bild bearbeiten / zuschneiden',onClick:guard(async e=>{e.stopPropagation();await openMediaEditor(id,{platform:channel?.platform})}),
     })),
     h('div', { class: 'upcoming-preview-text' }, post.body_text || '(kein Text)'),
     (post.hashtags || []).length ? h('div', { class: 'upcoming-preview-text hint' },
@@ -69,7 +70,7 @@ export function renderUpcoming(list, posts, channels) {
         ids.length > 1 ? h('span', { class: 'upcoming-count' }, '+' + (ids.length - 1)) : null),
       h('span', { class: 'upcoming-copy' },
         h('span', { class: 'upcoming-meta hint' },
-          h('i', { class: 'dot', style: { background: channel?.color || '#666' } }),
+          platformIcon(channel?.platform), h('i', { class: 'dot', style: { background: channel?.color || '#666' } }),
           h('span', { class: 'num' }, fmtDateTime(post.scheduled_at)),
           h('span', { class: 'upcoming-status' }, ({ scheduled: 'Geplant', needs_review: 'Zur Freigabe' })[post.status] || post.status)),
         h('span', { class: 'upcoming-text' }, post.body_text || '(kein Text)')),

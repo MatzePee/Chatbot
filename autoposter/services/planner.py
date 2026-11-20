@@ -1,6 +1,8 @@
 """Automatische Kalenderplanung: Slots berechnen, Bilder wählen, Texte erzeugen."""
 from __future__ import annotations
 
+from autoposter.services import telegram_paid
+
 import random
 import uuid
 from datetime import datetime, time, timedelta, timezone
@@ -273,9 +275,12 @@ async def pick_assets(
     exclude: Optional[set] = None,
     tags_any: Optional[Sequence[str]] = None,
     keep_set_order: bool = False,
+    prefer_avoid: Optional[set] = None,
 ) -> Tuple[List[MediaAsset], str]:
     """Wählt Bilder ausschließlich aus dem manuell zugeordneten Pool des Kanals.
 
+    Die zulässigen Kandidaten werden zufällig gemischt. Bilder ohne offene
+    Planung auf anderen Kanälen und ohne Auswahl in diesem Lauf haben Vorrang.
     tags_any grenzt zusätzlich ein, aus welchem Teil des Vorrats gezogen wird.
 
     keep_set_order gilt für Kanäle, die Sets einzeln posten: Aus einem Set kommt
@@ -283,7 +288,10 @@ async def pick_assets(
     Bildstrecke über mehrere Posts hinweg in der richtigen Reihenfolge, statt
     durcheinander.
     """
+    if count <= 0:
+        return [], ""
     exclude = exclude or set()
+    prefer_avoid = prefer_avoid or set()
     wanted_tags = {t.strip().lower() for t in (tags_any or []) if t.strip()}
     pool = await assignment.channel_pool(db, channel.id, include_used=False)
     if not pool:
@@ -319,8 +327,10 @@ async def pick_assets(
     else:
         blocked = set()
 
-    chosen: List[MediaAsset] = []
+    candidates: List[MediaAsset] = []
     for asset in pool:
+        if assignment.check_compatibility(asset, channel):
+            continue
         if asset.id in exclude or asset.id in blocked:
             continue
         if wanted_tags and not (wanted_tags & {t.lower() for t in (asset.tags or [])}):
@@ -335,16 +345,19 @@ async def pick_assets(
             for other in recent_hashes
         ):
             continue
-        chosen.append(asset)
-        if len(chosen) >= count:
-            break
+        candidates.append(asset)
 
-    if not chosen:
+    if not candidates:
         reason = "Pool erschöpft (Cooldown, NSFW-Regel oder Ähnlichkeitsfilter)"
         if wanted_tags:
             reason = f"Keine freien Bilder mit den Tags {', '.join(sorted(wanted_tags))}"
         return [], reason
-    return chosen, ""
+    random.shuffle(candidates)
+    # Stable sorting keeps each preference tier random while allowing reuse
+    # across channels when the assigned pool has no unplanned alternative.
+    candidates.sort(key=lambda asset: (asset.id in prefer_avoid,
+                    bool(asset.scheduled_channel_ids or [])))
+    return candidates[:count], ""
 
 
 def set_mode(channel: Channel, policy: PostingPolicy) -> str:
@@ -424,6 +437,8 @@ async def expand_to_set(
     bleibt im Vorrat und wird nicht angefasst.
     """
     exclude = exclude or set()
+    if channel.platform in ('x', 'instagram') and first.mime in ('video/mp4', 'image/gif'):
+        return None, [first]
     if set_mode(channel, policy) != "together":
         # Der Kanal postet Sets einzeln – die Reihenfolge hat pick_assets
         # bereits sichergestellt.
@@ -437,8 +452,10 @@ async def expand_to_set(
     ordered: List[MediaAsset] = []
     for member_id in member_ids:
         asset = pool.get(member_id)
-        if asset is None:
-            continue  # nicht zugeordnet oder schon verbraucht
+        if asset is None or assignment.check_compatibility(asset, channel):
+            continue  # nicht zugeordnet, nicht kompatibel oder schon verbraucht
+        if channel.platform in ('x', 'instagram') and asset.mime in ('video/mp4', 'image/gif'):
+            continue  # X videos/GIFs are planned as their own posts.
         if asset.id != first.id and asset.id in exclude:
             continue
         ordered.append(asset)
@@ -465,6 +482,7 @@ async def fill_calendar(
     actor_id: Optional[uuid.UUID] = None,
 ) -> PlanFillResult:
     result = PlanFillResult()
+    used_across_channels: set = set()
     stmt = select(Channel).where(Channel.is_active.is_(True))
     if channel_ids:
         stmt = stmt.where(Channel.id.in_(list(channel_ids)))
@@ -490,6 +508,7 @@ async def fill_calendar(
         horizon = min(days, plan.horizon_days if plan else days)
 
         taken = await existing_times(db, channel.id)
+        siblings = await telegram_paid.sibling_times(db, channel)
         daily_counts: Dict[object, int] = {}
         quota_rows = (await db.execute(select(Post.status, Post.scheduled_at, Post.published_at).where(
             Post.channel_id == channel.id,
@@ -510,7 +529,7 @@ async def fill_calendar(
         allowed = set(
             free_slots(
                 [slot for slot, _ in typed],
-                taken,
+                taken + siblings,
                 policy.min_gap_minutes,
                 blackouts,
                 foreign=foreign,
@@ -535,25 +554,31 @@ async def fill_calendar(
 
         for slot, kind in open_slots:
             local_day = slot.astimezone(tz).date()
+            if not telegram_paid.on_day(channel, local_day): continue
             if daily_counts.get(local_day, 0) >= daily_limit:
                 continue  # No media or LLM work for a full channel-local day.
             weekday = slot.astimezone(tz).weekday()
             theme = (plan.themes or {}).get(str(weekday), "") if plan else ""
 
-            wants_text_only = kind == "text" and limits.supports_text_only
+            wants_text_only = kind == "text" and limits.supports_text_only and not telegram_paid.is_paid(channel)
 
             assets: List[MediaAsset] = []
             set_id: Optional[uuid.UUID] = None
             reason = ""
             if not wants_text_only:
-                assets, reason = await pick_assets(
-                    db, channel, policy, count=1, exclude=used_in_run,
-                    keep_set_order=set_mode(channel, policy) != "together",
-                )
-                if assets:
-                    set_id, assets = await expand_to_set(
-                        db, channel, policy, assets[0], exclude=used_in_run
+                if telegram_paid.is_paid(channel):
+                    assets, set_id, reason = await telegram_paid.pick(db, channel, policy,
+                        exclude=used_in_run, prefer_avoid=used_across_channels)
+                else:
+                    assets, reason = await pick_assets(
+                        db, channel, policy, count=1, exclude=used_in_run,
+                        prefer_avoid=used_across_channels,
+                        keep_set_order=set_mode(channel, policy) != "together",
                     )
+                    if assets:
+                        set_id, assets = await expand_to_set(
+                            db, channel, policy, assets[0], exclude=used_in_run
+                        )
                 if not assets:
                     result.gaps.append(
                         {
@@ -565,6 +590,7 @@ async def fill_calendar(
                     )
                     continue
                 used_in_run.update(a.id for a in assets)
+                used_across_channels.update(a.id for a in assets)
 
             post_type = (
                 PostType.text_only.value
@@ -594,6 +620,7 @@ async def fill_calendar(
                     type=post_type,
                     media_asset_ids=[a.id for a in assets],
                     reason=theme,
+                    price_stars=(await telegram_paid.spec(db, channel, [a.id for a in assets], set_id))['stars'] if telegram_paid.is_paid(channel) else None,
                     audience=audience,
                 )
             )
@@ -669,6 +696,7 @@ async def fill_calendar(
                 generation_meta=meta,
                 created_by=actor_id,
             )
+            await telegram_paid.prepare(db, channel, post)
             db.add(post)
             await db.flush()
             result.created_post_ids.append(post.id)
@@ -688,6 +716,13 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
     if not channel:
         return [{"level": "error", "code": "no_channel", "message": "Kanal fehlt"}]
 
+    if channel.platform == "instagram":
+        from autoposter.services import credentials
+        if not credentials.is_connected(channel):
+            issues.append({"level": "error", "code": "buffer_setup", "message": "Buffer-Konto und Webspace zuerst in den Kanal-Einstellungen testen."})
+    paid_issue = await telegram_paid.validate(db, channel, post)
+    if paid_issue:
+        issues.append({'level': 'error', 'code': 'telegram_paid', 'message': paid_issue})
     adapter = get_adapter(channel.platform)
     limits = adapter.limits()
     policy = channel.policy or PostingPolicy()
@@ -726,12 +761,18 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
     if post.type != PostType.text_only.value and not asset_ids:
         issues.append({"level": "error", "code": "no_media", "message": "Kein Bild ausgewählt"})
 
+    if channel.platform == "instagram" and not asset_ids:
+        issues.append({"level": "error", "code": "instagram_media", "message": "Instagram benötigt mindestens ein Bild oder Video; reine Textposts sind nicht möglich."})
     if asset_ids:
         assets = (
             await db.execute(select(MediaAsset).where(MediaAsset.id.in_(asset_ids)))
         ).scalars().all()
-        if channel.platform == "telegram" and len(assets) != len(asset_ids):
+        if channel.platform in ("telegram", "instagram") and len(assets) != len(asset_ids):
             issues.append({"level":"error", "code":"telegram_missing_media", "message":"Telegram: Medien fehlen oder sind doppelt ausgewählt."})
+        from autoposter.services.media_rules import combination_issue
+        media_issue = combination_issue(channel.platform, assets)
+        if media_issue:
+            issues.append({'level': 'error', 'code': 'media_combination', 'message': media_issue})
         for asset in assets:
             reason = assignment.check_compatibility(asset, channel)
             if reason:
@@ -751,7 +792,7 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
                     }
                 )
             send_alt = channel.platform != 'x' or channel.x_send_alt_text
-            if limits.supports_alt_text and send_alt and not (post.alt_texts or {}).get(str(asset.id)):
+            if asset.mime != "video/mp4" and limits.supports_alt_text and send_alt and not (post.alt_texts or {}).get(str(asset.id)):
                 issues.append(
                     {
                         "level": "warning",
@@ -786,7 +827,7 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
                     }
                 )
 
-        if len(assets) > limits.max_images_per_post and channel.platform != "telegram":
+        if len(assets) > limits.max_images_per_post and channel.platform not in ("telegram", "instagram"):
             issues.append(
                 {
                     "level": "warning",
@@ -825,6 +866,7 @@ async def preflight(db: AsyncSession, post: Post) -> List[Dict[str, str]]:
         neighbours = [
             t for t in await existing_times(db, channel.id) if t != post.scheduled_at
         ]
+        neighbours += await telegram_paid.sibling_times(db, channel)
         if any(
             abs((post.scheduled_at - other).total_seconds()) < policy.min_gap_minutes * 60
             for other in neighbours
@@ -923,6 +965,7 @@ async def plan_range(
     from autoposter.schemas import PlanCapacity, PlanRangeResult
 
     result = PlanRangeResult()
+    used_across_channels: set = set()
 
     stmt = select(Channel).where(Channel.is_active.is_(True))
     if request.channel_ids:
@@ -976,6 +1019,7 @@ async def plan_range(
         )
 
         taken = await existing_times(db, channel.id)
+        siblings = await telegram_paid.sibling_times(db, channel)
         foreign = await other_channel_times(db, channel.id)
         blackouts = await _blackouts(db, channel.id)
 
@@ -996,6 +1040,7 @@ async def plan_range(
 
         for day in days:
             runs.check(run)
+            if request.respect_channel_interval and not telegram_paid.on_day(channel, day): continue
             already = existing_by_day.get(day.isoformat(), 0) if request.fill_gaps_only else 0
 
             # Zwei Betriebsarten. Nach Sichtbarkeit geplant wird nur, wenn der
@@ -1034,7 +1079,7 @@ async def plan_range(
                 # Fehlende Posts auf die Typen verteilen: Bilder zuerst, dann Text.
                 want_images = min(request.image_posts_per_day, open_count)
                 want_texts = min(request.text_posts_per_day, open_count - want_images)
-                if not limits.supports_text_only:
+                if not limits.supports_text_only or telegram_paid.is_paid(channel):
                     want_images += want_texts
                     want_texts = 0
                 kinds = [("image", None)] * want_images + [("text", None)] * want_texts
@@ -1056,7 +1101,7 @@ async def plan_range(
                 min_gap_minutes=min_gap,
             )
             usable = free_slots(
-                candidates, taken, min_gap, blackouts,
+                candidates, taken + siblings, min_gap, blackouts,
                 foreign=foreign, cross_channel_gap_minutes=cross_gap,
             )
 
@@ -1104,11 +1149,16 @@ async def plan_range(
                 assets: List[MediaAsset] = []
                 set_id: Optional[uuid.UUID] = None
                 if kind == "image":
-                    assets, reason = await pick_assets(
-                        db, channel, policy, count=1,
-                        exclude=used_in_run, tags_any=request.tags_any,
-                        keep_set_order=set_mode(channel, policy) != "together",
-                    )
+                    if telegram_paid.is_paid(channel):
+                        assets, set_id, reason = await telegram_paid.pick(db, channel, policy,
+                            exclude=used_in_run, tags_any=request.tags_any, prefer_avoid=used_across_channels)
+                    else:
+                        assets, reason = await pick_assets(
+                            db, channel, policy, count=1,
+                            exclude=used_in_run, tags_any=request.tags_any,
+                            prefer_avoid=used_across_channels,
+                            keep_set_order=set_mode(channel, policy) != "together",
+                        )
                     if not assets:
                         result.gaps.append(
                             {
@@ -1123,10 +1173,12 @@ async def plan_range(
                         continue
                     # Gehört das Bild zu einem Set, wandert das ganze Set in
                     # diesen einen Post – genau dafür sind Sets da.
-                    set_id, assets = await expand_to_set(
-                        db, channel, policy, assets[0], exclude=used_in_run
-                    )
+                    if not telegram_paid.is_paid(channel):
+                        set_id, assets = await expand_to_set(
+                            db, channel, policy, assets[0], exclude=used_in_run
+                        )
                     used_in_run.update(a.id for a in assets)
+                    used_across_channels.update(a.id for a in assets)
 
                 pending.pop(0)
                 runs.check(run)
@@ -1165,6 +1217,7 @@ async def plan_range(
                         type=post_type,
                         media_asset_ids=[a.id for a in assets],
                         reason=theme,
+                        price_stars=(await telegram_paid.spec(db, channel, [a.id for a in assets], set_id))['stars'] if telegram_paid.is_paid(channel) else None,
                         audience=audience,
                     )
                 )
@@ -1232,6 +1285,7 @@ async def plan_range(
                     generation_meta=meta,
                     created_by=actor_id,
                 )
+                await telegram_paid.prepare(db, channel, post)
                 db.add(post)
                 await db.flush()
                 result.created_post_ids.append(post.id)
@@ -1264,11 +1318,12 @@ async def plan_range(
         if request.tags_any:
             wanted = {t.strip().lower() for t in request.tags_any if t.strip()}
             pool = [a for a in pool if wanted & {t.lower() for t in (a.tags or [])}]
-        available = len(pool)
+        available = len(await telegram_paid.units(db, channel, policy, tags_any=request.tags_any)) if telegram_paid.is_paid(channel) else len(pool)
         result.capacity.append(
             PlanCapacity(
                 channel_id=channel.id,
                 channel_name=channel.display_name,
+                unit_label="Pay-Angebote" if telegram_paid.is_paid(channel) else "Bilder",
                 needed_images=needed_images,
                 available_images=available,
                 enough=available >= needed_images,

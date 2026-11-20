@@ -42,8 +42,12 @@ if settings.ui_mode == "react":
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings.ensure_dirs()
+    from autoposter import image_edits_schema
+    await image_edits_schema.upgrade(engine)
     import os
     if os.environ.get('MP_CHARACTERS_ENABLED') == '1':
+        from autoposter import paid_media_schema
+        await paid_media_schema.upgrade(engine)
         from autoposter.character_startup import validate_installation
         app.state.characters = await validate_installation(engine)
         from app import deployment
@@ -65,6 +69,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+    from autoposter import paid_media_schema
+    await paid_media_schema.upgrade(engine)
 
     # Retire the old middle category without losing its adult-content warning.
     from sqlalchemy import update

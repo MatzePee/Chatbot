@@ -58,7 +58,7 @@ class XAdapter:
         return ChannelLimits(
             max_chars=280,
             max_images_per_post=4,
-            mime_whitelist=["image/jpeg", "image/png", "image/webp", "image/gif"],
+            mime_whitelist=["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4"],
             supports_text_only=True,
             supports_alt_text=True,
             supports_platform_scheduling=False,
@@ -189,6 +189,9 @@ class XAdapter:
     async def upload_media(
         self, cred: Credentials, asset: MediaAsset, data: bytes, *, include_alt_text: bool = True
     ) -> MediaRef:
+        max_bytes = self.limits().max_video_bytes if asset.mime == 'video/mp4' else self.limits().max_image_bytes
+        if not data or len(data) > max_bytes:
+            raise AdapterError('X: leere oder zu große Mediendatei (Videos maximal 50 MB).')
         url = f"{self.base}/2/media/upload"
         headers = self._auth(cred)
 
@@ -200,7 +203,7 @@ class XAdapter:
                 json={
                     "total_bytes": len(data),
                     "media_type": asset.mime,
-                    "media_category": "tweet_gif" if asset.mime == "image/gif" else "tweet_image",
+                    "media_category": "tweet_video" if asset.mime == "video/mp4" else "tweet_gif" if asset.mime == "image/gif" else "tweet_image",
                 },
             )
             raise_for_response(init, "X Media INIT")
@@ -240,9 +243,11 @@ class XAdapter:
                 )
                 raise_for_response(status, "X Media STATUS")
                 processing = status.json().get("data", status.json()).get("processing_info")
+                if not processing:
+                    raise AdapterError('X hat den Abschluss der Medienverarbeitung nicht bestätigt.')
 
-            if processing and processing.get("state") == "failed":
-                raise AdapterError(f"X Media-Verarbeitung fehlgeschlagen: {processing}")
+            if processing and processing.get("state") != "succeeded":
+                raise AdapterError(f"X Media-Verarbeitung nicht erfolgreich bestätigt: {processing}")
 
             # X zeigt bei hinterlegter Bildbeschreibung sein eigenes ALT-Abzeichen.
             alt = (asset.caption_hint or asset.ai_description or "")[:1000]
@@ -250,7 +255,7 @@ class XAdapter:
             explicit = asset.nsfw_level in ("explicit", "suggestive")
             if explicit:
                 metadata["sensitive_media_warning"] = {"adult_content": True}
-            if include_alt_text and alt:
+            if include_alt_text and alt and asset.mime != "video/mp4":
                 metadata["alt_text"] = {"text": alt}
             if metadata:
                 meta = await client.post(
@@ -264,7 +269,7 @@ class XAdapter:
                         raise AdapterError("X hat die Kennzeichnung als Erwachseneninhalt nicht bestaetigt")
 
         return MediaRef(asset_id=str(asset.id), external_id=media_id,
-                        expires_at=datetime.now(timezone.utc) + timedelta(hours=20))
+                        expires_at=datetime.now(timezone.utc) + timedelta(hours=20), mime=asset.mime)
 
     # ------------------------------------------------------------------ #
     # Publish
@@ -286,9 +291,13 @@ class XAdapter:
     async def publish(
         self, cred: Credentials, channel: Channel, post: Post, media: List[MediaRef]
     ) -> PublishResult:
+        from autoposter.services.media_rules import combination_issue
+        issue = combination_issue('x', media)
+        if issue or len(media) > 4:
+            raise AdapterError(issue or 'X: maximal vier Bilder pro Post; kein stilles Abschneiden.')
         body: Dict[str, Any] = {"text": self._compose_text(post)}
         if media:
-            body["media"] = {"media_ids": [m.external_id for m in media[:4]]}
+            body["media"] = {"media_ids": [m.external_id for m in media]}
             if channel.x_made_with_ai:
                 body["made_with_ai"] = True
         if post.reply_settings and post.reply_settings != "everyone":

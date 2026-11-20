@@ -1,12 +1,12 @@
 // Zuordnungsseite: Bilder per Drag & Drop auf Kanäle ziehen.
 // Ein Bild darf beliebig vielen Kanälen zugeordnet sein – X und Fanvue gleichzeitig
 // ist der Normalfall, kein Konflikt.
-import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
-import { openUploadDialog } from '../upload.js?v=creatorstudio-mobile-system-20260909'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { openUploadDialog } from '../upload.js?v=image-warning-20261121-1'
 import {
   h, append, clear, empty, modal, toast, guard, spinner,
   mediaTile, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, NSFW_RANK, debounce,
-} from '../ui.js?v=creatorstudio-preview-bounds-20261006'
+} from '../ui.js?v=image-warning-20261121-1'
 
 const POOL_FILTERS = [
   { key: 'all', label: 'Alle' },

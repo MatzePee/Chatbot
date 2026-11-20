@@ -488,10 +488,12 @@ def stopped_migrate(repo, user, service, *, environment=None):
             raise RuntimeError('Unsafe stopped source path')
         if stat.S_ISREG(info.st_mode):
             identities.add((info.st_dev, info.st_ino))
+    verified_processes = {}
     for process in Path('/proc').iterdir():
         if not process.name.isdigit():
             continue
         try:
+            started = (process / 'stat').read_bytes().rsplit(b')', 1)[1].split()[19].decode('ascii')
             descriptors = list((process / 'fd').iterdir())
             for descriptor in descriptors:
                 try:
@@ -500,13 +502,21 @@ def stopped_migrate(repo, user, service, *, environment=None):
                     continue
                 if (info.st_dev, info.st_ino) in identities:
                     raise RuntimeError('Source is open by a process; migration refused')
+            after = (process / 'stat').read_bytes().rsplit(b')', 1)[1].split()[19].decode('ascii')
+            if started != after:
+                raise RuntimeError('Process changed during source verification')
+            verified_processes[process.name] = started
         except FileNotFoundError:
             continue
         except PermissionError as exc:
             raise RuntimeError('Privileged source verification unavailable; migration refused') from exc
     with tempfile.TemporaryFile() as proof:
-        proof.write(json.dumps({'parent': os.getpid(), 'uid': account.pw_uid,
-                    'source': str(source), 'created': time.monotonic()}).encode())
+        payload = json.dumps({'parent': os.getpid(), 'uid': account.pw_uid,
+                    'source': str(source), 'created': time.monotonic(),
+                    'verified_processes': verified_processes}).encode()
+        if len(payload) > 1048576:
+            raise RuntimeError('Process attestation exceeds supported size')
+        proof.write(payload)
         proof.flush()
         os.fchmod(proof.fileno(), 0o400)
         readonly = os.open('/proc/self/fd/' + str(proof.fileno()), os.O_RDONLY)
@@ -522,7 +532,13 @@ def stopped_migrate(repo, user, service, *, environment=None):
                                       else os.getgrouplist(user, account.pw_gid)),
                         pass_fds=(readonly,), capture_output=True, timeout=1200)
             if result.returncode:
-                raise RuntimeError('Stopped migration refused; originals retained; inspect offline paths/schema')
+                # Emit stack locations only: exception text may contain credentials.
+                error_text = (result.stderr or b'').decode('utf-8', errors='replace')
+                frames = re.findall(r'^\s*File "([^"\r\n]+)", line (\d+), in ([^\r\n]+)', error_text, re.M)
+                locations = ' | '.join(f'{file}:{line} in {function}' for file, line, function in frames[-12:])
+                error_types = re.findall(r'^([A-Za-z_][A-Za-z0-9_.]*(?:Error|Exception)|InvalidToken|SystemExit|KeyboardInterrupt)(?::|$)', error_text, re.M)
+                error_type = error_types[-1] if error_types else 'UnknownError'
+                raise RuntimeError(f'Stopped migration refused; Migration child exited {result.returncode}; {error_type}; stack: {locations or "unavailable"}')
         finally:
             os.close(readonly)
 

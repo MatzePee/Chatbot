@@ -1,7 +1,7 @@
-import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
-import { h, clear, empty, field, card, toast, guard, spinner } from '../ui.js?v=creatorstudio-mobile-system-20260909'
-import { rhythmEditor } from '../rhythm.js?v=creatorstudio-mobile-system-20260909'
-import { examplesEditor } from '../examples.js?v=creatorstudio-persona-types-20260910'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { h, clear, empty, field, card, toast, guard, spinner } from '../ui.js?v=image-warning-20261121-1'
+import { rhythmEditor } from '../rhythm.js?v=image-warning-20261121-1'
+import { examplesEditor } from '../examples.js?v=image-warning-20261121-1'
 
 export default async function renderPersonas() {
   let [personas, channels] = await Promise.all([api.personas(), api.channels()])

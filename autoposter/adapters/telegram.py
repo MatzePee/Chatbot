@@ -1,4 +1,4 @@
-"""Independent outbound Bot API adapter. No polling/webhooks, paid sends or blind retries."""
+"""Independent outbound Bot API adapter. No polling/webhooks or blind retries."""
 from __future__ import annotations
 import io
 import json
@@ -109,7 +109,7 @@ class TelegramAdapter:
             raise AdapterError('Telegram: Bot-Identität stimmt nicht mit der gespeicherten Bindung überein.')
         if cred.raw_meta.get('chat_id') and cred.raw_meta['chat_id'] != chat_id:
             raise AdapterError('Telegram: Kanal-ID hat sich geändert; Zugang neu speichern.')
-        return AccountInfo(True, account_id=str(me['id']), username=me.get('username',''), message='Bot und Kanal-Schreibrecht geprüft (ohne Testnachricht).', raw={'chat_id':chat_id, 'username':chat.get('username','')})
+        return AccountInfo(True, account_id=str(me['id']), username=me.get('username',''), message='Bot und Kanal-Schreibrecht geprüft (ohne Testnachricht).', raw={'chat_id':chat_id, 'username':chat.get('username',''), 'can_send_paid_media': chat.get('can_send_paid_media') is True})
 
     async def upload_media(self, cred, asset, data):
         # Stage in memory only. Telegram uploads happen atomically with sendPhoto/Video/MediaGroup.
@@ -119,6 +119,19 @@ class TelegramAdapter:
     async def publish(self, cred, channel, post, media):
         if post.price_cents or post.pin_after_publish or post.thread_parent_id:
             raise AdapterError("Telegram: Preise, automatisches Anpinnen und X-Threads werden nicht unterstützt.")
+        paid = channel.telegram_mode == 'paid'
+        stars = getattr(post, 'price_stars', None)
+        if paid:
+            if type(stars) is not int or not 1 <= stars <= 25000 or not 1 <= len(media) <= 10:
+                raise AdapterError('Telegram Pay: Sternepreis und 1 bis 10 Bilder erforderlich.')
+            snapshot = (post.generation_meta or {}).get('telegram_paid', {})
+            if snapshot.get('stars') != stars or snapshot.get('asset_ids') != list(post.media_asset_ids or []) or (post.generation_meta or {}).get('telegram_paid_stale'):
+                raise AdapterError('Telegram Pay: bestätigter Preis-/Inhaltsstand fehlt.')
+            info = await self.verify(None, cred)
+            if info.raw.get('can_send_paid_media') is not True:
+                raise AdapterError('Telegram: Dieser Zielkanal erlaubt keine kostenpflichtigen Medien.')
+        elif stars:
+            raise AdapterError('Telegram: Sternepreis ist nur im Pay-Kanal erlaubt.')
         chat_id = cred.raw_meta.get('chat_id','')
         if not chat_id.startswith('-100') or not cred.external_user_id or cred.raw_meta.get('destination') != channel.handle:
             raise AdapterError('Telegram: Zielkanal zuerst speichern und Rechte testen.')
@@ -141,7 +154,20 @@ class TelegramAdapter:
                     raise AdapterError('Telegram: Medien müssen lokal neu geladen werden.')
                 validate_media(item.mime,item.data)
             payload['allow_paid_broadcast']='false'
-            if len(media)==1:
+            if paid:
+                method = 'sendPaidMedia'
+                payload.update(star_count=str(stars), caption=text, payload=str(post.id))
+                album = []
+                for i, item in enumerate(media):
+                    if item.mime not in ('image/jpeg', 'image/png', 'video/mp4'):
+                        raise AdapterError('Telegram Pay: nur JPEG-/PNG-Bilder und MP4-Videos.')
+                    key = f'media{i}'
+                    entry = {'type': 'video' if item.mime == 'video/mp4' else 'photo', 'media': f'attach://{key}'}
+                    if item.mime == 'video/mp4': entry['supports_streaming'] = True
+                    album.append(entry)
+                    files[key] = (item.filename, item.data, item.mime)
+                payload['media'] = json.dumps(album)
+            elif len(media)==1:
                 item=media[0]; kind='video' if item.mime=='video/mp4' else 'photo'
                 method='sendVideo' if kind=='video' else 'sendPhoto'
                 payload['caption']=text
@@ -162,7 +188,9 @@ class TelegramAdapter:
                 if str(message['chat']['id'])!=chat_id or not isinstance(message['message_id'],int) or message['message_id']<=0:
                     raise ValueError()
                 ids.append(message['message_id'])
-            if len(messages)!=max(1,len(media)) or len(set(ids))!=len(ids):raise ValueError()
+            if len(messages)!=(1 if paid else max(1,len(media))) or len(set(ids))!=len(ids):raise ValueError()
+            if paid and (messages[0].get('paid_media', {}).get('star_count') != stars or len(messages[0].get('paid_media', {}).get('paid_media', [])) != len(media)):
+                raise ValueError()
         except (KeyError,TypeError,ValueError):
             raise TelegramUncertain('Telegram: Versand unklar/teilweise bestätigt; kein erneuter Versand. Zielkanal manuell prüfen.',confirmed=ids) from None
         username=cred.raw_meta.get('username','')

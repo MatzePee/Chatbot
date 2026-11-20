@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import SecretStr, BaseModel, ConfigDict, EmailStr, Field
 
 
 class ORMModel(BaseModel):
@@ -178,6 +178,11 @@ class PolicyOut(ORMModel, PolicyBase):
 
 
 class ChannelCreate(BaseModel):
+    instagram_provider: Literal["buffer", "upload_post"] = "buffer"
+    telegram_mode: Literal['free', 'paid'] = 'free'
+    telegram_content: Literal['images', 'sets', 'mixed'] = 'mixed'
+    telegram_interval_days: int = Field(default=1, ge=1, le=365)
+    telegram_start_date: Optional[date] = None
     platform: str
     display_name: str
     handle: str = ""
@@ -197,6 +202,9 @@ class ChannelCreate(BaseModel):
 
 
 class ChannelUpdate(BaseModel):
+    telegram_content: Optional[Literal['images', 'sets', 'mixed']] = None
+    telegram_interval_days: Optional[int] = Field(default=None, ge=1, le=365)
+    telegram_start_date: Optional[date] = None
     display_name: Optional[str] = None
     handle: Optional[str] = None
     color: Optional[str] = None
@@ -225,12 +233,33 @@ class ChannelUpdate(BaseModel):
     policy: Optional[PolicyBase] = None
 
 
+class UploadPostSetup(BaseModel):
+    api_key: SecretStr = SecretStr("")
+    profile: str = Field(default="", max_length=200)
+
+
+class BufferSetup(BaseModel):
+    api_key: SecretStr = SecretStr("")
+    ftp_password: SecretStr = SecretStr("")
+    buffer_channel_id: str = Field(default="", max_length=200)
+    ftp_host: str = Field(max_length=253)
+    ftp_port: int = Field(default=21, ge=1, le=65535)
+    ftp_user: str = Field(max_length=200)
+    ftp_directory: str = Field(default="/", max_length=500)
+    public_base_url: str = Field(default="https://sally.sallylarsen.net", max_length=1000)
+
+
 class TelegramSetup(BaseModel):
     bot_token: str = Field(default="", repr=False)
     destination: str
 
 
 class ChannelOut(ORMModel):
+    instagram_provider: Literal["buffer", "upload_post"] = "buffer"
+    telegram_mode: Literal['free', 'paid'] = 'free'
+    telegram_content: Literal['images', 'sets', 'mixed'] = 'mixed'
+    telegram_interval_days: int = Field(default=1, ge=1, le=365)
+    telegram_start_date: Optional[date] = None
     id: uuid.UUID
     platform: str
     display_name: str
@@ -281,7 +310,23 @@ class ChannelOut(ORMModel):
 # --------------------------------------------------------------------------- #
 # Medien
 # --------------------------------------------------------------------------- #
+class ImageCropSave(BaseModel):
+    scope: Literal['all', 'instagram'] = 'instagram'
+    x: float = Field(default=0, ge=0, le=1, allow_inf_nan=False)
+    y: float = Field(default=0, ge=0, le=1, allow_inf_nan=False)
+    width: float = Field(default=1, gt=0, le=1, allow_inf_nan=False)
+    height: float = Field(default=1, gt=0, le=1, allow_inf_nan=False)
+    rotation: Literal[0, 90, 180, 270] = 0
+    flip_x: bool = False
+    flip_y: bool = False
+    straighten: float = Field(default=0, ge=-45, le=45, allow_inf_nan=False)
+    reset: bool = False
+    expected_version: Optional[str] = Field(default=None, max_length=36)
+
+
 class MediaOut(ORMModel):
+    image_crops: Dict[str, Any] = {}
+    telegram_price_stars: Optional[int] = Field(default=None, strict=True, ge=1, le=25000)
     id: uuid.UUID
     filename: str
     width: int
@@ -312,6 +357,7 @@ class MediaOut(ORMModel):
 
 
 class MediaUpdate(BaseModel):
+    telegram_price_stars: Optional[int] = Field(default=None, strict=True, ge=1, le=25000)
     tags: Optional[List[str]] = None
     caption_hint: Optional[str] = None
     nsfw_level: Optional[str] = None
@@ -343,6 +389,7 @@ class MediaQuery(BaseModel):
     not_used_on: List[uuid.UUID] = []
     unassigned: bool = False
     include_archived: bool = False
+    has_telegram_price: Optional[bool] = None
     uploaded_after: Optional[datetime] = None
     uploaded_before: Optional[datetime] = None
     used_after: Optional[datetime] = None
@@ -394,6 +441,7 @@ class MediaDetail(MediaOut):
 # Sets
 # --------------------------------------------------------------------------- #
 class MediaSetCreate(BaseModel):
+    telegram_price_stars: Optional[int] = Field(default=None, strict=True, ge=1, le=25000)
     name: str
     description: str = ""
     nsfw_level: str = "sfw"
@@ -403,6 +451,7 @@ class MediaSetCreate(BaseModel):
 
 
 class MediaSetUpdate(BaseModel):
+    telegram_price_stars: Optional[int] = Field(default=None, strict=True, ge=1, le=25000)
     name: Optional[str] = None
     description: Optional[str] = None
     nsfw_level: Optional[str] = None
@@ -413,6 +462,7 @@ class MediaSetUpdate(BaseModel):
 
 
 class MediaSetOut(ORMModel):
+    telegram_price_stars: Optional[int] = Field(default=None, strict=True, ge=1, le=25000)
     id: uuid.UUID
     name: str
     description: str
@@ -507,6 +557,7 @@ class PostUpdate(BaseModel):
 
 
 class PostOut(ORMModel):
+    price_stars: Optional[int] = None
     id: uuid.UUID
     channel_id: uuid.UUID
     persona_id: Optional[uuid.UUID]
@@ -575,6 +626,7 @@ class PlanFillRequest(BaseModel):
 
 
 class PlannedSlot(BaseModel):
+    price_stars: Optional[int] = None
     channel_id: uuid.UUID
     scheduled_at: datetime
     type: str
@@ -594,6 +646,7 @@ class PlanFillResult(BaseModel):
 # Zeitraum-Planung („Automatisch planen")
 # --------------------------------------------------------------------------- #
 class PlanRangeRequest(BaseModel):
+    respect_channel_interval: bool = True
     channel_ids: List[uuid.UUID] = []
     date_from: date
     date_to: date
@@ -621,6 +674,7 @@ class PlanRangeRequest(BaseModel):
 
 
 class PlanCapacity(BaseModel):
+    unit_label: str = "Bilder"
     """Reicht der zugeordnete Bildvorrat für den gewünschten Zeitraum?"""
 
     channel_id: uuid.UUID

@@ -60,6 +60,14 @@ const qs = (params) => {
 }
 
 export const api = {
+  saveImageCrop: (id, data) => request('/media/' + id + '/crop', {method:'PUT',body:JSON.stringify(data)}),
+  uploadPostSettings: id => get('/channels/' + id + '/upload-post'),
+  saveUploadPost: (id, data) => request('/channels/' + id + '/upload-post', {method:'PUT',body:JSON.stringify(data)}),
+  uploadPostProfiles: id => post('/channels/' + id + '/upload-post/profiles'),
+  bufferSettings: id => get('/channels/' + id + '/buffer'),
+  saveBuffer: (id, data) => request('/channels/' + id + '/buffer', { method: 'PUT', body: JSON.stringify(data) }),
+  bufferAccounts: id => post('/channels/' + id + '/buffer/accounts'),
+  bufferStatus: id => post('/posts/' + id + '/buffer-status'),
   saveTelegram: (id,d) => request('/channels/' + id + '/telegram', {method:'PUT', body:JSON.stringify(d)}),
   imageComment: () => get('/settings/image-comment'),
   saveImageComment: d => post('/settings/image-comment', d),
@@ -107,9 +115,12 @@ export const api = {
 
   // --- Kanäle & Personas ---
   channels: () => get('/channels'),
+  createTelegramPay: (id) => post('/channels/' + id + '/telegram-pay', {}),
+  paidItems: (id) => get('/channels/' + id + '/paid-items'),
+  refreshPaid: (id) => post('/posts/' + id + '/refresh-paid', {}),
   createChannel: (d) => post('/channels', d),
   updateChannel: (id, d) => patch('/channels/' + id, d),
-  deleteChannel: (id) => del('/channels/' + id),
+  deleteChannel: (id, options) => del('/channels/' + id + qs(options)),
   channelDeletionPreview: (id) => get(`/channels/${id}/deletion-preview`),
   restartService: () => post('/system/restart'),
   pauseChannel: (id, paused) => post(`/channels/${id}/pause?paused=${paused}`),

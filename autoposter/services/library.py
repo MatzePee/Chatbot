@@ -64,6 +64,8 @@ def _json_contains(column, value: str):
 def build_query(q: MediaQuery) -> Select:
     stmt = select(MediaAsset)
     conditions = []
+    if q.has_telegram_price is not None:
+        conditions.append(MediaAsset.telegram_price_stars.isnot(None) if q.has_telegram_price else MediaAsset.telegram_price_stars.is_(None))
 
     if not q.include_archived and Lifecycle.archived.value not in q.lifecycle:
         conditions.append(MediaAsset.status != MediaStatus.archived.value)

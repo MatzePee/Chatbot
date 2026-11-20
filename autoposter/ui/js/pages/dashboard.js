@@ -1,8 +1,9 @@
-import { runtimeCard } from './settings.js?v=settings-structure-20261120-2'
-import { historyChart } from '../account-history.js?v=analytics-20261019'
-import { renderUpcoming } from '../upcoming-posts.js?v=creatorstudio-translation-20260910'
-import { api } from '../api.js?v=creatorstudio-dashboard-20261011'
-import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { platformIcon, platformLabel } from '../platform-icon.js?v=image-warning-20261121-1'
+import { runtimeCard } from './settings.js?v=image-warning-20261121-1'
+import { historyChart } from '../account-history.js?v=image-warning-20261121-1'
+import { renderUpcoming } from '../upcoming-posts.js?v=image-warning-20261121-1'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard } from '../ui.js?v=image-warning-20261121-1'
 
 export function problemTime(raw) {
   if (!raw) return 'Zeitpunkt unbekannt'
@@ -45,6 +46,7 @@ export default async function renderDashboard() {
   for (const e of data.inventory.channels) {
     inv.appendChild(h('div', { class: 'card pad' },
       h('div', { class: 'row', style: { marginBottom: '8px' } },
+        platformIcon(e.platform),
         h('i', { class: 'dot', style: { background: e.color } }),
         h('b', { style: { flex: '1' } }, e.channel_name),
         h('span', { class: 'hint', style: { textTransform: 'uppercase' } }, e.platform),
@@ -82,22 +84,32 @@ export default async function renderDashboard() {
   for (const platform of ['x', 'telegram']) {
   const title = platform === 'x' ? 'X-Follower' : 'Telegram-Abonnenten / Kanalmitglieder'
   try {
-    const accounts = await (platform === 'x' ? api.xFollowers() : api.telegramMembers())
+    const paidTelegramIds = new Set(data.channel_health
+      .filter(channel => channel.platform === 'telegram' && channel.telegram_mode === 'paid')
+      .map(channel => channel.id))
+    const accounts = (await (platform === 'x' ? api.xFollowers() : api.telegramMembers()))
+      .filter(account => platform !== 'telegram' || !paidTelegramIds.has(account.channel_id))
     const historyKeys = ['yesterday', 'days7', 'days30']
     const historyText = value => value.count === null ? 'Keine Historie'
       : `${value.count} (${value.growth === null ? 'Wachstum unbekannt' : (value.growth >= 0 ? '+' : '') + value.growth})`
     const measurementText = a => `${problemTime(a.sampled_at)}${a.stale ? ' · veraltet' : ''} · ${a.status}`
+    const accountChart = account => {
+      const chart = historyChart(account)
+      const caption = chart.querySelector('figcaption')
+      if (caption) caption.replaceChildren(platformLabel(platform, caption.textContent))
+      return chart
+    }
     const rows = accounts.flatMap(a => [h('tr', {},
-      h('td', {}, a.name),
+      h('td', {}, platformLabel(platform, a.name)),
       h('td', { class: 'num' }, a.current ?? 'Keine Messung'),
       ...historyKeys.map(key => h('td', { class: 'num' }, historyText(a[key]))),
       h('td', { class: 'hint' }, measurementText(a)),
-    ), h('tr', {}, h('td', { colspan: 6 }, historyChart(a)))])
+    ), h('tr', {}, h('td', { colspan: 6 }, accountChart(a)))])
     // CSS display:none excludes the inactive view from both focus and accessibility trees.
     // Both views use text nodes via h(), never account/status HTML.
     const mobileAccounts = h('div', { class: 'x-followers-cards col' }, ...accounts.map(a =>
       h('article', { class: 'x-followers-account' },
-        h('h3', {}, a.name),
+        h('h3', {}, platformLabel(platform, a.name)),
         h('dl', { class: 'x-followers-metrics' },
           ...[a.current ?? 'Keine Messung', ...historyKeys.map(key => historyText(a[key]))].map((value, i) =>
             h('div', { class: 'x-followers-metric' },
@@ -106,16 +118,16 @@ export default async function renderDashboard() {
         ),
         h('div', { class: 'x-followers-measurement hint' },
           h('b', {}, 'Messzeit / Status'), h('div', {}, measurementText(a))),
-        historyChart(a),
+        accountChart(a),
       )))
-    page.appendChild(card(title + ' · Stand und Wachstum',
+    page.appendChild(card(platformLabel(platform, title + ' · Stand und Wachstum'),
       h('div', { class: 'hint' }, 'Vergleich mit dem exakten Kalendertag (Europe/Berlin). Fehlende Messungen werden nicht geschätzt.'),
       accounts.length ? h('div', { class: 'x-followers' },
         h('div', { class: 'x-followers-table table-scroll', tabindex: 0 }, h('table', {},
           h('thead', {}, h('tr', {}, ...['Account', 'Aktuell', 'Gestern (Δ)', 'Vor 7 Tagen (Δ)', 'Vor 30 Tagen (Δ)', 'Messzeit / Status'].map(t => h('th', {}, t)))),
           h('tbody', {}, ...rows))), mobileAccounts) : empty(platform === 'x' ? 'Keine X-Accounts.' : 'Keine Telegram-Kanäle.'),
     ))
-  } catch { page.appendChild(card(title, empty('Messübersicht derzeit nicht verfügbar.'))) }
+  } catch { page.appendChild(card(platformLabel(platform, title), empty('Messübersicht derzeit nicht verfügbar.'))) }
   }
 
   // ------------------------------------------------------------ Lebenszyklus
@@ -144,9 +156,12 @@ export default async function renderDashboard() {
   function drawProblems(current) {
     clear(problems)
     if (!current.notifications.length && !current.recent_failures.length) problems.appendChild(empty('Alles ruhig.'))
+    const channelPlatform = id => current.channel_health.find(channel => channel.id === id)?.platform
+    const notificationPlatform = note => note.platform || (note.entity === 'channel' ? channelPlatform(note.entity_id)
+      : note.entity === 'post' ? channelPlatform([...current.upcoming_posts, ...current.recent_failures].find(post => post.id === note.entity_id)?.channel_id) : null)
     for (const n of current.notifications) {
       problems.appendChild(h('div', { class: n.level === 'error' ? 'errbox' : 'warnbox' },
-        h('div', {}, h('b', {}, n.title), h('div', { class: 'hint' }, n.body)),
+        h('div', {}, h('b', {}, platformLabel(notificationPlatform(n), n.title)), h('div', { class: 'hint' }, n.body)),
         h('div', { class: 'hint' }, problemTime(n.created_at)),
         h('button', { class: 'small', title: 'Meldung ausblenden; behebt nicht die Ursache', onClick: guard(async () => {
           await api.markRead([n.id]); drawProblems(await api.dashboard())
@@ -156,7 +171,7 @@ export default async function renderDashboard() {
     for (const p of current.recent_failures) {
       if (current.notifications.some(n => n.entity === 'post' && n.entity_id === p.id && /^(Preflight fehlgeschlagen:|Veröffentlichung fehlgeschlagen:)/.test(n.title))) continue
       problems.appendChild(h('div', { class: p.retry_ready ? 'warnbox' : 'errbox' },
-        h('b', {}, p.retry_ready ? 'Post wartet auf erneute Freigabe' : 'Veröffentlichung fehlgeschlagen'),
+        h('b', {}, platformLabel(channelPlatform(p.channel_id), p.retry_ready ? 'Post wartet auf erneute Freigabe' : 'Veröffentlichung fehlgeschlagen')),
         h('div', { class: 'hint' }, p.error_message),
         h('div', { class: 'hint' }, problemTime(p.last_attempt_at || p.created_at)),
         h('button', { class: 'small', title: 'Nur diesen Fehlversuch ausblenden; kein erneuter Versand', onClick: guard(async () => {
@@ -192,7 +207,7 @@ export default async function renderDashboard() {
   // ------------------------------------------------------------ Kanal-Status
   const rows = data.channel_health.map((c) => h('tr', {},
     h('td', {}, h('span', { class: 'row', style: { gap: '6px' } },
-      h('i', { class: 'dot', style: { background: c.color } }), c.display_name)),
+      platformIcon(c.platform), h('i', { class: 'dot', style: { background: c.color } }), c.display_name)),
     h('td', { class: 'hint', style: { textTransform: 'uppercase' } }, c.platform),
     h('td', { style: { color: c.health === 'ok' ? 'var(--ok)' : c.health === 'paused' ? 'var(--dim)' : 'var(--err)' } }, c.health),
     h('td', { class: 'hint' }, c.token_expires_at ? fmtDateTime(c.token_expires_at) : '—'),

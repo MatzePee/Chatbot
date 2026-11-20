@@ -1,9 +1,28 @@
-import { api } from '../api.js?v=top-posts-targets-20261101'
-import { h, clear, empty, toast, attachPreview } from '../ui.js?v=creatorstudio-library-autosave-20261101'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { h, clear, empty, toast, attachPreview, modal, openMediaEditor, guard } from '../ui.js?v=image-warning-20261121-1'
 
 const formatTime = value => new Date(value).toLocaleString('de-DE', {
   timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
 })
+
+function openPicture(asset, trigger) {
+  const preview = modal('Bildvorschau', close => h('div', { class: 'col' },
+    h(asset.mime === 'video/mp4' ? 'video' : 'img', { src: asset.url, alt: asset.filename,
+      ...(asset.mime === 'video/mp4' ? { controls: true, playsInline: true, preload: 'metadata', poster: asset.thumb_url } : {}),
+      style: { display: 'block', width: '100%', maxHeight: '65vh', objectFit: 'contain' } }),
+    asset.mime!=='video/mp4'?h('button',{onClick:guard(()=>openMediaEditor(asset))},'Bild bearbeiten / zuschneiden'):null,
+    h('div', { class: 'hint', style: { overflowWrap: 'anywhere' } }, asset.filename),
+    h('button', { type: 'button', class: 'primary', onClick: close }, 'Zurück zur Übersicht'),
+  ), { wide: true, beforeClose: () => { if (trigger.isConnected) trigger.focus({ preventScroll: true }) } })
+  const dialog = preview.body.closest('.modal')
+  dialog.setAttribute('role', 'dialog')
+  dialog.setAttribute('aria-modal', 'true')
+  dialog.setAttribute('aria-label', 'Bildvorschau')
+  const dismiss = dialog.querySelector('.modal-head button')
+  dismiss.textContent = 'Schließen'
+  dismiss.setAttribute('aria-label', 'Bildvorschau schließen')
+  dismiss.focus({ preventScroll: true })
+}
 
 export default async function renderTopPostsX() {
   const list = h('div', { class: 'top-x-list', 'aria-label': 'X-Posts nach Views' })
@@ -90,7 +109,9 @@ export default async function renderTopPostsX() {
     for (const item of data.items) {
       const pictures = h('div', { class: 'top-x-pictures' })
       for (const asset of item.media) {
-        const picture = h('a', { href: asset.url, target: '_blank', rel: 'noreferrer', 'aria-label': 'Bild öffnen: ' + asset.filename },
+        const picture = h('button', { type: 'button', 'aria-label': 'Bild öffnen: ' + asset.filename,
+          style: { padding: '0', border: '0', background: 'transparent', display: 'block' },
+          onClick: () => openPicture(asset, picture) },
           h('img', { src: asset.thumb_url, alt: asset.filename, loading: 'lazy' }))
         attachPreview(picture, asset.mime === 'video/mp4' ? asset.thumb_url : asset.url, { size: 400 })
         pictures.appendChild(picture)

@@ -1,16 +1,20 @@
-import { translationField } from './translation-preview.js?v=creatorstudio-translation-20260910'
+import { translationField } from './translation-preview.js?v=image-warning-20261121-1'
 // Post-Editor als eigenes Modul – wird vom Kalender und vom Tagesdetail genutzt.
-import { api } from './api.js?v=creatorstudio-mobile-system-20260909'
+import { api } from './api.js?v=image-warning-20261121-1'
 import {
-  h, append, clear, empty, field, modal, toast, guard, spinner,
-  toLocalInput, attachPreview, confirmDialog,
-} from './ui.js?v=creatorstudio-mobile-system-20260909'
+  h, append, clear, empty, field, modal, toast, guard, spinner, openMediaEditor,
+  toLocalInput, attachPreview, confirmDialog, mediaPreview,
+} from './ui.js?v=image-warning-20261121-1'
 
 export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
   const channel = channels.find((c) => c.id === post.channel_id)
   const isFanvue = channel && channel.platform === 'fanvue'
-  const maxChars = channel?.platform === 'telegram' ? (post.media_asset_ids?.length ? 1024 : 4096) : channel?.platform === 'x' ? 280 : 5000
+  const maxChars = channel?.platform === 'telegram' ? (post.media_asset_ids?.length ? 1024 : 4096) : channel?.platform === 'x' ? 280 : channel?.platform === 'instagram' ? 2200 : 5000
 
+  const bufferDelivery = post.generation_meta?.buffer_delivery
+  const uploadPost = (bufferDelivery?.provider || channel?.instagram_provider) === 'upload_post'
+  const providerName = uploadPost ? 'Upload-Post' : 'Buffer'
+  const bufferLocked = ['preparing','uploading','pending','queued','uncertain','remote_error'].includes(bufferDelivery?.state)
   modal(`Post — ${channel ? channel.display_name : ''}`, (close) => {
     const text = h('textarea', { style: { height: '130px' } })
     text.value = post.body_text || ''
@@ -46,11 +50,20 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
     const mediaBox = h('div', { class: 'row' })
     for (const assetId of post.media_asset_ids || []) {
       const img = h('img', {
-        src: `/api/v1/media/${assetId}/thumb?size=256`,
+        src: `/api/v1/media/${assetId}/thumb?size=256&variant=${channel?.platform==='instagram'?'instagram':'all'}`,
         class: 'daythumb', alt: '',
       })
-      attachPreview(img, channel?.platform === 'telegram' ? `/api/v1/media/${assetId}/thumb?size=512` : `/api/v1/media/${assetId}/file`, { size: 360 })
-      mediaBox.appendChild(img)
+      const open = h('button', { type: 'button', class: 'ghost', style: { padding: '0' }, 'aria-label': 'Medium öffnen',
+        onClick: guard(async () => {
+          const asset = await api.mediaDetail(assetId)
+          if(asset.mime==='video/mp4')modal('Medienvorschau',()=>mediaPreview(asset,{style:{width:'100%',maxHeight:'65vh',objectFit:'contain'},playsInline:true}),{wide:true})
+          else await openMediaEditor(asset,{platform:channel?.platform,onSaved:async()=>{await onChanged();showIssues((await api.preflight(post.id)).issues)}})
+        }),
+      }, img)
+      attachPreview(open, `/api/v1/media/${assetId}/thumb?size=512&variant=${channel?.platform==='instagram'?'instagram':'all'}`, { size: 360 })
+      open.dataset.cropAsset=assetId;open.dataset.instagramAssigned=String(channel?.platform==='instagram')
+      if(channel?.platform==='instagram')api.mediaDetail(assetId).then(asset=>{if(asset.mime.startsWith('image/')&&asset.image_crops?.instagram?.valid===false){open.style.outline='3px solid #dc2626';open.title='⚠ Instagram-Bildformat passt nicht – Bild bearbeiten';open.appendChild(h('span',{class:'image-crop-warning',role:'img','aria-label':'Achtung: Instagram-Bildformat passt nicht'},'⚠'))}}).catch(()=>{})
+      mediaBox.appendChild(open)
     }
     if (!(post.media_asset_ids || []).length) {
       mediaBox.appendChild(h('span', { class: 'hint' }, 'Reiner Textpost'))
@@ -137,9 +150,27 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
       }
     }))
 
+    if(bufferLocked) genBtn.disabled=true
     return h('div', { class: 'grid c2' },
       h('div', {},
         mediaBox,
+        bufferDelivery ? h('div',{class:bufferLocked?'warnbox':'hint',style:{display:'flex',flexDirection:'column',alignItems:'stretch',gap:'10px'}},
+          `Instagram über ${providerName} · ` + ({preparing:'Versand vorbereitet',uploading:'Medien werden übertragen',pending:'Übermittlung läuft/unklar – Status prüfen',queued:'Übergeben – Bestätigung steht aus',uncertain:'Versand unklar – Status prüfen, nicht erneut senden',remote_error:'Anbieter hat einen Fehler gemeldet',confirmed:'Auf Instagram veröffentlicht',rejected:'Übermittlung abgelehnt'}[bufferDelivery.state] || bufferDelivery.state),
+          h('div',{class:'row'},
+            h('button',{style:{whiteSpace:'nowrap',flex:'0 0 auto'},onClick:guard(async()=>{const r=await api.bufferStatus(post.id);toast.info(r.message);const fresh=await api.post(post.id);close();await onChanged();openPostEditor(fresh,channels,{onChanged})})},'Status prüfen'),
+            h('a',{class:'btn',style:{whiteSpace:'nowrap',flex:'0 0 auto'},href:uploadPost?'https://app.upload-post.com/':'https://publish.buffer.com',target:'_blank',rel:'noreferrer'},providerName + ' öffnen')),
+          post.error_message && ['remote_error','rejected','uncertain'].includes(bufferDelivery.state) ? h('p',{},post.error_message) : null,
+          bufferLocked ? h('p',{},'Vor weiteren Aktionen den Versandstatus beim Anbieter prüfen. Es wird kein zweiter Beitrag gesendet.') : null) : null,
+        channel?.telegram_mode === 'paid' ? h('div', {class:'card pad col'},
+          h('b', {}, `Telegram Pay · ${post.media_set_id ? 'Set' : 'Einzelbild'} · ⭐ ${post.price_stars || 'Preis fehlt'}`),
+          h('div',{class:'hint'},'Gespeicherter Gesamtpreis. Änderungen an Preis oder Set erfordern eine erneute Freigabe.'),
+          h('button', {onClick:guard(async()=>{
+            await api.updatePost(post.id,{body_text:text.value,hashtags:hashtags.value.split(',').map(t=>t.trim()).filter(Boolean)})
+            const updated = await api.refreshPaid(post.id)
+            toast.ok('Set und Preis übernommen. Bitte erneut freigeben.')
+            close(); await onChanged(); openPostEditor(updated, channels, {onChanged})
+          })}, 'Set und Preis übernehmen'),
+        ) : null,
         channel?.platform === 'telegram' ? h('div',{class:'hint'}, `Telegram · ${maxChars} Zeichen · Plaintext · keine automatische Aufteilung`, post.generation_meta?.telegram_delivery ? ' · Versand: ' + ({uncertain:'unklar – Zielkanal manuell prüfen, nicht erneut senden',pending:'unklar/läuft – nicht erneut senden',confirmed:'bestätigt',rejected:'abgelehnt'}[post.generation_meta.telegram_delivery.state] || post.generation_meta.telegram_delivery.state) : '') : null,
         post.generation_meta?.x_image_comment ? h('div', { class: 'hint', style: { marginTop: '12px', whiteSpace: 'pre-wrap' } },
           'X Auto-Kommentar · ' + ({ pending: 'Wartet', sending: 'Versand begonnen – bei Abbruch auf X prüfen', sent: 'Veröffentlicht', failed: 'Fehlgeschlagen – auf X prüfen', unknown: 'Status unklar – auf X prüfen', cancelled: 'Deaktiviert' }[post.generation_meta.x_image_comment.state] || post.generation_meta.x_image_comment.state),
@@ -159,11 +190,11 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
         isFanvue ? h('label', { class: 'inline', style: { marginBottom: '12px' } }, pin,
           'Nach dem Veröffentlichen anpinnen') : null,
         h('div', { class: 'row' },
-          h('button', { class: 'primary', onClick: save }, 'Speichern'),
-          h('button', { onClick: guard(async () => {
+          h('button', { class: 'primary', disabled:bufferLocked, onClick: save }, 'Speichern'),
+          h('button', { disabled:bufferLocked, onClick: guard(async () => {
             await api.approve(post.id); toast.ok('Freigegeben'); close(); await onChanged()
           }) }, 'Freigeben'),
-          h('button', { onClick: guard(async () => {
+          h('button', { disabled:bufferLocked, onClick: guard(async () => {
             const result = await api.publish(post.id)
             result.ok ? toast.ok(result.message) : toast.error(result.message)
             close(); await onChanged()
@@ -175,7 +206,7 @@ export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
             toast.ok('Auf den Folgetag kopiert'); close(); await onChanged()
           }) }, 'Duplizieren'),
           h('div', { class: 'spacer' }),
-          h('button', { class: 'small danger', onClick: guard(async () => {
+          h('button', { class: 'small danger', disabled:bufferLocked || !!bufferDelivery?.files?.length, onClick: guard(async () => {
             if (!(await confirmDialog('Post löschen', 'Diesen Post wirklich löschen?',
               { okLabel: 'Löschen', danger: true }))) return
             await api.deletePost(post.id); toast.ok('Gelöscht'); close(); await onChanged()

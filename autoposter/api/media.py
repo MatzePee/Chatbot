@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 import zipfile
 from io import BytesIO
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -39,7 +39,7 @@ from autoposter.schemas import (
     MediaSetCreate,
     MediaSetOut,
     MediaSetUpdate,
-    MediaUpdate,
+    MediaUpdate, ImageCropSave,
     MediaUsageEntry,
     MaintenanceReport,
     SavedViewIn,
@@ -375,15 +375,27 @@ async def detail(
     return out
 
 
+@router.put("/{asset_id}/crop", response_model=MediaDetail)
+async def save_crop(asset_id: uuid.UUID, payload: ImageCropSave, db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
+    from autoposter.services import image_edits
+    asset = await db.get(MediaAsset, asset_id)
+    if not asset:
+        raise HTTPException(404, "Bild nicht gefunden")
+    await image_edits.save(db, asset, payload)
+    await db.commit()
+    return await detail(asset_id, db, _)
+
+
 @router.get("/{asset_id}/file")
-async def file(asset_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(current_user)) -> FileResponse:
+async def file(asset_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(current_user), variant: Literal["all", "instagram", "original"] = "all") -> FileResponse:
     asset = (
         await db.execute(select(MediaAsset).where(MediaAsset.id == asset_id))
     ).scalar_one_or_none()
     if not asset:
         raise HTTPException(404, "Bild nicht gefunden")
     try:
-        path = media_service.original_path(asset)
+        from autoposter.services.image_edits import selected_path
+        path = selected_path(asset, "instagram" if variant == "instagram" else None, original=variant == "original")
     except ValueError:
         raise HTTPException(404, "Datei nicht im Character-Arbeitsbereich")
     if not path.is_file():
@@ -393,7 +405,7 @@ async def file(asset_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User 
 
 @router.get("/{asset_id}/thumb")
 async def thumb(
-    asset_id: uuid.UUID, size: int = 256, db: AsyncSession = Depends(get_db), _: User = Depends(current_user)
+    asset_id: uuid.UUID, size: int = 256, db: AsyncSession = Depends(get_db), _: User = Depends(current_user), variant: Literal["all", "instagram", "original"] = "all"
 ) -> FileResponse:
     asset = (
         await db.execute(select(MediaAsset).where(MediaAsset.id == asset_id))
@@ -401,11 +413,11 @@ async def thumb(
     if not asset:
         raise HTTPException(404, "Bild nicht gefunden")
     try:
-        path = media_service.thumb_path(asset, size) or media_service.thumb_path(asset, 256)
+        path = media_service.thumb_path(asset, size, platform="instagram" if variant == "instagram" else None, original=variant == "original") or media_service.thumb_path(asset, 256, platform="instagram" if variant == "instagram" else None, original=variant == "original")
     except ValueError:
         raise HTTPException(404, "Vorschaubild nicht im Character-Arbeitsbereich")
     if not path:
-        return await file(asset_id, db)
+        return await file(asset_id, db, variant=variant)
     return FileResponse(
         path, media_type="image/jpeg", headers={"Cache-Control": "private, no-store"}
     )
@@ -423,8 +435,12 @@ async def update(
     ).scalar_one_or_none()
     if not asset:
         raise HTTPException(404, "Bild nicht gefunden")
+    old_price = asset.telegram_price_stars
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(asset, key, value)
+    if old_price != asset.telegram_price_stars:
+        from autoposter.services import telegram_paid
+        await telegram_paid.invalidate(db, asset_id=asset.id)
     db.add(asset)
     await db.flush()
     await lifecycle_service.refresh_asset(db, asset)
@@ -453,6 +469,9 @@ async def bulk_update(
                 MediaStatus.archived.value if payload.archive else MediaStatus.ready.value
             )
         db.add(asset)
+        if payload.archive:
+            from autoposter.services import telegram_paid
+            await telegram_paid.invalidate(db, asset_id=asset.id, include_sets=True)
     await db.flush()
     await lifecycle_service.refresh_assets(db, [a.id for a in assets])
     library.invalidate_counts()
@@ -467,6 +486,9 @@ async def archive(
     _: User = Depends(require_editor),
 ) -> MediaOut:
     await media_service.archive(db, [asset_id], archived)
+    if archived:
+        from autoposter.services import telegram_paid
+        await telegram_paid.invalidate(db, asset_id=asset_id, include_sets=True)
     library.invalidate_counts()
     asset = (
         await db.execute(select(MediaAsset).where(MediaAsset.id == asset_id))
@@ -556,8 +578,13 @@ async def create_set(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_editor),
 ) -> MediaSetOut:
+    if len(payload.asset_ids) != len(set(payload.asset_ids)):
+        raise HTTPException(422, 'Ein Bild darf nur einmal im Set vorkommen.')
+    if payload.telegram_price_stars and not 2 <= len(payload.asset_ids) <= 10:
+        raise HTTPException(422, 'Telegram-Pay-Sets benötigen 2 bis 10 Bilder.')
     media_set = MediaSet(
         name=payload.name,
+        telegram_price_stars=payload.telegram_price_stars,
         description=payload.description,
         nsfw_level=payload.nsfw_level,
         tags=payload.tags,
@@ -590,7 +617,15 @@ async def update_set(
     if not media_set:
         raise HTTPException(404, "Set nicht gefunden")
     data = payload.model_dump(exclude_unset=True)
+    old_price = media_set.telegram_price_stars
+    old_members = [i.media_asset_id for i in sorted(media_set.items, key=lambda i:i.position)]
     asset_ids = data.pop("asset_ids", None)
+    if asset_ids is not None and len(asset_ids) != len(set(asset_ids)):
+        raise HTTPException(422, 'Ein Bild darf nur einmal im Set vorkommen.')
+    stars = data.get('telegram_price_stars', media_set.telegram_price_stars)
+    count = len(asset_ids) if asset_ids is not None else len(media_set.items)
+    if stars and not 2 <= count <= 10:
+        raise HTTPException(422, 'Telegram-Pay-Sets benötigen 2 bis 10 Bilder.')
     for key, value in data.items():
         setattr(media_set, key, value)
     db.add(media_set)
@@ -604,6 +639,9 @@ async def update_set(
         await db.flush()
         await lifecycle_service.refresh_assets(db, asset_ids)
     await db.flush()
+    if (asset_ids is not None and asset_ids != old_members) or old_price != media_set.telegram_price_stars:
+        from autoposter.services import telegram_paid
+        await telegram_paid.invalidate(db, set_id=set_id)
     return await _set_out(db, media_set)
 
 
@@ -617,6 +655,8 @@ async def delete_set(
         await db.execute(select(MediaSet).where(MediaSet.id == set_id))
     ).scalar_one_or_none()
     if media_set:
+        from autoposter.services import telegram_paid
+        await telegram_paid.invalidate(db, set_id=set_id)
         members = (
             await db.execute(
                 select(MediaSetItem.media_asset_id).where(MediaSetItem.media_set_id == set_id)

@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=ppv-restore-1'
-import { h, clear, card, confirmDialog } from '../ui.js?v=creatorstudio-mobile-system-20260909'
+import { api } from '../api.js?v=image-warning-20261121-1'
+import { h, clear, card, confirmDialog } from '../ui.js?v=image-warning-20261121-1'
 
 export async function visibilityAgingCard(values) {
   const enabled = h('input', {type:'checkbox', checked:values.visibility_aging_enabled === true})

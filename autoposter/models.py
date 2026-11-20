@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -351,6 +352,11 @@ class ChannelCredential(Base, CharacterOwned, TimestampMixin):
 class Channel(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "channel"
 
+    telegram_mode: Mapped[str] = mapped_column(String(10), default="free")
+    telegram_content: Mapped[str] = mapped_column(String(10), default="mixed")
+    telegram_interval_days: Mapped[int] = mapped_column(Integer, default=1)
+    telegram_start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
     platform: Mapped[str] = mapped_column(String(20), index=True)
     display_name: Mapped[str] = mapped_column(String(120))
@@ -438,6 +444,15 @@ class Channel(Base, CharacterOwned, TimestampMixin):
 # --------------------------------------------------------------------------- #
 class MediaAsset(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "media_asset"
+    image_edits: Mapped[List["MediaImageEdit"]] = relationship(lazy="selectin", cascade="all, delete-orphan", passive_deletes=True)
+
+    @property
+    def image_crops(self):
+        from autoposter.services.image_edits import describe
+        return describe(self)
+
+
+    telegram_price_stars: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
     filename: Mapped[str] = mapped_column(String(255))
@@ -477,8 +492,22 @@ class MediaAsset(Base, CharacterOwned, TimestampMixin):
     )
 
 
+class MediaImageEdit(Base, CharacterOwned, TimestampMixin):
+    __tablename__ = "media_image_edit"
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
+    media_asset_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("media_asset.id", ondelete="CASCADE"), index=True)
+    scope: Mapped[str] = mapped_column(String(20))
+    storage_path: Mapped[str] = mapped_column(String(500))
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    settings: Mapped[Dict[str, Any]] = mapped_column(JSONB_, default=dict)
+    __table_args__ = (UniqueConstraint("media_asset_id", "scope", name="uq_image_edit_scope"),)
+
+
 class MediaSet(Base, CharacterOwned, TimestampMixin):
     __tablename__ = "media_set"
+
+    telegram_price_stars: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
     name: Mapped[str] = mapped_column(String(200))
@@ -639,6 +668,7 @@ class Post(Base, CharacterOwned, TimestampMixin):
     # Fanvue
     audience: Mapped[str] = mapped_column(String(40), default="subscribers")
     price_cents: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    price_stars: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     media_preview_id: Mapped[Optional[uuid.UUID]] = mapped_column(GUID, nullable=True)
     expires_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     pin_after_publish: Mapped[bool] = mapped_column(Boolean, default=False)

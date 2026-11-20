@@ -84,6 +84,10 @@ async def publish_one(post_id: uuid.UUID) -> Dict[str, Any]:
         channel = (
             await db.execute(select(Channel).where(Channel.id == post.channel_id))
         ).scalar_one_or_none()
+        if channel and channel.platform == "instagram":
+            from autoposter.services import buffer_channels
+            if buffer_channels.locked(post):
+                return {"ok": False, "message": "Buffer-Versand läuft oder ist unklar; Status prüfen."}
         if channel:
             await publisher.split_thread_if_needed(db, post, channel)
         # Falls ein Dispatcher den Post bereits auf 'publishing' gesetzt hat.
@@ -312,6 +316,18 @@ async def nightly_maintenance() -> Dict[str, Any]:
         refreshed = await lifecycle.refresh_all(db)
     library.invalidate_counts()
     return {"counters_refreshed": refreshed}
+
+
+async def reconcile_upload_post_posts():
+    from autoposter.services import upload_post
+    async with session_scope() as db:
+        return await upload_post.tick(db)
+
+
+async def reconcile_buffer_posts():
+    from autoposter.services import buffer_channels
+    async with session_scope() as db:
+        return await buffer_channels.tick(db)
 
 
 async def token_health() -> Dict[str, Any]:

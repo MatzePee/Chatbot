@@ -207,6 +207,8 @@ def apply_stopped(root):
     from autoposter.db import Base
     import autoposter.models  # noqa: F401
     with contextlib.closing(sqlite3.connect(active / 'autoposter.db')) as conn:
+        from autoposter.paid_media_schema import upgrade_sqlite
+        upgrade_sqlite(conn)
         for table in Base.metadata.sorted_tables:
             actual = {row[1] for row in conn.execute('PRAGMA table_info("' + table.name + '")')}
             if not set(table.columns.keys()).issubset(actual):

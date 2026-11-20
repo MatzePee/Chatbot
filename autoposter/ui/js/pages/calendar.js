@@ -1,17 +1,27 @@
-import { plannedPostsCard } from './settings.js?v=settings-structure-20261120-2'
+import { plannedPostsCard } from './settings.js?v=image-warning-20261121-1'
 // Kalender: ganzer Monat auf einer Seite, mit Planer, Tagesdetail und Sammelaktionen.
-import { api } from '../api.js?v=creatorstudio-mobile-system-20260909'
+import { api } from '../api.js?v=image-warning-20261121-1'
 import {
   h, append, clear, empty, field, modal, toast, guard, spinner, confirmDialog,
-  fmtTime, fmtDate, fmtDateTime, toLocalInput, attachPreview,
-} from '../ui.js?v=creatorstudio-mobile-system-20260909'
-import { openPostEditor } from '../posteditor.js?v=creatorstudio-translation-20260910'
-import { runProgress } from '../progress.js?v=creatorstudio-mobile-system-20260909'
+  fmtTime, fmtDate, fmtDateTime, toLocalInput, attachPreview, openMediaEditor,
+} from '../ui.js?v=image-warning-20261121-1'
+import { openPostEditor } from '../posteditor.js?v=image-warning-20261121-1'
+import { runProgress } from '../progress.js?v=image-warning-20261121-1'
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 const WEEKDAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli',
   'August', 'September', 'Oktober', 'November', 'Dezember']
+
+const PLATFORM_NAMES = { x: 'X', fanvue: 'Fanvue', telegram: 'Telegram', instagram: 'Instagram' }
+function platformIcon(platform) {
+  const label = PLATFORM_NAMES[platform]
+  return label ? h('img', { class: 'calendar-platform-icon',
+    src: `/static/platform-icons/${platform}.${platform === 'instagram' ? 'svg' : 'jpg'}`, alt: label, title: label,
+    width: 12, height: 12, draggable: false,
+    style: { width: '12px', height: '12px', flex: '0 0 12px', objectFit: 'contain', borderRadius: '2px' },
+  }) : null
+}
 
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const sameDay = (a, b) => a.toDateString() === b.toDateString()
@@ -113,7 +123,7 @@ export default async function renderCalendar() {
             : state.activeChannels.add(c.id)
           draw()
         },
-      }, h('i', { class: 'dot', style: { background: c.color } }), c.display_name))
+      }, platformIcon(c?.platform), h('i', { class: 'dot', style: { background: c.color } }), c.display_name))
     }
 
     clear(statRow)
@@ -252,13 +262,7 @@ export default async function renderCalendar() {
       ))
 
       const list = h('div', { class: 'daylist' })
-      for (const post of dayPosts.slice(0, 4)) list.appendChild(postChip(post))
-      if (dayPosts.length > 4) {
-        list.appendChild(h('button', {
-          class: 'daymore',
-          onClick: () => openDayDialog(day, dayPosts),
-        }, `+${dayPosts.length - 4} weitere`))
-      }
+      for (const post of dayPosts) list.appendChild(postChip(post))
       cell.appendChild(list)
 
       // Posts per Drag & Drop auf einen anderen Tag ziehen.
@@ -303,8 +307,9 @@ export default async function renderCalendar() {
         }
       },
     },
-      h('i', { class: 'dot', style: { background: ch ? ch.color : '#666' } }),
+      platformIcon(ch?.platform), h('i', { class: 'dot', style: { background: ch ? ch.color : '#666' } }),
       h('span', { class: 'num' }, fmtTime(post.scheduled_at)),
+      post.price_stars ? h('span',{class:'chipaud'}, 'Pay ⭐ ' + post.price_stars) : null,
       post.media_asset_ids.length
         ? h('span', { class: 'chiptype' }, '▣')
         : h('span', { class: 'chiptype' }, '¶'),
@@ -319,7 +324,7 @@ export default async function renderCalendar() {
     )
     chip.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', post.id))
     if (post.media_asset_ids.length) {
-      attachPreview(chip, `/api/v1/media/${post.media_asset_ids[0]}/file`, { delay: 450, size: 300 })
+      attachPreview(chip, `/api/v1/media/${post.media_asset_ids[0]}/thumb?size=512&variant=${ch?.platform==='instagram'?'instagram':'all'}`, { delay: 450, size: 300 })
     }
     return chip
   }
@@ -337,19 +342,19 @@ export default async function renderCalendar() {
         const ch = channelOf(post)
         const thumb = post.media_asset_ids.length
           ? h('img', {
-              src: `/api/v1/media/${post.media_asset_ids[0]}/thumb?size=256`,
-              class: 'daythumb', alt: '',
+              src: `/api/v1/media/${post.media_asset_ids[0]}/thumb?size=256&variant=${ch?.platform==='instagram'?'instagram':'all'}`,
+              class: 'daythumb', alt: '',title:'Bild bearbeiten / zuschneiden',onClick:guard(async e=>{e.stopPropagation();await openMediaEditor(post.media_asset_ids[0],{platform:ch?.platform})}),
             })
           : h('div', { class: 'daythumb ph' }, '¶')
         if (post.media_asset_ids.length) {
-          attachPreview(thumb, `/api/v1/media/${post.media_asset_ids[0]}/file`, { size: 360 })
+          attachPreview(thumb, `/api/v1/media/${post.media_asset_ids[0]}/thumb?size=512&variant=${ch?.platform==='instagram'?'instagram':'all'}`, { size: 360 })
         }
 
         list.appendChild(h('div', { class: 'dayrow' },
           thumb,
           h('div', { style: { flex: '1', minWidth: '0' } },
             h('div', { class: 'row', style: { gap: '6px' } },
-              h('i', { class: 'dot', style: { background: ch ? ch.color : '#666' } }),
+              platformIcon(ch?.platform), h('i', { class: 'dot', style: { background: ch ? ch.color : '#666' } }),
               h('b', {}, ch ? ch.display_name : '—'),
               h('span', { class: 'hint num' }, fmtTime(post.scheduled_at)),
               h('span', { class: 'chip', style: { pointerEvents: 'none' } }, post.status),
@@ -388,11 +393,30 @@ export default async function renderCalendar() {
         ...state.channels.map((c) => h('option', { value: c.id }, `${c.display_name} (${c.platform})`)))
       const timeInput = h('input', { type: 'time', value: '18:00' })
       const typeSel = h('select', {},
-        h('option', { value: 'image_single' }, 'Mit Bild'),
+        h('option', { value: 'image_single' }, 'Mit Bild oder Video'),
         h('option', { value: 'text_only' }, 'Nur Text'))
       const textArea = h('textarea', { placeholder: 'Text – leer lassen und unten automatisch erzeugen' })
       const tagsInput = h('input', { placeholder: 'Bild-Tags eingrenzen (optional)' })
       const autoBox = h('div', { class: 'hint' })
+      const offers = h('select', {'aria-label':'Pay-Angebot'})
+      let paidUnits = []
+      const offerBox = field('Pay-Angebot für manuelle Auswahl', offers, 'Automatisch erzeugen wählt zufällig aus den freien Angeboten. Der Setpreis gilt für alle Bilder und Videos zusammen.')
+      const updateOffers = guard(async () => {
+        const selectedId = channelSel.value
+        const paid = state.channels.find(c => c.id === selectedId)?.telegram_mode === 'paid'
+        offerBox.hidden = !paid
+        typeSel.disabled = paid
+        if (paid) typeSel.value = 'image_single'
+        if (!paid) {paidUnits=[]; return}
+        clear(offers).appendChild(h('option',{value:''},'Angebote laden …'))
+        const choices = await api.paidItems(selectedId)
+        if (selectedId !== channelSel.value) return
+        paidUnits = choices
+        clear(offers).appendChild(h('option',{value:''}, choices.length ? 'Bitte auswählen' : 'Keine freien bepreisten Angebote zugeordnet'))
+        choices.forEach((u,index) => offers.appendChild(h('option',{value:String(index)},`${u.title} · ${u.asset_ids.length} Medium/Medien · ⭐ ${u.stars}`)))
+      })
+      channelSel.addEventListener('change', updateOffers)
+      updateOffers()
 
       const buildWhen = () => {
         const [hh, mm] = (timeInput.value || '18:00').split(':')
@@ -402,9 +426,13 @@ export default async function renderCalendar() {
       }
 
       const createManual = guard(async () => {
+        const paid = state.channels.find(c => c.id === channelSel.value)?.telegram_mode === 'paid'
+        const unit = paid && offers.value !== '' ? paidUnits[Number(offers.value)] : null
+        if (paid && !unit) {toast.error('Ein bepreistes Pay-Angebot auswählen.'); return}
         const post = await api.createPost({
           channel_id: channelSel.value,
-          type: typeSel.value,
+          type: unit ? (unit.asset_ids.length > 1 ? 'image_set' : 'image_single') : typeSel.value,
+          ...(unit ? {media_asset_ids:unit.asset_ids,media_set_id:unit.set_id || null} : {}),
           scheduled_at: buildWhen().toISOString(),
           body_text: textArea.value,
           status: 'draft',
@@ -430,6 +458,7 @@ export default async function renderCalendar() {
           weekdays: [0, 1, 2, 3, 4, 5, 6],
           tags_any: tagsInput.value.split(',').map((t) => t.trim()).filter(Boolean),
           fill_gaps_only: false,
+          respect_channel_interval: false,
           generate_text: true,
           dry_run: false,
         })
@@ -449,13 +478,14 @@ export default async function renderCalendar() {
           field('Uhrzeit', timeInput),
           field('Art', typeSel),
         ),
+        offerBox,
         field('Text (optional)', textArea),
         field('Bild-Tags (optional)', tagsInput,
           'Nur Bilder mit diesen Tags kommen für die automatische Erzeugung infrage.'),
         autoBox,
         h('div', { class: 'row', style: { marginTop: '10px' } },
           h('button', { class: 'primary', onClick: createAuto }, 'Automatisch erzeugen'),
-          h('button', { onClick: createManual }, 'Leeren Post anlegen'),
+          h('button', { onClick: createManual }, 'Manuell anlegen'),
           h('div', { class: 'spacer' }),
           h('button', { onClick: close }, 'Abbrechen'),
         ),
@@ -469,7 +499,7 @@ export default async function renderCalendar() {
   // gemeinsamer Dialog müsste die Hälfte der Felder je nach Kanal ausgrauen.
   function openPlanner(platform) {
     const isFanvue = platform === 'fanvue'
-    modal(`Automatisch planen — ${platform === 'telegram' ? 'Telegram' : isFanvue ? 'Fanvue' : 'X'}`, (close) => {
+    modal(`Automatisch planen — ${platform === 'telegram' ? 'Telegram' : platform === 'instagram' ? 'Instagram' : isFanvue ? 'Fanvue' : 'X'}`, (close) => {
       const start = new Date()
       const end = new Date(); end.setDate(end.getDate() + 14)
 
@@ -503,14 +533,14 @@ export default async function renderCalendar() {
             btn.className = 'chip' + (chosen.has(c.id) ? ' on' : '')
             checkFeasibility()
           },
-        }, h('i', { class: 'dot', style: { background: c.color } }), c.display_name)
+        }, platformIcon(c?.platform), h('i', { class: 'dot', style: { background: c.color } }), c.display_name)
         channelBox.appendChild(btn)
       }
       for (const c of paused) {
         channelBox.appendChild(h('button', {
           class: 'chip', disabled: true,
           title: 'Pausiert — unter Kanäle auf „Fortsetzen" klicken',
-        }, h('i', { class: 'dot', style: { background: c.color } }),
+        }, platformIcon(c?.platform), h('i', { class: 'dot', style: { background: c.color } }),
            c.display_name + ' (pausiert)'))
       }
 
@@ -527,6 +557,7 @@ export default async function renderCalendar() {
         dayBox.appendChild(btn)
       })
 
+      if(platform === 'instagram') {textCount.value='0';textCount.disabled=true}
       const preview = h('div', {})
       const feasibility = h('div', { class: 'hint' })
 
@@ -594,7 +625,7 @@ export default async function renderCalendar() {
         // jeweils andere Seite bleibt 0 – das Backend erkennt daran, welche
         // Betriebsart gemeint ist.
         image_posts_per_day: isFanvue ? 0 : Number(imageCount.value) || 0,
-        text_posts_per_day: isFanvue ? 0 : Number(textCount.value) || 0,
+        text_posts_per_day: isFanvue || platform === 'instagram' ? 0 : Number(textCount.value) || 0,
         sub_posts_per_day: isFanvue ? Number(subCount.value) || 0 : 0,
         free_posts_per_day: isFanvue ? Number(freeCount.value) || 0 : 0,
         time_from: timeFrom.value || '09:00',
@@ -611,14 +642,14 @@ export default async function renderCalendar() {
         const capacity = h('div', { class: 'col' }, ...result.capacity.map((c) =>
           h('div', { class: c.enough ? 'okbox' : 'warnbox' },
             c.enough
-              ? `${c.channel_name}: ${c.needed_images} Bilder nötig, ${c.available_images} verfügbar`
-              : `${c.channel_name}: ${c.needed_images} Bilder nötig, nur ${c.available_images} verfügbar — ${c.missing} fehlen`)))
+              ? `${c.channel_name}: ${c.needed_images} ${c.unit_label || "Bilder"} nötig, ${c.available_images} verfügbar`
+              : `${c.channel_name}: ${c.needed_images} ${c.unit_label || "Bilder"} nötig, nur ${c.available_images} verfügbar — ${c.missing} fehlen`)))
 
         const slotList = h('div', { style: { maxHeight: '220px', overflowY: 'auto', fontSize: '12px' } },
           ...result.slots.map((s) => {
             const c = state.channels.find((x) => x.id === s.channel_id)
             return h('div', { class: 'row', style: { gap: '6px' } },
-              h('i', { class: 'dot', style: { background: c ? c.color : '#666' } }),
+              platformIcon(c?.platform), h('i', { class: 'dot', style: { background: c ? c.color : '#666' } }),
               h('span', { class: 'hint num' }, fmtDateTime(s.scheduled_at)),
               h('span', { class: 'hint' }, s.type === 'text_only' ? 'Text' : 'Bild'),
               c && c.platform === 'fanvue'
@@ -766,6 +797,7 @@ export default async function renderCalendar() {
         ? h('button', { class: 'primary', onClick: () => openPlanner('x') },
             '⚡ X planen')
         : null,
+      state.channels.some(c => c.platform === 'instagram') ? h('button',{class:'primary',onClick:()=>openPlanner('instagram')},'⚡ Instagram planen') : null,
       state.channels.some((c) => c.platform === 'telegram')
         ? h('button', { class: 'primary', onClick: () => openPlanner('telegram') }, '⚡ Telegram planen') : null,
       state.channels.some((c) => c.platform === 'fanvue')

@@ -13,8 +13,8 @@ async def test_mp4_library_ingest_reuse_and_platform_scope(db,tmp_path):
     assert media.read_bytes(asset)[4:8]==b'ftyp'
     assert media.thumb_path(asset).exists()
     assert assignment.check_compatibility(asset,Channel(platform='telegram',nsfw_level='sfw')) is None
-    assert assignment.check_compatibility(asset,Channel(platform='x',nsfw_level='sfw'))
-    assert assignment.check_compatibility(asset,Channel(platform='fanvue',nsfw_level='sfw'))
+    assert assignment.check_compatibility(asset,Channel(platform='x',nsfw_level='sfw')) is None
+    assert assignment.check_compatibility(asset,Channel(platform='fanvue',nsfw_level='sfw')) is None
     from autoposter.services.appconfig import current
     from autoposter.services.llm import llm
     from unittest.mock import patch, AsyncMock

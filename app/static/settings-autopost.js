@@ -1,7 +1,7 @@
-import { api } from '/autoposter/js/api.js?v=creatorstudio-mobile-system-20260909'
-import renderSettings from '/autoposter/js/pages/settings.js?v=settings-structure-20261120-2'
-import renderChannels from '/autoposter/js/pages/channels.js?v=settings-reorg-1'
-import renderPersonas from '/autoposter/js/pages/personas.js?v=settings-structure-20261120-2'
+import { api } from '/autoposter/js/api.js?v=image-warning-20261121-1'
+import renderSettings from '/autoposter/js/pages/settings.js?v=image-warning-20261121-1'
+import renderChannels from '/autoposter/js/pages/channels.js?v=image-warning-20261121-1'
+import renderPersonas from '/autoposter/js/pages/personas.js?v=image-warning-20261121-1'
 
 const root = document.getElementById('autopost-settings')
 const pages = { autopost: renderSettings, channels: renderChannels, personas: renderPersonas }

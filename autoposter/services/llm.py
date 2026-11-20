@@ -23,6 +23,7 @@ from autoposter.services.appconfig import current as cfg
 logger = logging.getLogger(__name__)
 
 PLATFORM_RULES = {
+    "instagram": "Instagram Feed bzw. Reel. Maximal 2200 Zeichen einschließlich Hashtags. Passender persönlicher Text zum Bild/Video. Keine Fanvue-Zielgruppen, keine Telegram-Sterne, keine X-Regeln. Keine erfundenen Bilddetails.",
     "telegram": "Plattform Telegram-Kanal. Eigene geplante Beiträge, keine X-Spiegelung. Klarer persönlicher Text; Plaintext ohne HTML/Markdown. Text max. 4096, Medien-Caption max. 1024 Zeichen inklusive Hashtags. Keine Fanvue-Zielgruppen oder X-Regeln.",
     "x": (
         "Plattform X (Twitter). Maximal 280 Zeichen inklusive Hashtags. Kurz, pointiert, "

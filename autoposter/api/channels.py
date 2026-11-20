@@ -40,7 +40,7 @@ from autoposter.models import (
     User,
 )
 from autoposter.schemas import (
-    TelegramSetup,
+    TelegramSetup, BufferSetup, UploadPostSetup,
     ChannelCreate,
     ChannelOut,
     ChannelUpdate,
@@ -254,6 +254,13 @@ async def _to_out(db: AsyncSession, channel: Channel) -> ChannelOut:
         out.redirect_uri = ""
         out.connection_source = "telegram_bot"
         out.has_bot_token = bool(channel.credential_id)
+    if channel.platform == "instagram":
+        from autoposter.services import upload_post
+        out.instagram_provider = await upload_post.provider(db, channel)
+        out.connection_source = out.instagram_provider
+        out.app_configured = False
+        out.redirect_uri = ""
+        out.uses_own_app = False
     out.last_verified_at = channel.last_verified_at
     out.verified_account = channel.verified_account
     out.has_watermark = watermark.path_for(channel.id).exists()
@@ -287,7 +294,7 @@ async def create_channel(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ) -> ChannelOut:
-    if payload.platform not in ("x", "fanvue", "telegram"):
+    if payload.platform not in ("x", "fanvue", "telegram", "instagram"):
         raise HTTPException(400, "Unbekannte Plattform")
     try:
         redirect_base = oauthapp.normalize_redirect_base(payload.oauth_redirect_base, payload.platform)
@@ -302,6 +309,10 @@ async def create_channel(
     await db.flush()
 
     channel = Channel(
+        telegram_mode=payload.telegram_mode if payload.platform == 'telegram' else 'free',
+        telegram_content=payload.telegram_content,
+        telegram_interval_days=payload.telegram_interval_days,
+        telegram_start_date=payload.telegram_start_date,
         platform=payload.platform,
         display_name=payload.display_name,
         handle=payload.handle,
@@ -320,7 +331,7 @@ async def create_channel(
     if current_character() is not None:
         channel.is_active = False
         channel.auto_plan_enabled = False
-    if channel.platform == "telegram":
+    if channel.platform in ("telegram", "instagram"):
         channel.is_active = False
         channel.auto_plan_enabled = False
         channel.default_audience = ""
@@ -332,6 +343,11 @@ async def create_channel(
             channel.handle = tokens['account_handle'] or ''
         channel.health = chatbot_fanvue.health(channel)
         channel.health_note = 'Verbindung über AutoChat' if channel.health == 'ok' else 'Bitte AutoChat-Verbindung und Kanal-Handle prüfen.'
+    if channel.platform == "instagram" and payload.instagram_provider == "upload_post":
+        credential = ChannelCredential(platform="instagram", raw_meta={"provider": "upload_post"})
+        db.add(credential)
+        await db.flush()
+        channel.credential_id = credential.id
     if payload.oauth_client_id:
         oauthapp.store_app(
             channel, payload.oauth_client_id, payload.oauth_client_secret, payload.oauth_app_name
@@ -342,6 +358,50 @@ async def create_channel(
     await db.flush()
     await db.refresh(channel)
     return await _to_out(db, channel)
+
+
+@router.post('/channels/{channel_id}/telegram-pay', response_model=ChannelOut)
+async def create_telegram_pay(channel_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    from sqlalchemy import update
+    from datetime import date
+    from zoneinfo import ZoneInfo
+    await db.execute(update(Channel).where(Channel.id == channel_id).values(id=Channel.id, updated_at=Channel.updated_at))
+    source = await db.get(Channel, channel_id)
+    if not source or source.platform != 'telegram' or source.telegram_mode != 'free':
+        raise HTTPException(422, 'Bitte einen Telegram-Gratis-Kanal wählen.')
+    if not source.credential_id:
+        raise HTTPException(422, 'Zuerst den Telegram-Bot-Zugang des Gratis-Kanals speichern.')
+    existing = (await db.execute(select(Channel).where(Channel.credential_id == source.credential_id, Channel.telegram_mode == 'paid'))).scalars().first()
+    if existing:
+        return await _to_out(db, existing)
+    policy = PostingPolicy(posts_per_day=1, auto_approve=False, text_only_ratio=0)
+    if source.policy:
+        for key in ('allowed_time_windows', 'min_gap_minutes', 'jitter_minutes'):
+            setattr(policy, key, getattr(source.policy, key))
+    db.add(policy)
+    await db.flush()
+    channel = Channel(platform='telegram', display_name=source.display_name + ' · Pay', handle=source.handle,
+        credential_id=source.credential_id, policy_id=policy.id, persona_id=source.persona_id,
+        timezone=source.timezone, color=source.color, telegram_mode='paid', telegram_content='mixed',
+        telegram_interval_days=3, telegram_start_date=datetime.now(ZoneInfo(source.timezone or 'UTC')).date(),
+        is_active=False, auto_plan_enabled=False, default_audience='', platform_side_scheduling=False,
+        health='needs_reauth', health_note='Pay-Kanal angelegt. Rechte testen und Bilder/Sets zuordnen.')
+    db.add(channel)
+    await db.flush()
+    db.add(ContentPlan(channel_id=channel.id))
+    await db.flush()
+    await db.refresh(channel)
+    return await _to_out(db, channel)
+
+
+@router.get('/channels/{channel_id}/paid-items')
+async def paid_items(channel_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(current_user)):
+    from autoposter.services import telegram_paid
+    channel = await db.get(Channel, channel_id)
+    if not channel or not telegram_paid.is_paid(channel):
+        raise HTTPException(422, 'Kein Telegram-Pay-Kanal.')
+    units = await telegram_paid.units(db, channel, channel.policy or PostingPolicy())
+    return [{k: v for k, v in unit.items() if k != 'assets'} for unit in units]
 
 
 @router.patch("/channels/{channel_id}", response_model=ChannelOut)
@@ -358,7 +418,13 @@ async def update_channel(
         raise HTTPException(404, "Kanal nicht gefunden")
 
     data = payload.model_dump(exclude_unset=True)
-    if channel.platform == "telegram" and payload.handle is not None and payload.handle != channel.handle:
+    if channel.platform == "instagram":
+        from autoposter.services import buffer_channels
+        if payload.handle is not None and payload.handle != channel.handle and await buffer_channels.pending(db, channel):
+            raise HTTPException(409, "Zuerst offene Buffer-Versandvorgänge klären.")
+        if data.get("is_active") and not channel.last_verified_at:
+            raise HTTPException(422, "Zuerst Buffer-Konto und Webspace testen.")
+    if channel.platform in ("telegram", "instagram") and payload.handle is not None and payload.handle != channel.handle:
         channel.last_verified_at = None
         channel.health = ChannelHealth.needs_reauth.value
     fixed = fanvue_channels.fixed_audience(channel)
@@ -375,6 +441,8 @@ async def update_channel(
             data["oauth_redirect_base"] = oauthapp.normalize_redirect_base(data["oauth_redirect_base"], channel.platform)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
+    if any(k in data and data[k] is None for k in ('telegram_content', 'telegram_interval_days')):
+        raise HTTPException(422, 'Pay-Auswahl und Intervall dürfen nicht leer sein.')
     policy_data = data.pop("policy", None)
     client_id = data.pop("oauth_client_id", None)
     client_secret = data.pop("oauth_client_secret", None)
@@ -454,8 +522,14 @@ async def deletion_preview(
         Post, Post.channel_id == channel_id, Post.status == PostStatus.published.value
     )
     total_posts = await count(Post, Post.channel_id == channel_id)
+    external = {"external_deliveries": 0, "hosted_files": 0, "requires_external_detach": False}
+    if channel.platform == "instagram":
+        from autoposter.services import buffer_channels
+        posts = (await db.execute(select(Post).where(Post.channel_id == channel.id))).scalars().all()
+        external = buffer_channels.deletion_details(posts)
 
     return {
+        **external,
         "channel_id": str(channel_id),
         "display_name": channel.display_name,
         "platform": channel.platform,
@@ -476,6 +550,8 @@ async def deletion_preview(
 @router.delete("/channels/{channel_id}", status_code=204, response_model=None)
 async def delete_channel(
     channel_id: uuid.UUID,
+    detach_external: bool = Query(default=False),
+    confirm_name: str = Query(default=""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ) -> None:
@@ -501,6 +577,10 @@ async def delete_channel(
     if fanvue_channels.fixed_audience(channel):
         raise HTTPException(409, 'Dieser Kanal gehört zur gemeinsamen Fanvue-Verbindung. Bitte bei Bedarf pausieren.')
 
+    if channel.platform == "instagram":
+        from autoposter.services import buffer_channels
+        posts = (await db.execute(select(Post).where(Post.channel_id == channel.id))).scalars().all()
+        buffer_channels.validate_channel_deletion(channel, posts, detach_external=detach_external, confirm_name=confirm_name)
     credential_id = channel.credential_id
 
     # Betroffene Bilder VOR dem Löschen einsammeln – danach ist die Verbindung
@@ -564,6 +644,8 @@ async def pause_channel(
     ).scalar_one_or_none()
     if not channel:
         raise HTTPException(404, "Kanal nicht gefunden")
+    if channel.platform == "instagram" and not paused and not channel.last_verified_at:
+        raise HTTPException(422, "Zuerst Buffer-Konto und Webspace testen.")
     channel.health = ChannelHealth.paused.value if paused else ChannelHealth.ok.value
     channel.is_active = not paused
     db.add(channel)
@@ -591,6 +673,8 @@ async def oauth_start(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ) -> dict:
+    if platform == "instagram":
+        raise HTTPException(409, "Instagram wird über Buffer & Webspace eingerichtet, kein OAuth im Studio.")
     if platform == "telegram":
         raise HTTPException(409, "Telegram verwendet Bot-Zugang, kein OAuth.")
     if platform == "fanvue":
@@ -725,6 +809,54 @@ async def oauth_callback(
     return page("Verbunden", f"Kanal '{name}' ist jetzt mit {platform} verbunden.", True)
 
 
+@router.get("/channels/{channel_id}/upload-post")
+async def upload_post_settings(channel_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    from autoposter.services import upload_post
+    return await upload_post.settings(db, await _channel_or_404(db, channel_id))
+
+
+@router.put("/channels/{channel_id}/upload-post", response_model=ChannelOut)
+async def save_upload_post(channel_id: uuid.UUID, payload: UploadPostSetup, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    from autoposter.services import upload_post
+    channel = await _channel_or_404(db, channel_id)
+    await upload_post.save(db, channel, payload)
+    return await _to_out(db, channel)
+
+
+@router.post("/channels/{channel_id}/upload-post/profiles")
+async def upload_post_profiles(channel_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    from autoposter.services import upload_post
+    return await upload_post.discover(db, await _channel_or_404(db, channel_id))
+
+
+@router.get("/channels/{channel_id}/buffer")
+async def buffer_settings(channel_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    channel = await _channel_or_404(db, channel_id)
+    if channel.platform != "instagram":
+        raise HTTPException(422, "Kein Instagram-Kanal")
+    from autoposter.services import buffer_channels
+    return await buffer_channels.settings(db, channel)
+
+
+@router.put("/channels/{channel_id}/buffer", response_model=ChannelOut)
+async def save_buffer(channel_id: uuid.UUID, payload: BufferSetup, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    channel = await _channel_or_404(db, channel_id)
+    if channel.platform != "instagram":
+        raise HTTPException(422, "Kein Instagram-Kanal")
+    from autoposter.services import buffer_channels
+    await buffer_channels.save(db, channel, payload)
+    return await _to_out(db, channel)
+
+
+@router.post("/channels/{channel_id}/buffer/accounts")
+async def buffer_accounts(channel_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    channel = await _channel_or_404(db, channel_id)
+    if channel.platform != "instagram":
+        raise HTTPException(422, "Kein Instagram-Kanal")
+    from autoposter.services import buffer_channels
+    return await buffer_channels.discover(db, channel)
+
+
 @router.put("/channels/{channel_id}/telegram", response_model=ChannelOut)
 async def save_telegram(channel_id: uuid.UUID, payload: TelegramSetup, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)) -> ChannelOut:
     channel = await db.get(Channel, channel_id)
@@ -757,6 +889,14 @@ async def test_channel(
             raise HTTPException(403, "Admin erforderlich")
         from autoposter.services import telegram_channels
         return await telegram_channels.test(db, channel)
+    if channel.platform == "instagram":
+        if _.role != "admin":
+            raise HTTPException(403, "Admin erforderlich")
+        from autoposter.services import buffer_channels
+        from autoposter.services import upload_post
+        if await upload_post.provider(db, channel) == "upload_post":
+            return await upload_post.test(db, channel)
+        return await buffer_channels.test(db, channel)
     app = oauthapp.for_channel(channel)
     redirect = app.redirect_uri(channel.platform)
     result: Dict[str, Any] = {
@@ -920,9 +1060,52 @@ async def disconnect(
     if channel.platform == "telegram":
         row = await db.get(ChannelCredential, channel.credential_id) if channel.credential_id else None
         if row:
+            siblings = (await db.execute(select(Channel).where(Channel.credential_id == row.id))).scalars().all()
+            for sibling in siblings:
+                sibling.credential_id = None
+                sibling.last_verified_at = None
+                sibling.verified_account = ''
+                sibling.health = ChannelHealth.needs_reauth.value
+                sibling.health_note = 'Gemeinsame Telegram-Verbindung getrennt'
+            await db.flush()
             await db.delete(row)
         channel.last_verified_at = None
         channel.verified_account = ""
+    if channel.platform == "instagram":
+        from autoposter.services import upload_post
+        if await upload_post.provider(db, channel) == "upload_post":
+            from autoposter.services import buffer_channels
+            for post in (await db.execute(select(Post).where(Post.channel_id == channel.id))).scalars().all():
+                buffer_channels.editable(post, deleting=True)
+            credential = await db.get(ChannelCredential, channel.credential_id)
+            credential.access_token_enc = None
+            credential.refresh_token_enc = None
+            credential.external_user_id = None
+            credential.raw_meta = {"provider": "upload_post"}
+            channel.last_verified_at = None
+            channel.verified_account = ""
+            channel.health = "needs_reauth"
+            channel.health_note = "Upload-Post-Zugang entfernt"
+            channel.is_active = False
+            channel.auto_plan_enabled = False
+            db.add_all([credential, channel])
+            await db.flush()
+            return
+    if channel.platform == "instagram":
+        from autoposter.services import buffer_channels
+        for post in (await db.execute(select(Post).where(Post.channel_id == channel.id))).scalars().all():
+            buffer_channels.editable(post, deleting=True)
+        if await buffer_channels.pending(db, channel):
+            raise HTTPException(409, "Zuerst offene Buffer-Versandvorgänge klären.")
+        row = await db.get(ChannelCredential, channel.credential_id) if channel.credential_id else None
+        channel.last_verified_at = None
+        channel.verified_account = ""
+        channel.is_active = False
+        channel.auto_plan_enabled = False
+        channel.credential_id = None
+        await db.flush()
+        if row:
+            await db.delete(row)
     channel.credential_id = None
     channel.health = ChannelHealth.needs_reauth.value
     channel.health_note = "Verbindung getrennt"

@@ -276,26 +276,32 @@ async def ingest(
     )
 
 
-def read_bytes(asset: MediaAsset) -> bytes:
-    return original_path(asset).read_bytes()
+def read_bytes(asset: MediaAsset, *, platform=None) -> bytes:
+    from autoposter.services.image_edits import selected_path
+    return selected_path(asset, platform).read_bytes()
 
 
-def thumb_path(asset: MediaAsset, size: int = 256) -> Optional[Path]:
+def thumb_path(asset: MediaAsset, size: int = 256, *, platform=None, original=False) -> Optional[Path]:
     _assert_asset_owner(asset)
-    directory = asset_dir(asset.id)
+    from autoposter.services.image_edits import selected
+    crop = None if original else selected(asset, platform)
+    directory = resolve_media_path(crop.storage_path).parent if crop else asset_dir(asset.id)
     candidate = resolve_media_path((directory / f"thumb_{int(size)}.jpg").relative_to(media_root()))
     return candidate if candidate.is_file() else None
 
 
 def public_urls(asset: MediaAsset) -> Tuple[str, str]:
     base = f"/api/v1/media/{asset.id}"
+    from autoposter.services.image_edits import selected
+    crop = selected(asset)
+    version = "&v=" + str(crop.id) if crop else ""
     from autoposter.workspaces import current_character
     owner = current_character()
     if owner is not None:
         if asset.character_id != owner:
             raise ValueError('Media does not belong to this character')
-        return f"{base}/thumb?size=256&character_id={owner}", f"{base}/file?character_id={owner}"
-    return f"{base}/thumb?size=256", f"{base}/file"
+        return f"{base}/thumb?size=256&character_id={owner}{version}", f"{base}/file?character_id={owner}{version}"
+    return f"{base}/thumb?size=256{version}", f"{base}/file?v={str(crop.id) if crop else 'original'}"
 
 
 async def archive_candidates(db: AsyncSession, older_than_days: int = 30) -> List[MediaAsset]:
