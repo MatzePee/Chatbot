@@ -222,6 +222,9 @@ async def store_prepared(
         raise DuplicateUpload(existing)
 
     asset = MediaAsset(
+        # New ORM objects do not eagerly load an unset relationship on flush.
+        # Initialize it explicitly so response serialization never does async I/O.
+        image_edits=[],
         id=prepared.asset_id,
         filename=prepared.filename,
         storage_path=prepared.storage_path,
