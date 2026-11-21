@@ -12,6 +12,26 @@ import tempfile
 from unittest.mock import patch
 
 
+
+def snapshot_tables(connection):
+    """Record existing columns as well as rows: additive schema is permitted."""
+    from tools.release_smoke import fingerprint
+    tables = [row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+    result = {}
+    for name in tables:
+        quoted = name.replace('"', '""')
+        columns = [row[1] for row in connection.execute('PRAGMA table_info("' + quoted + '")')]
+        result[name] = (columns, fingerprint(connection, name, columns))
+    return result
+
+
+def assert_tables_preserved(connection, snapshot):
+    from tools.release_smoke import fingerprint
+    changed = [name for name, (columns, digest) in snapshot.items()
+               if fingerprint(connection, name, columns) != digest]
+    assert not changed, 'Existing workspace data changed in tables: ' + ', '.join(changed)
+
+
 def run_active(source):
     from app.character_upgrade import _active_paths
     pointer = json.loads((source / 'data/character-active.json').read_text())
@@ -41,12 +61,10 @@ def run_active(source):
                           MP_AUTOPOSTER_DATA_DIR=str(copied), MP_AUTOPOSTER_MEDIA_ROOT=str(copied / 'media'),
                           MP_AUTOPOSTER_SCHEDULER_MODE='off', MP_AUTOPOSTER_AUTH_ENABLED='false',
                           MP_EXPORT_DIR=str(Path(temporary) / 'exports'))
-        from tools.release_smoke import fingerprint
         before = {}
         for database in copied.rglob('*.db'):
             with closing(sqlite3.connect(database)) as conn:
-                tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
-                before[database] = {name: fingerprint(conn, name) for name in tables}
+                before[database] = snapshot_tables(conn)
         media_before = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in (copied / 'media').rglob('*') if p.is_file()}
         from autoposter.crypto import decrypt
         from autoposter.services.appconfig import SECRET_FIELDS
@@ -92,8 +110,7 @@ def run_active(source):
                         assert response.status_code == 200, 'Workspace route failed: ' + path
         for database, tables in before.items():
             with closing(sqlite3.connect(database)) as conn:
-                changed = [name for name, digest in tables.items() if fingerprint(conn, name) != digest]
-                assert not changed, 'Existing workspace data changed in tables: ' + ', '.join(changed)
+                assert_tables_preserved(conn, tables)
                 assert conn.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
         assert all(p.is_file() and hashlib.sha256(p.read_bytes()).hexdigest() == digest for p, digest in media_before.items()), 'Workspace media changed'
         for connection in db._character_connections.values():
