@@ -288,7 +288,7 @@ export function channelChips(asset, channels, max = 4) {
 }
 
 export async function openMediaEditor(asset, options = {}) {
-  const module = await import('./image-editor.js?v=instagram-followers-20261121-1')
+  const module = await import('./image-editor.js?v=persona-hashtags-20261121-1')
   return module.openImageEditor(asset, options)
 }
 

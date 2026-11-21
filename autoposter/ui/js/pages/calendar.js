@@ -1,12 +1,12 @@
-import { plannedPostsCard } from './settings.js?v=instagram-followers-20261121-1'
+import { plannedPostsCard } from './settings.js?v=persona-hashtags-20261121-1'
 // Kalender: ganzer Monat auf einer Seite, mit Planer, Tagesdetail und Sammelaktionen.
-import { api } from '../api.js?v=instagram-followers-20261121-1'
+import { api } from '../api.js?v=persona-hashtags-20261121-1'
 import {
   h, append, clear, empty, field, modal, toast, guard, spinner, confirmDialog,
   fmtTime, fmtDate, fmtDateTime, toLocalInput, attachPreview, openMediaEditor,
-} from '../ui.js?v=instagram-followers-20261121-1'
-import { openPostEditor } from '../posteditor.js?v=instagram-followers-20261121-1'
-import { runProgress } from '../progress.js?v=instagram-followers-20261121-1'
+} from '../ui.js?v=persona-hashtags-20261121-1'
+import { openPostEditor } from '../posteditor.js?v=persona-hashtags-20261121-1'
+import { runProgress } from '../progress.js?v=persona-hashtags-20261121-1'
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 const WEEKDAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']

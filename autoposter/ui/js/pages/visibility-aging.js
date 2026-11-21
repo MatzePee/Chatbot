@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=instagram-followers-20261121-1'
-import { h, clear, card, confirmDialog } from '../ui.js?v=instagram-followers-20261121-1'
+import { api } from '../api.js?v=persona-hashtags-20261121-1'
+import { h, clear, card, confirmDialog } from '../ui.js?v=persona-hashtags-20261121-1'
 
 export async function visibilityAgingCard(values) {
   const enabled = h('input', {type:'checkbox', checked:values.visibility_aging_enabled === true})

@@ -1,15 +1,15 @@
-import '/static/live-refresh.js?v=instagram-followers-20261121-1'
+import '/static/live-refresh.js?v=persona-hashtags-20261121-1'
 // Einstiegspunkt: Anmeldung prüfen, Rahmen aufbauen, Hash-Router.
-import { api } from './api.js?v=instagram-followers-20261121-1'
-import { h, clear, append, toast } from './ui.js?v=instagram-followers-20261121-1'
+import { api } from './api.js?v=persona-hashtags-20261121-1'
+import { h, clear, append, toast } from './ui.js?v=persona-hashtags-20261121-1'
 
-import renderDashboard from './pages/dashboard.js?v=instagram-followers-20261121-1'
-import renderLibrary from './pages/library.js?v=instagram-followers-20261121-1'
-import renderAssign from './pages/assign.js?v=instagram-followers-20261121-1'
-import renderMatrix from './pages/matrix.js?v=instagram-followers-20261121-1'
-import renderTopPostsX from './pages/top-posts-x.js?v=instagram-followers-20261121-1'
-import renderCalendar from './pages/calendar.js?v=instagram-followers-20261121-1'
-import renderSettings from './pages/settings.js?v=instagram-followers-20261121-1'
+import renderDashboard from './pages/dashboard.js?v=persona-hashtags-20261121-1'
+import renderLibrary from './pages/library.js?v=persona-hashtags-20261121-1'
+import renderAssign from './pages/assign.js?v=persona-hashtags-20261121-1'
+import renderMatrix from './pages/matrix.js?v=persona-hashtags-20261121-1'
+import renderTopPostsX from './pages/top-posts-x.js?v=persona-hashtags-20261121-1'
+import renderCalendar from './pages/calendar.js?v=persona-hashtags-20261121-1'
+import renderSettings from './pages/settings.js?v=persona-hashtags-20261121-1'
 
 
 const ROUTES = [
@@ -176,7 +176,7 @@ async function start() {
       )
       return
     }
-    const { default: renderLogin } = await import('./pages/login.js?v=instagram-followers-20261121-1')
+    const { default: renderLogin } = await import('./pages/login.js?v=persona-hashtags-20261121-1')
     shell = null
     clear(root).appendChild(renderLogin({ onLogin: (user) => { state.user = user; start() } }))
     return

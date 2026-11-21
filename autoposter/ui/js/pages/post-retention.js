@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=instagram-followers-20261121-1'
-import { h, card, confirmDialog } from '../ui.js?v=instagram-followers-20261121-1'
+import { api } from '../api.js?v=persona-hashtags-20261121-1'
+import { h, card, confirmDialog } from '../ui.js?v=persona-hashtags-20261121-1'
 
 export async function postRetentionCard(values) {
   let status={active:false}, backendReady=false

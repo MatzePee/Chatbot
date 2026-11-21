@@ -651,6 +651,7 @@ class LlmClient:
         has_image: Optional[bool] = None,
     ) -> LlmResult:
         has_image = bool(image_descriptions) if has_image is None else has_image
+        separate_hashtags = not persona or getattr(persona, "generate_separate_hashtags", True) is not False
         custom_prompt = ((persona.media_system_prompt if has_image else persona.system_prompt) or "") if persona else ""
         # Recognize the explicitly requested flag format, never impose it on
         # Fanvue personas that ask for a single language.
@@ -700,7 +701,10 @@ class LlmClient:
                 user_parts.append("Textvorgaben nur für diesen Telegram-Kanal: " + channel.policy.text_guidelines)
         if instruction:
             user_parts.append(f"Zusätzliche Anweisung: {instruction}")
-        if persona and persona.hashtag_pool:
+        if not separate_hashtags:
+            user_parts.append("Keine zusätzlichen Hashtags im separaten Feld erzeugen: Setze hashtags auf []. "
+                              "Hashtags, die der individuelle Prompt im Caption-Text verlangt, bleiben unverändert im Feld text.")
+        if separate_hashtags and persona and persona.hashtag_pool:
             user_parts.append(
                 "Nur wenn der individuelle Prompt Hashtags erlaubt: maximal 3 passende auswählen aus: "
                 + ", ".join(persona.hashtag_pool)
@@ -835,7 +839,7 @@ class LlmClient:
                 str(t).lstrip("#")
                 for t in (item.get("hashtags") or [])
                 if not is_placeholder(str(t))
-            ][:3]
+            ][:3] if separate_hashtags else []
             full_length = len(text) + (len(" ".join(f"#{t}" for t in tags)) + 2 if tags else 0)
             issues = []
             if full_length > max_chars:

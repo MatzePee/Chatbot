@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=instagram-followers-20261121-1'
-import { h, field, spinner, clear } from '../ui.js?v=instagram-followers-20261121-1'
+import { api } from '../api.js?v=persona-hashtags-20261121-1'
+import { h, field, spinner, clear } from '../ui.js?v=persona-hashtags-20261121-1'
 
 export default function renderLogin({ onLogin }) {
   const email = h('input', { type: 'email', required: true, autofocus: true, autocomplete: 'username' })

@@ -1,7 +1,7 @@
 // Bilder-Upload per Drag & Drop, mit Fortschritt je Datei und
 // anschließender Zuordnung zu Kanälen.
-import { api } from './api.js?v=instagram-followers-20261121-1'
-import { h, clear, append, field, modal, toast, guard, spinner, fmtBytes } from './ui.js?v=instagram-followers-20261121-1'
+import { api } from './api.js?v=persona-hashtags-20261121-1'
+import { h, clear, append, field, modal, toast, guard, spinner, fmtBytes } from './ui.js?v=persona-hashtags-20261121-1'
 
 const ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4']
 //: Wie viele Dateien pro Anfrage. Kleine Bündel halten die Rückmeldung flüssig

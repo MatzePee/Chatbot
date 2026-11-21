@@ -1,7 +1,7 @@
-import { api } from '../api.js?v=instagram-followers-20261121-1'
-import { h, clear, empty, field, card, toast, guard, spinner } from '../ui.js?v=instagram-followers-20261121-1'
-import { rhythmEditor } from '../rhythm.js?v=instagram-followers-20261121-1'
-import { examplesEditor } from '../examples.js?v=instagram-followers-20261121-1'
+import { api } from '../api.js?v=persona-hashtags-20261121-1'
+import { h, clear, empty, field, card, toast, guard, spinner } from '../ui.js?v=persona-hashtags-20261121-1'
+import { rhythmEditor } from '../rhythm.js?v=persona-hashtags-20261121-1'
+import { examplesEditor } from '../examples.js?v=persona-hashtags-20261121-1'
 
 export default async function renderPersonas() {
   let [personas, channels] = await Promise.all([api.personas(), api.channels()])
@@ -53,7 +53,9 @@ export default async function renderPersonas() {
     const temp = h('input', { type: 'number', step: '0.1', value: p.temperature })
     const model = h('input', { value: p.model_override || '', placeholder: 'z. B. anthropic/claude-sonnet-4' })
     const forbidden = h('input', { value: (p.forbidden_topics || []).join(', ') })
-    const hashtags = h('input', { value: (p.hashtag_pool || []).join(', ') })
+    const hashtags = h('input', { value: (p.hashtag_pool || []).join(', '),disabled:p.generate_separate_hashtags===false })
+    const separateHashtags = h('input',{type:'checkbox',checked:p.generate_separate_hashtags!==false,'aria-label':'Hashtags zusätzlich im separaten Feld erzeugen'})
+    separateHashtags.addEventListener('change',()=>{hashtags.disabled=!separateHashtags.checked})
     const ctas = h('input', { value: (p.cta_pool || []).join(' | ') })
     const rhythm = rhythmEditor({ value: p.daily_rhythm || '' })
     const textExamples = examplesEditor(p, { kind: 'text' })
@@ -72,6 +74,7 @@ export default async function renderPersonas() {
         model_override: model.value || null,
         forbidden_topics: forbidden.value.split(',').map((t) => t.trim()).filter(Boolean),
         hashtag_pool: hashtags.value.split(',').map((t) => t.trim()).filter(Boolean),
+        generate_separate_hashtags:separateHashtags.checked,
         cta_pool: ctas.value.split('|').map((t) => t.trim()).filter(Boolean),
         daily_rhythm: rhythm.value,
       })
@@ -154,6 +157,8 @@ export default async function renderPersonas() {
         h('div', {},
           field('Verbotene Themen (kommagetrennt)', forbidden),
           field('Hashtag-Pool', hashtags),
+          h('label',{class:'inline'},separateHashtags,'Hashtags zusätzlich im separaten Feld erzeugen'),
+          h('p',{class:'hint'},'Ausschalten, wenn dein Prompt die Hashtags bereits im Caption-Text erzeugt. Gilt beim nächsten Generieren und Neuerzeugen. Bestehende Posts und manuell eingetragene Hashtags bleiben unverändert. Der Hashtag-Pool bleibt gespeichert.'),
           field('CTA-Pool (mit | trennen)', ctas),
         ),
       ),

@@ -82,7 +82,7 @@ if (hub) {
   if(styles) {
     async function loadStyles() {
       try {
-        const {default:renderPersonas}=await import('/autoposter/js/pages/personas.js?v=settings-structure-20261120-2')
+        const {default:renderPersonas}=await import('/autoposter/js/pages/personas.js?v=persona-hashtags-20261121-1')
         styles.replaceChildren(await renderPersonas())
       } catch(error) {
         const message=document.createElement('p');message.textContent='Post-Stil konnte nicht geladen werden: '+error.message

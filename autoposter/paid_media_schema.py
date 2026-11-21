@@ -2,6 +2,7 @@
 from sqlalchemy import inspect
 
 COLUMNS = {
+    'persona': {'generate_separate_hashtags': 'BOOLEAN NOT NULL DEFAULT TRUE'},
     'channel': {
         'instagram_is_ai_generated': 'BOOLEAN NOT NULL DEFAULT FALSE',
         'telegram_mode': "VARCHAR(10) NOT NULL DEFAULT 'free'",

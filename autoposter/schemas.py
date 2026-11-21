@@ -51,6 +51,7 @@ class PersonaBase(BaseModel):
     emoji_policy: str = "sparse"
     language: str = "en"
     hashtag_pool: List[str] = []
+    generate_separate_hashtags: bool = True
     cta_pool: List[str] = []
     model_override: Optional[str] = None
     temperature: float = 0.9
@@ -71,6 +72,7 @@ class PersonaUpdate(BaseModel):
     emoji_policy: Optional[str] = None
     language: Optional[str] = None
     hashtag_pool: Optional[List[str]] = None
+    generate_separate_hashtags: bool = True
     cta_pool: Optional[List[str]] = None
     model_override: Optional[str] = None
     temperature: Optional[float] = None

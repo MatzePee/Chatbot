@@ -42,6 +42,8 @@ if settings.ui_mode == "react":
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings.ensure_dirs()
+    from autoposter import persona_schema
+    await persona_schema.upgrade(engine)
     from autoposter import instagram_schema
     await instagram_schema.upgrade(engine)
     from autoposter import image_edits_schema

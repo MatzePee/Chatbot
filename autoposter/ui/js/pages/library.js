@@ -1,12 +1,12 @@
-import { platformIcon } from '../platform-icon.js?v=instagram-followers-20261121-1'
-import { libraryCleanupCard } from './settings.js?v=instagram-followers-20261121-1'
-import { api } from '../api.js?v=instagram-followers-20261121-1'
-import { openUploadDialog } from '../upload.js?v=instagram-followers-20261121-1'
-import { openCreateSetDialog, openSetDialog } from '../sets.js?v=instagram-followers-20261121-1'
+import { platformIcon } from '../platform-icon.js?v=persona-hashtags-20261121-1'
+import { libraryCleanupCard } from './settings.js?v=persona-hashtags-20261121-1'
+import { api } from '../api.js?v=persona-hashtags-20261121-1'
+import { openUploadDialog } from '../upload.js?v=persona-hashtags-20261121-1'
+import { openCreateSetDialog, openSetDialog } from '../sets.js?v=persona-hashtags-20261121-1'
 import {
   h, append, clear, card, empty, field, modal, toast, guard, spinner, confirmDialog,
   mediaPreview, mediaTile, openMediaEditor, instagramCropWarning, LIFECYCLE, LIFECYCLE_ORDER, fmtDate, fmtDateTime, fmtBytes, debounce, attachPreview,
-} from '../ui.js?v=instagram-followers-20261121-1'
+} from '../ui.js?v=persona-hashtags-20261121-1'
 
 export default async function renderLibrary({ query }) {
   const [channels, views, tagList] = await Promise.all([api.channels(), api.views(), api.tags()])

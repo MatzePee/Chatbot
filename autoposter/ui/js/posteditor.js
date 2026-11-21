@@ -1,10 +1,10 @@
-import { translationField } from './translation-preview.js?v=instagram-followers-20261121-1'
+import { translationField } from './translation-preview.js?v=persona-hashtags-20261121-1'
 // Post-Editor als eigenes Modul – wird vom Kalender und vom Tagesdetail genutzt.
-import { api } from './api.js?v=instagram-followers-20261121-1'
+import { api } from './api.js?v=persona-hashtags-20261121-1'
 import {
   h, append, clear, empty, field, modal, toast, guard, spinner, openMediaEditor,
   toLocalInput, attachPreview, confirmDialog, mediaPreview,
-} from './ui.js?v=instagram-followers-20261121-1'
+} from './ui.js?v=persona-hashtags-20261121-1'
 
 export function openPostEditor(post, channels, { onChanged = () => {} } = {}) {
   const channel = channels.find((c) => c.id === post.channel_id)

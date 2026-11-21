@@ -1,6 +1,6 @@
 // Fortschritt eines Hintergrundlaufs: Balken, Schritttext, Restzeit, Abbruch.
-import { api } from './api.js?v=instagram-followers-20261121-1'
-import { h, append, clear, toast } from './ui.js?v=instagram-followers-20261121-1'
+import { api } from './api.js?v=persona-hashtags-20261121-1'
+import { h, append, clear, toast } from './ui.js?v=persona-hashtags-20261121-1'
 
 const seconds = (value) => {
   if (value === null || value === undefined) return ''

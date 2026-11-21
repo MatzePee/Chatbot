@@ -259,6 +259,7 @@ class Persona(Base, CharacterOwned, TimestampMixin):
     emoji_policy: Mapped[str] = mapped_column(String(20), default="sparse")
     language: Mapped[str] = mapped_column(String(10), default="en")
     hashtag_pool: Mapped[List[str]] = mapped_column(StrArray, default=list)
+    generate_separate_hashtags: Mapped[bool] = mapped_column(Boolean, default=True)
     cta_pool: Mapped[List[str]] = mapped_column(StrArray, default=list)
     model_override: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     temperature: Mapped[float] = mapped_column(Float, default=0.9)
