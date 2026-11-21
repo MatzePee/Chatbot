@@ -293,6 +293,7 @@ async def refresh_metrics(hours: int = 72) -> Dict[str, Any]:
     async with session_scope() as db:
         follower_accounts = await followers.collect(db)
         follower_accounts += await followers.collect(db, platform='telegram')
+        follower_accounts += await followers.collect(db, platform='instagram')
     return {"updated": updated, "follower_accounts": follower_accounts}
 
 
@@ -302,6 +303,7 @@ async def collect_daily_followers(now=None) -> Dict[str, Any]:
     async with session_scope() as db:
         count = await followers.collect(db, now=now, daily_only=True)
         count += await followers.collect(db, now=now, daily_only=True, platform='telegram')
+        count += await followers.collect(db, now=now, daily_only=True, platform='instagram')
     return {"follower_accounts": count, "schedule": "06:00 Europe/Berlin"}
 
 

@@ -616,3 +616,16 @@ async def acknowledge_failure(post_id: uuid.UUID, db: AsyncSession = Depends(get
             note.is_read = True
             db.add(note)
     return {'acknowledged': str(post.id)}
+
+
+@router.get('/analytics/instagram-followers')
+async def instagram_followers(db: AsyncSession = Depends(get_db), _: User = Depends(current_user)):
+    from autoposter.services import followers
+    return await followers.overview(db, platform='instagram')
+
+
+@router.post('/analytics/instagram-followers/refresh')
+async def refresh_instagram_followers(db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
+    from autoposter.services import followers
+    updated = await followers.collect(db, platform='instagram', force=True)
+    return {'updated': updated, 'accounts': await followers.overview(db, platform='instagram')}

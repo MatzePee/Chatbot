@@ -1,5 +1,5 @@
-import { api } from './api.js?v=instagram-ai-20261121-1'
-import { h, field, modal, guard } from './ui.js?v=instagram-ai-20261121-1'
+import { api } from './api.js?v=instagram-followers-20261121-1'
+import { h, field, modal, guard } from './ui.js?v=instagram-followers-20261121-1'
 
 const RATIOS = [['free','Frei',null],['original','Original',null],['3:4','3:4',.75],['4:5','4:5',.8],['1:1','1:1',1],['1.91:1','1,91:1',1.91]]
 

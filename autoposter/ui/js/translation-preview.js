@@ -1,5 +1,5 @@
-import { h } from './ui.js?v=instagram-ai-20261121-1'
-import { api } from './api.js?v=instagram-ai-20261121-1'
+import { h } from './ui.js?v=instagram-followers-20261121-1'
+import { api } from './api.js?v=instagram-followers-20261121-1'
 
 let nextId = 0
 

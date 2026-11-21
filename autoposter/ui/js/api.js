@@ -83,6 +83,8 @@ export const api = {
   // --- Dashboard / Betrieb ---
   dashboard: () => get('/dashboard'),
   xFollowers: () => get('/analytics/x-followers'),
+  instagramFollowers: () => get('/analytics/instagram-followers'),
+  refreshInstagramFollowers: () => post('/analytics/instagram-followers/refresh'),
   topPostsX: () => get('/analytics/top-posts-x'),
   refreshTopPostsX: scope => post('/analytics/top-posts-x/collection/' + encodeURIComponent(scope)),
   reuseTopPostX: (id, channelId) => post('/analytics/top-posts-x/' + id + '/reuse' + (channelId ? '?channel_id=' + encodeURIComponent(channelId) : '')),

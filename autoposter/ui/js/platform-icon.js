@@ -1,4 +1,4 @@
-import { h } from './ui.js?v=instagram-ai-20261121-1'
+import { h } from './ui.js?v=instagram-followers-20261121-1'
 
 const NAMES = { x: 'X', fanvue: 'Fanvue', telegram: 'Telegram', instagram: 'Instagram' }
 export function platformIcon(platform) {

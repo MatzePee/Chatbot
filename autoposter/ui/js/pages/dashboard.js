@@ -1,9 +1,9 @@
-import { platformIcon, platformLabel } from '../platform-icon.js?v=instagram-ai-20261121-1'
-import { runtimeCard } from './settings.js?v=instagram-ai-20261121-1'
-import { historyChart } from '../account-history.js?v=instagram-ai-20261121-1'
-import { renderUpcoming } from '../upcoming-posts.js?v=instagram-ai-20261121-1'
-import { api } from '../api.js?v=instagram-ai-20261121-1'
-import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard } from '../ui.js?v=instagram-ai-20261121-1'
+import { platformIcon, platformLabel } from '../platform-icon.js?v=instagram-followers-20261121-1'
+import { runtimeCard } from './settings.js?v=instagram-followers-20261121-1'
+import { historyChart } from '../account-history.js?v=instagram-followers-20261121-1'
+import { renderUpcoming } from '../upcoming-posts.js?v=instagram-followers-20261121-1'
+import { api } from '../api.js?v=instagram-followers-20261121-1'
+import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard } from '../ui.js?v=instagram-followers-20261121-1'
 
 export function problemTime(raw) {
   if (!raw) return 'Zeitpunkt unbekannt'
@@ -81,13 +81,13 @@ export default async function renderDashboard() {
   page.appendChild(invCard)
 
   // Cached account metrics only: no X requests from browser refresh.
-  for (const platform of ['x', 'telegram']) {
-  const title = platform === 'x' ? 'X-Follower' : 'Telegram-Abonnenten / Kanalmitglieder'
+  for (const platform of ['x', 'telegram', 'instagram']) {
+  const title = platform === 'instagram' ? 'Instagram-Follower' : platform === 'x' ? 'X-Follower' : 'Telegram-Abonnenten / Kanalmitglieder'
   try {
     const paidTelegramIds = new Set(data.channel_health
       .filter(channel => channel.platform === 'telegram' && channel.telegram_mode === 'paid')
       .map(channel => channel.id))
-    const accounts = (await (platform === 'x' ? api.xFollowers() : api.telegramMembers()))
+    const accounts = (await (platform === 'instagram' ? api.instagramFollowers() : platform === 'x' ? api.xFollowers() : api.telegramMembers()))
       .filter(account => platform !== 'telegram' || !paidTelegramIds.has(account.channel_id))
     const historyKeys = ['yesterday', 'days7', 'days30']
     const historyText = value => value.count === null ? 'Keine Historie'
@@ -120,12 +120,18 @@ export default async function renderDashboard() {
           h('b', {}, 'Messzeit / Status'), h('div', {}, measurementText(a))),
         accountChart(a),
       )))
+    const refreshInstagram = platform === 'instagram' ? h('button',{type:'button',onClick:guard(async event=>{
+      const button=event.currentTarget;button.disabled=true;button.textContent='Wird abgerufen …'
+      try {const result=await api.refreshInstagramFollowers();toast.info(result.updated ? 'Instagram-Followerzahl aktualisiert' : 'Keine neue Messung verfügbar – Status prüfen');location.reload()}
+      finally {button.disabled=false;button.textContent='Instagram-Follower aktualisieren'}
+    })},'Instagram-Follower aktualisieren') : null
     page.appendChild(card(platformLabel(platform, title + ' · Stand und Wachstum'),
+      refreshInstagram,
       h('div', { class: 'hint' }, 'Vergleich mit dem exakten Kalendertag (Europe/Berlin). Fehlende Messungen werden nicht geschätzt.'),
       accounts.length ? h('div', { class: 'x-followers' },
         h('div', { class: 'x-followers-table table-scroll', tabindex: 0 }, h('table', {},
           h('thead', {}, h('tr', {}, ...['Account', 'Aktuell', 'Gestern (Δ)', 'Vor 7 Tagen (Δ)', 'Vor 30 Tagen (Δ)', 'Messzeit / Status'].map(t => h('th', {}, t)))),
-          h('tbody', {}, ...rows))), mobileAccounts) : empty(platform === 'x' ? 'Keine X-Accounts.' : 'Keine Telegram-Kanäle.'),
+          h('tbody', {}, ...rows))), mobileAccounts) : empty(platform === 'instagram' ? 'Keine Instagram-Kanäle.' : platform === 'x' ? 'Keine X-Accounts.' : 'Keine Telegram-Kanäle.'),
     ))
   } catch { page.appendChild(card(platformLabel(platform, title), empty('Messübersicht derzeit nicht verfügbar.'))) }
   }

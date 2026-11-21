@@ -1,8 +1,8 @@
-import { platformDefaultsCard, connectionCard } from './settings.js?v=instagram-ai-20261121-1'
-import { api } from '../api.js?v=instagram-ai-20261121-1'
-import { platformIcon } from '../platform-icon.js?v=instagram-ai-20261121-1'
-import { watermarkEditor } from '../watermark.js?v=instagram-ai-20261121-1'
-import { h, clear, empty, field, modal, toast, guard, fmtDateTime } from '../ui.js?v=instagram-ai-20261121-1'
+import { platformDefaultsCard, connectionCard } from './settings.js?v=instagram-followers-20261121-1'
+import { api } from '../api.js?v=instagram-followers-20261121-1'
+import { platformIcon } from '../platform-icon.js?v=instagram-followers-20261121-1'
+import { watermarkEditor } from '../watermark.js?v=instagram-followers-20261121-1'
+import { h, clear, empty, field, modal, toast, guard, fmtDateTime } from '../ui.js?v=instagram-followers-20261121-1'
 
 function callbackEditor(channel = null) {
   const suffix = '/api/v1/oauth/x/callback'

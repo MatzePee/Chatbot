@@ -27,7 +27,7 @@ async def request(token, path, *, files=None, data=None, params=None, request_id
             raise AdapterError("Unbekannte Upload-Post-Schreiboperation.")
         from autoposter.services.runtime import assert_external_write_allowed
         await assert_external_write_allowed()
-    elif not (path == "/api/uploadposts/status" or path == "/api/uploadposts/users" or path.startswith("/api/uploadposts/users/")):
+    elif not (path == "/api/uploadposts/status" or path == "/api/uploadposts/users" or path.startswith("/api/uploadposts/users/") or path.startswith("/api/analytics/")):
         raise AdapterError("Unbekannte Upload-Post-Leseoperation.")
     if not token:
         raise AdapterError("Upload-Post API-Key fehlt.", needs_reauth=True)
@@ -179,3 +179,14 @@ class UploadPostAdapter(BufferAdapter):
             raise BufferUncertain("Upload-Post hat eine abweichende Vorgangs-ID zurückgegeben. Anbieter prüfen; nicht erneut senden.")
         state = normalized(payload, request_id, cred.external_user_id, cred.access_token)
         return PublishResult(request_id, state["externalLink"], raw=state)
+
+
+async def fetch_followers(cred, channel):
+    """Account-bound, read-only Instagram count. Missing data is never zero."""
+    await verify_account(cred, channel)
+    payload = await request(cred.access_token, '/api/analytics/' + quote(cred.external_user_id, safe=''), params={'platforms':'instagram'})
+    metrics = payload.get('instagram')
+    count = metrics.get('followers') if isinstance(metrics, dict) else None
+    if type(count) is not int or count < 0:
+        raise AdapterError('Upload-Post: Instagram-Followerzahl nicht verfügbar. Analytics-Berechtigung und Tarif prüfen.')
+    return count

@@ -1,7 +1,7 @@
-import { api } from '../api.js?v=instagram-ai-20261121-1'
-import { h, clear, empty, field, card, toast, guard, spinner } from '../ui.js?v=instagram-ai-20261121-1'
-import { rhythmEditor } from '../rhythm.js?v=instagram-ai-20261121-1'
-import { examplesEditor } from '../examples.js?v=instagram-ai-20261121-1'
+import { api } from '../api.js?v=instagram-followers-20261121-1'
+import { h, clear, empty, field, card, toast, guard, spinner } from '../ui.js?v=instagram-followers-20261121-1'
+import { rhythmEditor } from '../rhythm.js?v=instagram-followers-20261121-1'
+import { examplesEditor } from '../examples.js?v=instagram-followers-20261121-1'
 
 export default async function renderPersonas() {
   let [personas, channels] = await Promise.all([api.personas(), api.channels()])

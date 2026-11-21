@@ -1,7 +1,7 @@
-import { postRetentionCard } from './post-retention.js?v=instagram-ai-20261121-1'
-import { visibilityAgingCard } from './visibility-aging.js?v=instagram-ai-20261121-1'
-import { api } from '../api.js?v=instagram-ai-20261121-1'
-import { h, clear, card, field, empty, toast, guard, spinner, confirmDialog } from '../ui.js?v=instagram-ai-20261121-1'
+import { postRetentionCard } from './post-retention.js?v=instagram-followers-20261121-1'
+import { visibilityAgingCard } from './visibility-aging.js?v=instagram-followers-20261121-1'
+import { api } from '../api.js?v=instagram-followers-20261121-1'
+import { h, clear, card, field, empty, toast, guard, spinner, confirmDialog } from '../ui.js?v=instagram-followers-20261121-1'
 
 export async function commonOverview() {
   const response = await fetch(window.CreatorStudioCharacters.url('/settings/shared/ai-usage'))

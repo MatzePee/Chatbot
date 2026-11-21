@@ -47,12 +47,6 @@
         <a href="{{ href }}"{% if active %} class="active" aria-current="page"{% endif %}><span class="workspace-icon" aria-hidden="true">{{ icon }}</span><span>{{ label }}</span>{% if href == '/queue' and pending_count %}<span class="badge">{{ pending_count }}</span>{% endif %}</a>
       {% endfor %}
     </nav>
-    <div class="workspace-sidefoot">
-      <div class="status" id="workspace-status">
-        <div>{% if connected %}<span class="dot green"></span>Fanvue verbunden{% else %}<span class="dot red"></span>Fanvue getrennt{% endif %}</div>
-        <div>{% if preview %}Mitlesen · Versand gesperrt{% elif running %}Läuft ({{ mode }}){% else %}AutoChat pausiert{% endif %}</div>
-      </div>
-    </div>
   </aside>
   <div class="workspace-scroll">
     <div class="workspace-notices">

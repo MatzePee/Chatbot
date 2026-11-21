@@ -1,8 +1,8 @@
 // System: installierte Version, Updates einspielen, nach GitHub veröffentlichen.
-import { api } from '../api.js?v=instagram-ai-20261121-1'
+import { api } from '../api.js?v=instagram-followers-20261121-1'
 import {
   h, append, clear, card, field, empty, toast, guard, spinner, confirmDialog, fmtDateTime,
-} from '../ui.js?v=instagram-ai-20261121-1'
+} from '../ui.js?v=instagram-followers-20261121-1'
 
 export default async function renderSystem() {
   const page = h('div', { class: 'page stack' },

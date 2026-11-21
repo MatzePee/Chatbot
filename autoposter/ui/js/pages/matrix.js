@@ -1,6 +1,6 @@
 // Matrix: Bilder × Kanäle. Beantwortet auf einen Blick "was fehlt wo noch".
-import { api } from '../api.js?v=instagram-ai-20261121-1'
-import { h, clear, empty, toast, guard, attachPreview, fmtDate, spinner, openMediaEditor } from '../ui.js?v=instagram-ai-20261121-1'
+import { api } from '../api.js?v=instagram-followers-20261121-1'
+import { h, clear, empty, toast, guard, attachPreview, fmtDate, spinner, openMediaEditor } from '../ui.js?v=instagram-followers-20261121-1'
 
 const CELL = {
   none: {

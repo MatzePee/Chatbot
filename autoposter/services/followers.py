@@ -27,8 +27,13 @@ def account_binding(channel, cred, platform):
         if channel.verified_account and not x_account_matches(channel, channel.verified_account):
             return None
         return cred.external_user_id
-    import re
     meta = cred.raw_meta or {}
+    if platform == 'instagram':
+        bound = meta.get('instagram_account_id')
+        return str(bound) if (meta.get('provider') == 'upload_post' and channel.last_verified_at and bound
+            and cred.external_user_id and x_account_matches(channel, channel.verified_account)
+            and x_account_matches(channel, meta.get('destination'))) else None
+    import re
     chat = meta.get('chat_id')
     if (channel.last_verified_at and meta.get('destination') == channel.handle
             and isinstance(chat, str) and re.fullmatch(r'-100[0-9]+', chat)):
@@ -37,7 +42,7 @@ def account_binding(channel, cred, platform):
 
 
 def cache_key(platform, account):
-    return ('x_followers:' if platform == 'x' else 'telegram_members:') + account
+    return {'x':'x_followers:', 'telegram':'telegram_members:', 'instagram':'instagram_followers:'}[platform] + account
 
 
 async def overview(db, now=None, *, platform='x'):
@@ -64,6 +69,8 @@ async def overview(db, now=None, *, platform='x'):
         for label, horizon in [('yesterday', 1), ('days7', 7), ('days30', 30)]:
             count = days.get((today - timedelta(days=horizon)).isoformat())
             item[label] = {'count': count, 'growth': current - count if current is not None and count is not None and latest == today.isoformat() else None}
+        if platform == 'instagram' and not account:
+            item['status'] = ('Für Instagram-Follower bitte Upload-Post verbinden.' if cred and (cred.raw_meta or {}).get('provider') != 'upload_post' else 'Instagram-Verbindung unter Einstellungen → Kanäle testen; Profil und Konto prüfen.')
         item['platform'] = platform
         item['history'] = [{'date': (today - timedelta(days=offset)).isoformat(), 'count': days.get((today - timedelta(days=offset)).isoformat())} for offset in range(29, -1, -1)]
         result.append(item)
@@ -118,6 +125,9 @@ async def collect(db, now=None, *, daily_only=False, platform='x', force=False):
             if platform == 'telegram':
                 from autoposter.adapters.telegram import TelegramAdapter
                 count = await TelegramAdapter().fetch_members(cred)
+            elif platform == 'instagram':
+                from autoposter.adapters.upload_post import fetch_followers
+                count = await fetch_followers(cred, channel)
             else:
                 count = await XAdapter().fetch_followers(cred)
             days = dict(value.get('days', {}))
@@ -128,6 +138,8 @@ async def collect(db, now=None, *, daily_only=False, platform='x', force=False):
         except Exception as exc:
             # Never persist provider response/token-bearing exception text.
             value['status'] = ('Messung nicht verfügbar – Telegram-Zielkanal, Privatsphäre, Berechtigung oder Token prüfen' if platform == 'telegram' else 'Messung nicht verfügbar – X-Tarif, Berechtigung oder Token prüfen')
+            if platform == 'instagram':
+                value['status'] = 'Messung nicht verfügbar – Upload-Post-Profil, Instagram-Verbindung, Analytics-Berechtigung oder Tarif prüfen'
             if platform == 'telegram':
                 from autoposter.adapters import AdapterError
                 code = getattr(exc, 'status', None) if isinstance(exc, AdapterError) else None

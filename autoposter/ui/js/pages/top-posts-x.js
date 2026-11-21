@@ -1,5 +1,5 @@
-import { api } from '../api.js?v=instagram-ai-20261121-1'
-import { h, clear, empty, toast, attachPreview, modal, openMediaEditor, guard } from '../ui.js?v=instagram-ai-20261121-1'
+import { api } from '../api.js?v=instagram-followers-20261121-1'
+import { h, clear, empty, toast, attachPreview, modal, openMediaEditor, guard } from '../ui.js?v=instagram-followers-20261121-1'
 
 const formatTime = value => new Date(value).toLocaleString('de-DE', {
   timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
