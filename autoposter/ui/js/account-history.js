@@ -1,4 +1,4 @@
-import { h } from './ui.js?v=image-warning-20261121-1'
+import { h } from './ui.js?v=instagram-ai-20261121-1'
 
 // One real last-success sample per Berlin calendar day; null explicitly breaks paths.
 export function historyChart(account) {

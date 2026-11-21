@@ -215,6 +215,7 @@ class ChannelUpdate(BaseModel):
     auto_plan_enabled: bool = True
     x_send_alt_text: bool = True
     x_made_with_ai: bool = False
+    instagram_is_ai_generated: bool = False
     platform_side_scheduling: Optional[bool] = None
     default_audience: Optional[str] = None
     oauth_client_id: Optional[str] = None
@@ -272,6 +273,7 @@ class ChannelOut(ORMModel):
     auto_plan_enabled: bool = True
     x_send_alt_text: bool = True
     x_made_with_ai: bool = False
+    instagram_is_ai_generated: bool = False
     health: str
     health_note: str
     platform_side_scheduling: bool

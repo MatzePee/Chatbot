@@ -3,6 +3,7 @@ from sqlalchemy import inspect
 
 COLUMNS = {
     'channel': {
+        'instagram_is_ai_generated': 'BOOLEAN NOT NULL DEFAULT FALSE',
         'telegram_mode': "VARCHAR(10) NOT NULL DEFAULT 'free'",
         'telegram_content': "VARCHAR(10) NOT NULL DEFAULT 'mixed'",
         'telegram_interval_days': 'INTEGER NOT NULL DEFAULT 1',

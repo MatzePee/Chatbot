@@ -170,6 +170,7 @@ class UploadPostAdapter(BufferAdapter):
         files = [("video" if video else "photos[]", (f"media-{index}.mp4" if video else f"media-{index}.jpg", ref.data, ref.mime)) for index, ref in enumerate(media)]
         data = {"user": cred.external_user_id, "platform[]": "instagram", "title": text,
                 "async_upload": "true", "request_id": request_id, "external_id": str(post.id)}
+        data["is_ai_generated"] = "true" if channel.instagram_is_ai_generated else "false"
         if video:
             data["media_type"] = "REELS"
         payload = await request(cred.access_token, "/api/upload" if video else "/api/upload_photos",

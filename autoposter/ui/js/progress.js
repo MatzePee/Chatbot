@@ -1,6 +1,6 @@
 // Fortschritt eines Hintergrundlaufs: Balken, Schritttext, Restzeit, Abbruch.
-import { api } from './api.js?v=image-warning-20261121-1'
-import { h, append, clear, toast } from './ui.js?v=image-warning-20261121-1'
+import { api } from './api.js?v=instagram-ai-20261121-1'
+import { h, append, clear, toast } from './ui.js?v=instagram-ai-20261121-1'
 
 const seconds = (value) => {
   if (value === null || value === undefined) return ''

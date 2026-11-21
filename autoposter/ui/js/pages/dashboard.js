@@ -1,9 +1,9 @@
-import { platformIcon, platformLabel } from '../platform-icon.js?v=image-warning-20261121-1'
-import { runtimeCard } from './settings.js?v=image-warning-20261121-1'
-import { historyChart } from '../account-history.js?v=image-warning-20261121-1'
-import { renderUpcoming } from '../upcoming-posts.js?v=image-warning-20261121-1'
-import { api } from '../api.js?v=image-warning-20261121-1'
-import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard } from '../ui.js?v=image-warning-20261121-1'
+import { platformIcon, platformLabel } from '../platform-icon.js?v=instagram-ai-20261121-1'
+import { runtimeCard } from './settings.js?v=instagram-ai-20261121-1'
+import { historyChart } from '../account-history.js?v=instagram-ai-20261121-1'
+import { renderUpcoming } from '../upcoming-posts.js?v=instagram-ai-20261121-1'
+import { api } from '../api.js?v=instagram-ai-20261121-1'
+import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard } from '../ui.js?v=instagram-ai-20261121-1'
 
 export function problemTime(raw) {
   if (!raw) return 'Zeitpunkt unbekannt'

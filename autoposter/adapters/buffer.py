@@ -114,7 +114,7 @@ class BufferAdapter:
         result = await _request(cred.access_token, CREATE, {"input": {
             "channelId": cred.external_user_id, "mode": "shareNow", "schedulingType": "automatic",
             "text": text, "assets": [{"video" if ref.mime == "video/mp4" else "image": {"url": ref.external_id}} for ref in media],
-            "metadata": {"instagram": {"type": "reel" if media[0].mime == "video/mp4" else "post", "shouldShareToFeed": True}},
+            "metadata": {"instagram": {"type": "reel" if media[0].mime == "video/mp4" else "post", "shouldShareToFeed": True, "isAiGenerated": bool(channel.instagram_is_ai_generated)}},
         }}, write=True)
         action = result.get("createPost") or {}
         if action.get("__typename") != "PostActionSuccess":

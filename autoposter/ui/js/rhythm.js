@@ -1,6 +1,6 @@
 // Editor für den Tagesrhythmus einer Persona: Regeltext, Prüfung, Wochenraster.
-import { api } from './api.js?v=image-warning-20261121-1'
-import { h, append, clear, empty, toast, guard, spinner, debounce } from './ui.js?v=image-warning-20261121-1'
+import { api } from './api.js?v=instagram-ai-20261121-1'
+import { h, append, clear, empty, toast, guard, spinner, debounce } from './ui.js?v=instagram-ai-20261121-1'
 
 const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 

@@ -1,7 +1,7 @@
-import { platformIcon, platformLabel } from './platform-icon.js?v=image-warning-20261121-1'
-import { api } from './api.js?v=image-warning-20261121-1'
-import { h, clear, empty, fmtDateTime, guard, openMediaEditor } from './ui.js?v=image-warning-20261121-1'
-import { openPostEditor } from './posteditor.js?v=image-warning-20261121-1'
+import { platformIcon, platformLabel } from './platform-icon.js?v=instagram-ai-20261121-1'
+import { api } from './api.js?v=instagram-ai-20261121-1'
+import { h, clear, empty, fmtDateTime, guard, openMediaEditor } from './ui.js?v=instagram-ai-20261121-1'
+import { openPostEditor } from './posteditor.js?v=instagram-ai-20261121-1'
 
 let preview, owner, timer
 const observer = new MutationObserver(() => { if (owner && !owner.isConnected) hide() })

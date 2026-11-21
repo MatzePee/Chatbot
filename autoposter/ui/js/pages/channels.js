@@ -1,8 +1,8 @@
-import { platformDefaultsCard, connectionCard } from './settings.js?v=image-warning-20261121-1'
-import { api } from '../api.js?v=image-warning-20261121-1'
-import { platformIcon } from '../platform-icon.js?v=image-warning-20261121-1'
-import { watermarkEditor } from '../watermark.js?v=image-warning-20261121-1'
-import { h, clear, empty, field, modal, toast, guard, fmtDateTime } from '../ui.js?v=image-warning-20261121-1'
+import { platformDefaultsCard, connectionCard } from './settings.js?v=instagram-ai-20261121-1'
+import { api } from '../api.js?v=instagram-ai-20261121-1'
+import { platformIcon } from '../platform-icon.js?v=instagram-ai-20261121-1'
+import { watermarkEditor } from '../watermark.js?v=instagram-ai-20261121-1'
+import { h, clear, empty, field, modal, toast, guard, fmtDateTime } from '../ui.js?v=instagram-ai-20261121-1'
 
 function callbackEditor(channel = null) {
   const suffix = '/api/v1/oauth/x/callback'
@@ -508,6 +508,7 @@ export default async function renderChannels() {
       textGuidelines.addEventListener('input',()=>{p.text_guidelines=textGuidelines.value})
       const sendAltText = h('input', { type: 'checkbox', checked: channel.x_send_alt_text !== false })
       const madeWithAi = h('input', { type: 'checkbox', checked: !!channel.x_made_with_ai })
+      const instagramAi = h('input', { type:'checkbox', checked:!!channel.instagram_is_ai_generated, 'aria-label':'Medien als KI-generiert kennzeichnen' })
 
       // Sets: auf Fanvue gehört eine Bildstrecke in EINEN Post, auf X wirken
       // einzelne Bilder besser. Leer heißt "nach Plattform".
@@ -579,6 +580,11 @@ export default async function renderChannels() {
           'Größe und Abstände sind relativ zum Bild – dasselbe Zeichen sitzt auf Hoch- '
           + 'und Querformat gleich. Standard ist unten links mit kleinem Abstand.'),
         watermark.node,
+        channel.platform === 'instagram' ? h('div', {class:'col',style:{margin:'16px 0'}},
+          h('h3',{},'Instagram-KI-Kennzeichnung'),
+          h('label',{class:'inline'},instagramAi,'Medien als KI-generiert kennzeichnen'),
+          h('p',{class:'hint'},'Sendet die offizielle KI-Kennzeichnung für Bilder, Karussells und Reels an Instagram – über Upload-Post oder Buffer. Gilt auch für bereits lokal geplante Beiträge beim nächsten Versand. Bereits veröffentlichte oder extern übergebene Beiträge bleiben unverändert. Instagram entscheidet, wo der KI-Hinweis angezeigt wird.')
+        ) : null,
         channel.platform === 'x' ? h('div', { class: 'col', style: { margin: '16px 0' } },
           h('h3', {}, 'X-Medienkennzeichnung'),
           h('label', { class: 'inline' }, sendAltText, 'Bildbeschreibung an X senden (ALT)'),
@@ -625,6 +631,7 @@ export default async function renderChannels() {
               display_name: displayName,
               ...(channel.platform === 'telegram' ? {telegram_interval_days:Number(interval.value), telegram_start_date:start.value || null, telegram_content:content.value} : {}),
               policy: p,
+              ...(channel.platform === 'instagram' ? {instagram_is_ai_generated:instagramAi.checked} : {}),
               persona_id: personaSel.value || null,
               color: color.value,
               ...(callback ? callback.values() : {}),

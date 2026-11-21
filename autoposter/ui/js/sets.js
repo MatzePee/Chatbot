@@ -1,8 +1,8 @@
 // Bild-Sets: Medien, die zusammen in einem Post erscheinen sollen.
-import { api } from './api.js?v=image-warning-20261121-1'
+import { api } from './api.js?v=instagram-ai-20261121-1'
 import {
   h, append, clear, empty, field, modal, toast, guard, spinner, confirmDialog, attachPreview,
-} from './ui.js?v=image-warning-20261121-1'
+} from './ui.js?v=instagram-ai-20261121-1'
 
 /** Set aus einer Auswahl anlegen. Reihenfolge ist die Reihenfolge im Post. */
 export function openCreateSetDialog({ assets, onDone = () => {} }) {

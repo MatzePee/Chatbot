@@ -1,7 +1,7 @@
-import { api } from '/autoposter/js/api.js?v=image-warning-20261121-1'
-import renderSettings from '/autoposter/js/pages/settings.js?v=image-warning-20261121-1'
-import renderChannels from '/autoposter/js/pages/channels.js?v=image-warning-20261121-1'
-import renderPersonas from '/autoposter/js/pages/personas.js?v=image-warning-20261121-1'
+import { api } from '/autoposter/js/api.js?v=instagram-ai-20261121-1'
+import renderSettings from '/autoposter/js/pages/settings.js?v=instagram-ai-20261121-1'
+import renderChannels from '/autoposter/js/pages/channels.js?v=instagram-ai-20261121-1'
+import renderPersonas from '/autoposter/js/pages/personas.js?v=instagram-ai-20261121-1'
 
 const root = document.getElementById('autopost-settings')
 const pages = { autopost: renderSettings, channels: renderChannels, personas: renderPersonas }

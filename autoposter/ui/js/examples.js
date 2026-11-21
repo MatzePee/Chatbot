@@ -1,6 +1,6 @@
 // Beispielposts einer Persona: Stilvorlagen, die in jeden Prompt einfließen.
-import { api } from './api.js?v=image-warning-20261121-1'
-import { h, append, clear, empty, toast, guard, spinner, confirmDialog, fmtDate } from './ui.js?v=image-warning-20261121-1'
+import { api } from './api.js?v=instagram-ai-20261121-1'
+import { h, append, clear, empty, toast, guard, spinner, confirmDialog, fmtDate } from './ui.js?v=instagram-ai-20261121-1'
 
 const PLATFORMS = [['x', 'X'], ['fanvue', 'Fanvue']]
 
