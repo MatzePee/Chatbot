@@ -10,7 +10,7 @@ from autoposter.workspaces import current_character, CharacterBoundaryError
 
 _RESULT_KEYS = {'fanvue_retention_last_run', 'visibility_aging_last_run'}
 _EXACT = {'auto_plan_daily_gate', 'x_top_posts_collection'} | _RESULT_KEYS
-_PREFIXES = ('instagram_followers:', 'x_followers:', 'telegram_members:', 'fanvue_visibility:',
+_PREFIXES = ('fanvue_followers:', 'instagram_followers:', 'x_followers:', 'telegram_members:', 'fanvue_visibility:',
              'fanvue_retention:', 'fanvue_ppv_restore:')
 
 def _validate(db, key):

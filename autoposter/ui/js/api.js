@@ -82,6 +82,8 @@ export const api = {
 
   // --- Dashboard / Betrieb ---
   dashboard: () => get('/dashboard'),
+  socialSummary: () => get('/analytics/social-summary'),
+  refreshSocialSummary: () => post('/analytics/social-summary/refresh'),
   xFollowers: () => get('/analytics/x-followers'),
   instagramFollowers: () => get('/analytics/instagram-followers'),
   refreshInstagramFollowers: () => post('/analytics/instagram-followers/refresh'),

@@ -1,8 +1,9 @@
 import { platformIcon, platformLabel } from '../platform-icon.js?v=persona-hashtags-20261121-1'
 import { runtimeCard } from './settings.js?v=persona-hashtags-20261121-1'
 import { historyChart } from '../account-history.js?v=persona-hashtags-20261121-1'
-import { renderUpcoming } from '../upcoming-posts.js?v=persona-hashtags-20261121-1'
-import { api } from '../api.js?v=persona-hashtags-20261121-1'
+import { socialSummaryCard } from '../social-summary.js?v=social-summary-20261122-1'
+import { renderUpcoming } from '../upcoming-posts.js?v=upcoming-channel-name-20261122-1'
+import { api } from '../api.js?v=social-summary-20261122-1'
 import { h, card, empty, toast, fmtDate, fmtDateTime, LIFECYCLE, LIFECYCLE_ORDER, spinner, clear, guard } from '../ui.js?v=persona-hashtags-20261121-1'
 
 export function problemTime(raw) {
@@ -79,6 +80,9 @@ export default async function renderDashboard() {
       : null,
   )
   page.appendChild(invCard)
+
+  try {page.appendChild(socialSummaryCard(await api.socialSummary()))}
+  catch {page.appendChild(card('Social Media gesamt',empty('Gesamtstatistik derzeit nicht verfügbar.')))}
 
   // Cached account metrics only: no X requests from browser refresh.
   for (const platform of ['x', 'telegram', 'instagram']) {

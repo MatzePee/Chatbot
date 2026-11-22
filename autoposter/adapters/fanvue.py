@@ -174,6 +174,19 @@ class FanvueAdapter:
             max_image_bytes=50 * 1024 * 1024,
         )
 
+    async def fetch_followers(self, cred):
+        async with http_client(timeout=30.0) as client:
+            response = await client.get(f"{self.base}/users/me", headers=self._headers(cred))
+            raise_for_response(response, 'Fanvue Followerstatistik')
+            data = response.json()
+        if not isinstance(data, dict) or str(data.get('uuid') or '') != str(cred.external_user_id or '') or not cred.external_user_id:
+            raise AdapterError('Fanvue: unerwartetes Konto bei der Followerstatistik.')
+        counts = data.get('fanCounts')
+        count = counts.get('followersCount') if isinstance(counts, dict) else None
+        if type(count) is not int or count < 0:
+            raise AdapterError('Fanvue: Followerzahl nicht verfügbar.')
+        return count
+
     def _headers(self, cred: Credentials) -> Dict[str, str]:
         return {
             "Authorization": f"Bearer {cred.access_token}",

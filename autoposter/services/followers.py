@@ -21,6 +21,10 @@ def x_account_matches(channel, username):
 
 
 def account_binding(channel, cred, platform):
+    if platform == 'fanvue':
+        from autoposter.services import chatbot_fanvue
+        tokens = chatbot_fanvue.chatbot_db.get_tokens()
+        return str(tokens['account_uuid']) if tokens and tokens['account_uuid'] and chatbot_fanvue.connected(channel) else None
     if not cred or cred.platform != platform:
         return None
     if platform == 'x':
@@ -42,7 +46,7 @@ def account_binding(channel, cred, platform):
 
 
 def cache_key(platform, account):
-    return {'x':'x_followers:', 'telegram':'telegram_members:', 'instagram':'instagram_followers:'}[platform] + account
+    return {'fanvue':'fanvue_followers:', 'x':'x_followers:', 'telegram':'telegram_members:', 'instagram':'instagram_followers:'}[platform] + account
 
 
 async def overview(db, now=None, *, platform='x'):
@@ -50,9 +54,13 @@ async def overview(db, now=None, *, platform='x'):
     today = now.astimezone(ZONE).date()
     result = []
     channels = (await db.execute(select(Channel).where(Channel.platform == platform).order_by(Channel.display_name))).scalars().all()
+    seen = set()
     for channel in channels:
         cred = await db.get(ChannelCredential, channel.credential_id) if channel.credential_id else None
         account = account_binding(channel, cred, platform)
+        if platform == 'fanvue' and account:
+            if account in seen:continue
+            seen.add(account)
         row = await db.get(AppSetting, cache_key(platform, account)) if account else None
         value = (row.value or {}) if row else {}
         days = value.get('days', {})
@@ -71,6 +79,9 @@ async def overview(db, now=None, *, platform='x'):
             item[label] = {'count': count, 'growth': current - count if current is not None and count is not None and latest == today.isoformat() else None}
         if platform == 'instagram' and not account:
             item['status'] = ('Für Instagram-Follower bitte Upload-Post verbinden.' if cred and (cred.raw_meta or {}).get('provider') != 'upload_post' else 'Instagram-Verbindung unter Einstellungen → Kanäle testen; Profil und Konto prüfen.')
+        if platform == 'fanvue':
+            item['name'] = 'Fanvue · ' + (channel.handle or channel.display_name)
+            if not account:item['status'] = 'Fanvue-Verbindung unter AutoChat prüfen.'
         item['platform'] = platform
         item['history'] = [{'date': (today - timedelta(days=offset)).isoformat(), 'count': days.get((today - timedelta(days=offset)).isoformat())} for offset in range(29, -1, -1)]
         result.append(item)
@@ -87,11 +98,13 @@ async def collect(db, now=None, *, daily_only=False, platform='x', force=False):
     now = now or datetime.now(timezone.utc)
     channels = (await db.execute(select(Channel).where(Channel.platform == platform, Channel.is_active.is_(True) if not force else True))).scalars().all()
     done = 0
+    seen = set()
     for channel in channels:
         credrow = await db.get(ChannelCredential, channel.credential_id) if channel.credential_id else None
         account = account_binding(channel, credrow, platform)
-        if not account:
+        if not account or account in seen:
             continue
+        seen.add(account)
         key = cache_key(platform, account)
         # Atomic account lock in both supported DBs. SQLite's no-op write takes
         # its writer lock; PostgreSQL uses a row lock. Read only AFTER locking.
@@ -117,12 +130,19 @@ async def collect(db, now=None, *, daily_only=False, platform='x', force=False):
         await db.commit()  # Durable at-most-once attempt; no DB lock during HTTP.
         try:
             # Do not rotate tokens or change channel health for optional analytics.
-            if credrow.expires_at and credrow.expires_at <= now:
+            if credrow and credrow.expires_at and credrow.expires_at <= now:
                 raise ValueError('expired')
-            cred = credentials.to_credentials(credrow)
+            if platform == 'fanvue':
+                from autoposter.services import chatbot_fanvue
+                cred = await chatbot_fanvue.credentials(channel)
+            else:
+                cred = credentials.to_credentials(credrow)
             if platform == 'x' and hasattr(cred, 'raw_meta'):
                 cred.raw_meta = {**(cred.raw_meta or {}), 'expected_x_username': channel.handle}
-            if platform == 'telegram':
+            if platform == 'fanvue':
+                from autoposter.adapters.fanvue import FanvueAdapter
+                count = await FanvueAdapter().fetch_followers(cred)
+            elif platform == 'telegram':
                 from autoposter.adapters.telegram import TelegramAdapter
                 count = await TelegramAdapter().fetch_members(cred)
             elif platform == 'instagram':
@@ -138,6 +158,8 @@ async def collect(db, now=None, *, daily_only=False, platform='x', force=False):
         except Exception as exc:
             # Never persist provider response/token-bearing exception text.
             value['status'] = ('Messung nicht verfügbar – Telegram-Zielkanal, Privatsphäre, Berechtigung oder Token prüfen' if platform == 'telegram' else 'Messung nicht verfügbar – X-Tarif, Berechtigung oder Token prüfen')
+            if platform == 'fanvue':
+                value['status'] = 'Messung nicht verfügbar – Fanvue-Verbindung und Kontoberechtigung prüfen'
             if platform == 'instagram':
                 value['status'] = 'Messung nicht verfügbar – Upload-Post-Profil, Instagram-Verbindung, Analytics-Berechtigung oder Tarif prüfen'
             if platform == 'telegram':

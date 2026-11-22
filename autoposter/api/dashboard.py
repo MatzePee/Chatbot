@@ -629,3 +629,18 @@ async def refresh_instagram_followers(db: AsyncSession = Depends(get_db), _: Use
     from autoposter.services import followers
     updated = await followers.collect(db, platform='instagram', force=True)
     return {'updated': updated, 'accounts': await followers.overview(db, platform='instagram')}
+
+
+@router.get('/analytics/social-summary')
+async def social_summary(db: AsyncSession = Depends(get_db), _: User = Depends(current_user)):
+    from autoposter.services import social_summary as service
+    return await service.overview(db)
+
+
+@router.post('/analytics/social-summary/refresh')
+async def refresh_social_summary(db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
+    from autoposter.services import followers, social_summary as service
+    updated = 0
+    for platform in service.PLATFORMS:
+        updated += await followers.collect(db, platform=platform, force=True)
+    return {'updated':updated, **(await service.overview(db))}
