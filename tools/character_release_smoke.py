@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 
 
-def snapshot_tables(connection):
+def snapshot_tables(connection, *, character_chat=False):
     """Record existing columns as well as rows: additive schema is permitted."""
     from tools.release_smoke import fingerprint
     tables = [row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
@@ -21,14 +21,21 @@ def snapshot_tables(connection):
     for name in tables:
         quoted = name.replace('"', '""')
         columns = [row[1] for row in connection.execute('PRAGMA table_info("' + quoted + '")')]
-        result[name] = (columns, fingerprint(connection, name, columns))
+        additions = set()
+        if character_chat and name == 'settings' and columns == ['key', 'value']:
+            from app.db import DEFAULT_SETTINGS
+            existing = {row[0] for row in connection.execute('SELECT key FROM settings')}
+            # init_db seeds missing defaults when the character is first opened.
+            additions = {(key, json.dumps(value)) for key, value in DEFAULT_SETTINGS.items()
+                         if key not in existing}
+        result[name] = (columns, fingerprint(connection, name, columns), additions)
     return result
 
 
 def assert_tables_preserved(connection, snapshot):
     from tools.release_smoke import fingerprint
-    changed = [name for name, (columns, digest) in snapshot.items()
-               if fingerprint(connection, name, columns) != digest]
+    changed = [name for name, (columns, digest, additions) in snapshot.items()
+               if fingerprint(connection, name, columns, permitted_additions=additions) != digest]
     assert not changed, 'Existing workspace data changed in tables: ' + ', '.join(changed)
 
 
@@ -64,7 +71,8 @@ def run_active(source):
         before = {}
         for database in copied.rglob('*.db'):
             with closing(sqlite3.connect(database)) as conn:
-                before[database] = snapshot_tables(conn)
+                before[database] = snapshot_tables(
+                    conn, character_chat=database.match('characters/*/bot.db'))
         media_before = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in (copied / 'media').rglob('*') if p.is_file()}
         from autoposter.crypto import decrypt
         from autoposter.services.appconfig import SECRET_FIELDS

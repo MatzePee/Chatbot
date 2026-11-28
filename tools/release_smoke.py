@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-def fingerprint(connection, table, columns=None, *, expected_migrations=False):
+def fingerprint(connection, table, columns=None, *, expected_migrations=False, permitted_additions=()):
     digest = hashlib.sha256()
     projection = ', '.join('"' + c.replace('"', '""') + '"' for c in columns) if columns else '*'
     cursor = connection.execute('SELECT ' + projection + ' FROM "' + table.replace('"', '""') + '" ORDER BY rowid')
@@ -29,6 +29,8 @@ def fingerprint(connection, table, columns=None, *, expected_migrations=False):
                        and table in {'channel', 'media_asset', 'media_set'}
                        and 'nsfw_level' in names else None)
     for row in cursor:
+        if permitted_additions and tuple(row) in permitted_additions:
+            continue
         values = list(row)
         if migrated_column is not None and values[migrated_column] == 'suggestive':
             values[migrated_column] = 'explicit'

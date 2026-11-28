@@ -38,3 +38,37 @@ def test_existing_cell_changes_and_row_changes_are_still_rejected(mutation):
         connection.execute(mutation)
         with pytest.raises(AssertionError, match='Existing workspace data changed'):
             assert_tables_preserved(connection, before)
+
+
+def test_character_upgrade_seeds_missing_default_without_changing_existing_settings(monkeypatch):
+    from app import db
+    connection = sqlite3.connect(':memory:')
+    connection.row_factory = sqlite3.Row
+    monkeypatch.setattr(db, 'get_conn', lambda: connection)
+    monkeypatch.setattr(db, '_character_owner', lambda: 'test-character')
+    db.init_db()
+    connection.execute("DELETE FROM settings WHERE key='send_promise_guard_enabled'")
+    connection.execute("UPDATE settings SET value='false' WHERE key='time_guard_enabled'")
+    before = snapshot_tables(connection, character_chat=True)
+    strict = snapshot_tables(connection)
+    db.init_db()
+    assert connection.execute("SELECT value FROM settings WHERE key='send_promise_guard_enabled'").fetchone()[0] == 'true'
+    assert_tables_preserved(connection, before)
+    with pytest.raises(AssertionError, match='settings'):
+        assert_tables_preserved(connection, strict)
+
+
+@pytest.mark.parametrize('mutation', [
+    "INSERT INTO settings VALUES ('send_promise_guard_enabled', 'false')",
+    "INSERT INTO settings VALUES ('unknown', 'true')",
+    "UPDATE settings SET value='true' WHERE key='time_guard_enabled'",
+    "DELETE FROM settings WHERE key='time_guard_enabled'",
+])
+def test_character_upgrade_rejects_unexpected_settings_changes(mutation):
+    with fixture_db() as connection:
+        connection.execute('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)')
+        connection.execute("INSERT INTO settings VALUES ('time_guard_enabled', 'false')")
+        before = snapshot_tables(connection, character_chat=True)
+        connection.execute(mutation)
+        with pytest.raises(AssertionError, match='settings'):
+            assert_tables_preserved(connection, before)
