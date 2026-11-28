@@ -314,7 +314,31 @@ class ChannelOut(ORMModel):
 # --------------------------------------------------------------------------- #
 # Medien
 # --------------------------------------------------------------------------- #
+class CanvasPadding(BaseModel):
+    left: int = Field(ge=0, le=4096)
+    right: int = Field(ge=0, le=4096)
+    top: int = Field(ge=0, le=4096)
+    bottom: int = Field(ge=0, le=4096)
+
+
+class RetouchPatch(BaseModel):
+    padding: Optional[CanvasPadding] = None
+    x: int = Field(ge=0)
+    y: int = Field(ge=0)
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    png: str = Field(max_length=24_000_000)
+
+
+class GrainPatch(BaseModel):
+    kind: Literal["grain"]
+    seed: int = Field(ge=0, le=0xffffffff)
+    strength: int = Field(ge=1, le=64)
+
+
 class ImageCropSave(BaseModel):
+    source_version: Optional[uuid.UUID] = None
+    patches: List[RetouchPatch | GrainPatch] = Field(default_factory=list, max_length=32)
     scope: Literal['all', 'instagram'] = 'instagram'
     x: float = Field(default=0, ge=0, le=1, allow_inf_nan=False)
     y: float = Field(default=0, ge=0, le=1, allow_inf_nan=False)

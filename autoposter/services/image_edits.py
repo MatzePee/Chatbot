@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import io
 import uuid
 from pathlib import Path
@@ -88,6 +89,70 @@ def render(data, config, mime):
         return output.getvalue(), result.width, result.height
 
 
+def retouch_source(asset, version):
+    from autoposter.services import media
+    if version:
+        row = next((r for r in variants(asset).values() if r.id == version), None)
+        if not row:
+            raise HTTPException(409, "Bild inzwischen geändert. Bitte den Editor erneut öffnen.")
+        if (row.settings or {}).get("retouched"):
+            return media.resolve_media_path(row.storage_path).with_name("retouched.png")
+    return media.original_path(asset)
+
+
+def apply_grain(image, seed, strength):
+    # Same per-pixel integer hash as the browser preview. Chunk rows to bound
+    # working memory for full-resolution photos. Alpha is preserved.
+    import numpy as np
+    size = image.width
+    for y in range(0, image.height, 128):
+        end = min(y + 128, image.height)
+        box = (0, y, size, end)
+        pixels = np.array(image.crop(box))
+        v = np.arange(y * size, end * size, dtype=np.uint32) + np.uint32(seed)
+        v = (v ^ (v >> 16)) * np.uint32(0x7feb352d)
+        v = (v ^ (v >> 15)) * np.uint32(0x846ca68b)
+        v ^= v >> 16
+        amplitude = (v & 255).astype(np.int32) + ((v >> 8) & 255).astype(np.int32) - 255
+        delta = ((amplitude * strength + 127) // 255).reshape(end-y, size, 1)
+        pixels[:, :, :3] = np.clip(pixels[:, :, :3].astype(np.int16) + delta, 0, 255)
+        image.paste(Image.fromarray(pixels), box)
+
+
+def apply_patches(data, patches):
+    with Image.open(io.BytesIO(data)) as source:
+        if source.width * source.height > 24_000_000 or getattr(source, "is_animated", False):
+            raise HTTPException(422, "Der Radierer unterstützt Standbilder bis 24 Megapixel.")
+        image = ImageOps.exif_transpose(source).convert("RGBA")
+    for patch in patches:
+        if getattr(patch, "kind", None) == "grain":
+            apply_grain(image, patch.seed, patch.strength)
+            continue
+        try:
+            padding = patch.padding
+            if padding:
+                size = (image.width + padding.left + padding.right, image.height + padding.top + padding.bottom)
+                if size != (patch.width, patch.height) or patch.x or patch.y or size[0] * size[1] > 24_000_000:
+                    raise ValueError
+            elif patch.x + patch.width > image.width or patch.y + patch.height > image.height:
+                raise ValueError
+            raw = base64.b64decode(patch.png, validate=True)
+            with Image.open(io.BytesIO(raw)) as overlay:
+                if overlay.format != "PNG" or max(overlay.size) > 2048:
+                    raise ValueError
+                tile = overlay.convert("RGBA").resize((patch.width, patch.height), Image.Resampling.BILINEAR)
+            if padding:
+                tile.paste(image, (padding.left, padding.top))
+                image = tile
+            else:
+                image.alpha_composite(tile, (patch.x, patch.y))
+        except (OSError, ValueError, Image.DecompressionBombError) as exc:
+            raise HTTPException(422, "Ungültige Retusche im Bild.") from exc
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 async def save(db, asset, payload):
     from autoposter.services import media, library
     if asset.mime not in IMAGE_TYPES:
@@ -104,8 +169,17 @@ async def save(db, asset, payload):
     if payload.reset:
         data = None
     else:
-        config = payload.model_dump(exclude={"scope", "reset", "expected_version"})
-        data, width, height = await asyncio.to_thread(render, media.original_path(asset).read_bytes(), config, asset.mime)
+        config = payload.model_dump(exclude={"scope", "reset", "expected_version", "patches", "source_version"})
+        version = payload.source_version
+        if "source_version" not in payload.model_fields_set:
+            prior = selected(asset, payload.scope)
+            version = prior.id if prior else None
+        source = retouch_source(asset, version)
+        source_data = await asyncio.to_thread(source.read_bytes)
+        if payload.patches:
+            source_data = await asyncio.to_thread(apply_patches, source_data, payload.patches)
+        config["retouched"] = bool(payload.patches) or source != media.original_path(asset)
+        data, width, height = await asyncio.to_thread(render, source_data, config, asset.mime)
         if payload.scope == "instagram" and not instagram_ok(width, height):
             raise HTTPException(422, "Instagram benötigt ein Seitenverhältnis zwischen 3:4 und 1,91:1. Bitte ein passendes Format wählen.")
     for scope in scopes:
@@ -119,6 +193,8 @@ async def save(db, asset, payload):
         folder.mkdir(parents=True, exist_ok=False)
         ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[asset.mime]
         path = folder / ("image." + ext)
+        if config["retouched"]:
+            await asyncio.to_thread((folder / "retouched.png").write_bytes, source_data)
         await asyncio.to_thread(path.write_bytes, data)
         await asyncio.to_thread(media._write_thumbnails, folder, data)
         db.add(MediaImageEdit(id=identity, media_asset_id=asset.id, scope=payload.scope,

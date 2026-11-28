@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS drafts (
     ppv_preview_uuid  TEXT,
     -- Selbstheilung wartender Drafts (Recheck-Zyklus)
     inbound_uuid      TEXT,                  -- Fanvue-UUID der beantworteten Fan-Nachricht
+    regen_inbound_uuid TEXT,                 -- Fan-Nachricht des letzten Generierungsversuchs
     regen_count       INTEGER DEFAULT 0,     -- wie oft bereits neu generiert wurde
     last_regen_at     REAL,                  -- letzte Neugenerierung
     last_check_at     REAL,                  -- letzte Aktualitaetspruefung
@@ -488,6 +489,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # --- Zeit- und Situationskontext (gegen Uhrzeit-/Wochentag-Fehler) ---
     "time_context_enabled": True,       # Datum/Uhrzeit/Tagesplan in den Prompt injizieren
     "timestamps_in_history": True,      # relative Zeitmarken an die Verlaufsnachrichten
+    "send_promise_guard_enabled": True,
     "time_guard_enabled": True,         # Antwort auf Zeit-Widersprueche pruefen (kein Auto-Send)
     "persona_timezone": "Europe/Berlin",  # Zeitzone der PERSONA (nicht des Servers)
     "persona_schedule": (
@@ -612,6 +614,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ppv_price_cents": "INTEGER",
             "ppv_preview_uuid": "TEXT",
             "inbound_uuid": "TEXT",
+            "regen_inbound_uuid": "TEXT",
             "regen_count": "INTEGER DEFAULT 0",
             "last_regen_at": "REAL",
             "last_check_at": "REAL",
@@ -1010,6 +1013,25 @@ def update_draft(draft_id: int, **fields: Any) -> None:
         conn.commit()
 
 
+def save_regeneration(previous: sqlite3.Row, fields: dict) -> bool:
+    """Discard obsolete model results if another action changed this draft."""
+    cols = ", ".join(f"{key} = ?" for key in fields)
+    watched = ("status", "auto_send", "edited_text", "user_edited", "last_regen_at", "inbound_uuid")
+    predicate = " AND ".join(f"{key} IS ?" for key in watched)
+    with _lock:
+        conn = get_conn()
+        with conn:
+            updated = conn.execute(
+                f"UPDATE drafts SET {cols} WHERE id = ? AND {predicate}",
+                (*fields.values(), previous["id"], *(previous[key] for key in watched)),
+            )
+            if (updated.rowcount and fields.get("inbound_uuid")
+                    and fields["inbound_uuid"] != previous["inbound_uuid"]):
+                conn.execute("UPDATE chats SET last_inbound_uuid = ? WHERE user_uuid = ?",
+                             (fields["inbound_uuid"], previous["user_uuid"]))
+            return bool(updated.rowcount)
+
+
 def list_drafts(status: Optional[str] = None, limit: int = 100) -> list[sqlite3.Row]:
     with _lock:
         conn = get_conn()
@@ -1064,14 +1086,15 @@ def claim_due_auto_draft(draft_id: int, now: float) -> bool:
         return bool(cur.rowcount)
 
 
-def claim_manual_draft(draft_id: int, edited_text: str = "") -> bool:
+def claim_manual_draft(draft_id: int, edited_text: str = "", expected_inbound: str = "") -> bool:
     """Claim a manual send and its form text before an auto sender can start."""
     with _lock:
         conn = get_conn()
         cur = conn.execute(
             "UPDATE drafts SET auto_send = 2, scheduled_send_at = NULL "
-            "WHERE id = ? AND status IN ('pending', 'approved') AND COALESCE(auto_send, 0) != 2",
-            (draft_id,),
+            "WHERE id = ? AND status IN ('pending', 'approved') AND COALESCE(auto_send, 0) != 2 "
+            "AND (? = '' OR COALESCE(inbound_uuid, '-') = ?)",
+            (draft_id, expected_inbound, expected_inbound),
         )
         if not cur.rowcount:
             conn.commit()
@@ -1122,7 +1145,7 @@ def drafts_due_for_recheck(now: float, interval_seconds: float,
     """
     with _lock:
         return get_conn().execute(
-            "SELECT * FROM drafts WHERE status = 'pending' "
+            "SELECT * FROM drafts WHERE status = 'pending' AND COALESCE(auto_send, 0) != 2 "
             "AND (last_check_at IS NULL OR last_check_at <= ?) "
             "ORDER BY last_check_at IS NOT NULL, last_check_at ASC LIMIT ?",
             (now - interval_seconds, limit),

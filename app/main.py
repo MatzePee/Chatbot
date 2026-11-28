@@ -908,8 +908,8 @@ def _mark_edited(draft_id: int, edited_text: str) -> None:
 
 
 @app.post("/queue/{draft_id}/approve")
-def approve_draft(draft_id: int, edited_text: str = Form("")):
-    ok = poller.send_draft_now(draft_id, edited_text=edited_text)
+def approve_draft(draft_id: int, edited_text: str = Form(""), expected_inbound: str = Form("")):
+    ok = poller.send_draft_now(draft_id, edited_text=edited_text, expected_inbound=expected_inbound)
     msg = ""
     if not ok:
         d = db.get_draft(draft_id)
@@ -918,6 +918,8 @@ def approve_draft(draft_id: int, edited_text: str = Form("")):
             msg = f"Nicht gesendet – {d['stale_note']}"
         elif d and d["error"]:
             msg = f"Nicht gesendet – {d['error']}"
+        elif d and expected_inbound and (d["inbound_uuid"] or "-") != expected_inbound:
+            msg = "Der Fan hat weitergeschrieben. Bitte prüfe die neu erzeugte Antwort."
         else:
             msg = "Senden fehlgeschlagen – siehe Logs"
     return RedirectResponse(f"/queue?msg={_q(msg)}" if msg else "/queue", status_code=303)
@@ -1610,7 +1612,7 @@ async def ppv_mark_purchased(user_uuid: str, request: Request):
         db.update_ppv_state(user_uuid, unpurchased_streak=0, last_ppv_at=None,
                             outbound_since_ppv=int(db.get_setting("ppv_cooldown_outbound", 2)))
         db.log("info", "send", f"Set '{folder}' manuell als gekauft markiert ({user_uuid[:8]})")
-    return RedirectResponse("/chats", status_code=303)
+    return RedirectResponse(f"/chats/{user_uuid}/ppv", status_code=303)
 
 
 @app.post("/ppv/subscriber/{user_uuid}/reset-offered")
@@ -1908,6 +1910,62 @@ async def save_common_ai(request: Request):
     return RedirectResponse('/settings/shared?saved=ai#ai', status_code=303)
 
 
+def _comfyui_fields(comfy_url, comfy_model):
+    from urllib.parse import urlsplit
+    url = comfy_url.strip().rstrip('/')
+    model = comfy_model.strip()
+    try:
+        parts = urlsplit(url)
+        valid = parts.scheme in ('http', 'https') and parts.hostname and not (
+            parts.username or parts.password or parts.query or parts.fragment or parts.path)
+        _ = parts.port  # Validate the optional port.
+    except ValueError:
+        valid = False
+    if not valid or not model or len(model) > 300:
+        raise HTTPException(422, 'Bitte eine HTTP(S)-Serveradresse und einen Checkpoint-Dateinamen eingeben.')
+    return url, model
+
+
+@app.get('/settings/shared/comfyui/workflows/{tool}', dependencies=[Depends(_settings_admin)])
+def comfyui_download(tool: str):
+    from fastapi.responses import JSONResponse
+    from autoposter.services.comfyui import downloadable_workflow
+    if tool not in {"erase", "inpaint", "remove", "outpaint", "full", "krea", "face", "hands", "feet"}:
+        raise HTTPException(404, "Workflow nicht gefunden.")
+    return JSONResponse(downloadable_workflow(tool), headers={
+        "Content-Disposition": f'attachment; filename="AutoPost-{tool}.json"', "Cache-Control": "no-store"})
+
+
+@app.post('/settings/shared/comfyui/check', dependencies=[Depends(_settings_admin)])
+async def check_comfyui(comfy_url: str = Form(...), comfy_model: str = Form(...),
+                        comfy_qwen_model: str = Form(None), comfy_character_lora: str = Form("")):
+    from autoposter.services import comfyui
+    url, model = _comfyui_fields(comfy_url, comfy_model)
+    return await comfyui.component_inventory(url, model, (comfy_qwen_model or comfyui.QWEN_MODEL).strip(),
+                                            comfy_character_lora.strip())
+
+
+@app.post('/settings/shared/comfyui/lora', dependencies=[Depends(_settings_admin)])
+def save_character_lora(comfy_character_lora: str = Form("", max_length=500)):
+    from autoposter.workspaces import current_character
+    owner = current_character()
+    if not owner:
+        raise HTTPException(409, "Bitte zuerst einen Charakter wählen.")
+    name = comfy_character_lora.strip()
+    db.set_setting("comfy_character_lora", name)
+    return RedirectResponse(f'/settings/shared?view=comfyui&saved=settings&character_id={owner}', status_code=303)
+
+
+@app.post('/settings/shared/comfyui', dependencies=[Depends(_settings_admin)])
+def save_comfyui(comfy_url: str = Form(...), comfy_model: str = Form(...), comfy_qwen_model: str = Form(None)):
+    url, model = _comfyui_fields(comfy_url, comfy_model)
+    values = {'comfy_url': url, 'comfy_model': model}
+    if comfy_qwen_model is not None:
+        _, values['comfy_qwen_model'] = _comfyui_fields(url, comfy_qwen_model)
+    db.set_technical_settings(values)
+    return RedirectResponse('/settings/shared?view=comfyui&saved=settings', status_code=303)
+
+
 @app.post('/settings/shared/urls', dependencies=[Depends(_settings_admin)])
 async def save_common_urls(request: Request):
     form = await request.form()
@@ -2146,7 +2204,7 @@ _BOOL_KEYS = {"active_hours_enabled", "ppv_enabled", "ppv_use_llm_classifier",
               "ppv_confirm_enabled", "ppv_confirm_fail_open",
               "anti_ai_enabled", "reactivation_enabled", "incoming_image_enabled",
               "ppv_caption_use_vision", "ppv_block_on_distress", "tip_thanks_enabled",
-              "time_context_enabled", "timestamps_in_history", "time_guard_enabled",
+              "time_context_enabled", "timestamps_in_history", "time_guard_enabled", "send_promise_guard_enabled",
               "draft_recheck_enabled", "draft_regen_on_stale", "telegram_enabled",
               "update_check_enabled", "update_notify_telegram",
               "alert_keywords_enabled",

@@ -4,7 +4,7 @@ import { api } from './api.js?v=persona-hashtags-20261121-1'
 import { h, clear, append, toast } from './ui.js?v=persona-hashtags-20261121-1'
 
 import renderDashboard from './pages/dashboard.js?v=social-summary-20261122-1'
-import renderLibrary from './pages/library.js?v=persona-hashtags-20261121-1'
+import renderLibrary from './pages/library.js?v=qwen-edit-1'
 import renderAssign from './pages/assign.js?v=persona-hashtags-20261121-1'
 import renderMatrix from './pages/matrix.js?v=persona-hashtags-20261121-1'
 import renderTopPostsX from './pages/top-posts-x.js?v=persona-hashtags-20261121-1'

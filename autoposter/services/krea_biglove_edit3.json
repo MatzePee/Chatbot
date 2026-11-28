@@ -1,0 +1,330 @@
+{
+  "29": {
+    "inputs": {
+      "filename_prefix": "Krea2_Edit/Ganzbild",
+      "images": [
+        "117",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Ganzbild speichern"
+    }
+  },
+  "53": {
+    "inputs": {
+      "seed": 504794017000749,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "er_sde",
+      "scheduler": "beta",
+      "denoise": 1,
+      "model": [
+        "79",
+        0
+      ],
+      "positive": [
+        "84",
+        0
+      ],
+      "negative": [
+        "85",
+        0
+      ],
+      "latent_image": [
+        "111",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "1 · Maskierte Änderung"
+    }
+  },
+  "54": {
+    "inputs": {
+      "samples": [
+        "53",
+        0
+      ],
+      "vae": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Zwischenbild dekodieren"
+    }
+  },
+  "55": {
+    "inputs": {
+      "unet_name": "BigLoveKreaEdit3_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "56": {
+    "inputs": {
+      "clip_name": "qwen3vl_4b_bf16.safetensors",
+      "type": "krea2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "57": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "72": {
+    "inputs": {
+      "image": "bild-mit-maske.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Bild und Maske · Rechtsklick für MaskEditor"
+    }
+  },
+  "73": {
+    "inputs": {
+      "pixels": [
+        "72",
+        0
+      ],
+      "vae": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "79": {
+    "inputs": {
+      "ref_boost": 1,
+      "ref_boost_a": 1,
+      "fit_mode": "fit",
+      "model": [
+        "55",
+        0
+      ],
+      "source_latent": [
+        "73",
+        0
+      ]
+    },
+    "class_type": "Krea2EditModelPatch",
+    "_meta": {
+      "title": "Krea2 Edit (source patch)"
+    }
+  },
+  "82": {
+    "inputs": {
+      "width": [
+        "83",
+        0
+      ],
+      "height": [
+        "83",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "Leeres Ziel für das Ganzbild"
+    }
+  },
+  "83": {
+    "inputs": {
+      "image": [
+        "54",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Bildmaße"
+    }
+  },
+  "84": {
+    "inputs": {
+      "prompt": "Put white platform high heels on her feet. ",
+      "grounding_px": 512,
+      "system_prompt": "",
+      "clip": [
+        "56",
+        0
+      ],
+      "image": [
+        "72",
+        0
+      ]
+    },
+    "class_type": "Krea2EditGroundedEncode",
+    "_meta": {
+      "title": "Gewünschte Änderung"
+    }
+  },
+  "85": {
+    "inputs": {
+      "prompt": "",
+      "grounding_px": 512,
+      "system_prompt": "",
+      "clip": [
+        "56",
+        0
+      ],
+      "image": [
+        "72",
+        0
+      ]
+    },
+    "class_type": "Krea2EditGroundedEncode",
+    "_meta": {
+      "title": "Negative Konditionierung"
+    }
+  },
+  "111": {
+    "inputs": {
+      "samples": [
+        "73",
+        0
+      ],
+      "mask": [
+        "72",
+        1
+      ]
+    },
+    "class_type": "SetLatentNoiseMask",
+    "_meta": {
+      "title": "Nur die Maske neu samplen"
+    }
+  },
+  "113": {
+    "inputs": {
+      "pixels": [
+        "54",
+        0
+      ],
+      "vae": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "Zwischenbild als Referenz"
+    }
+  },
+  "114": {
+    "inputs": {
+      "ref_boost": 1,
+      "ref_boost_a": 1,
+      "fit_mode": "fit",
+      "model": [
+        "55",
+        0
+      ],
+      "source_latent": [
+        "113",
+        0
+      ]
+    },
+    "class_type": "Krea2EditModelPatch",
+    "_meta": {
+      "title": "Referenz für das ganze Bild"
+    }
+  },
+  "115": {
+    "inputs": {
+      "prompt": "Render the whole photograph with the same subject, outfit, pose and framing as the reference. Integrate the edited details with natural edges, consistent lighting and realistic contact shadows.",
+      "grounding_px": 512,
+      "system_prompt": "",
+      "clip": [
+        "56",
+        0
+      ],
+      "image": [
+        "54",
+        0
+      ]
+    },
+    "class_type": "Krea2EditGroundedEncode",
+    "_meta": {
+      "title": "Anweisung für das ganze Bild"
+    }
+  },
+  "116": {
+    "inputs": {
+      "seed": 29819524831191,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "er_sde",
+      "scheduler": "beta",
+      "denoise": 1,
+      "model": [
+        "114",
+        0
+      ],
+      "positive": [
+        "115",
+        0
+      ],
+      "negative": [
+        "85",
+        0
+      ],
+      "latent_image": [
+        "82",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "2 · Ganzes Bild neu generieren"
+    }
+  },
+  "117": {
+    "inputs": {
+      "samples": [
+        "116",
+        0
+      ],
+      "vae": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Ganzbild dekodieren"
+    }
+  },
+  "118": {
+    "inputs": {
+      "images": [
+        "54",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  }
+}

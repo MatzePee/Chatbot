@@ -375,6 +375,55 @@ async def detail(
     return out
 
 
+@router.get("/{asset_id}/edit-source/{version}")
+async def edit_source(asset_id: uuid.UUID, version: uuid.UUID, db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
+    from autoposter.services.image_edits import retouch_source
+    asset = await db.get(MediaAsset, asset_id)
+    if not asset:
+        raise HTTPException(404, "Bild nicht gefunden")
+    return FileResponse(retouch_source(asset, version), headers={"Cache-Control": "private, no-store"})
+
+
+@router.post("/{asset_id}/erase")
+async def erase(asset_id: uuid.UUID, image: UploadFile, mask: Optional[UploadFile] = None,
+                operation: Literal["erase", "inpaint", "remove", "outpaint", "full", "krea", "face", "hands", "feet"] = Form("erase"), prompt: str = Form("", max_length=4000),
+                steps: int = Form(3, ge=1, le=100), denoise: Optional[float] = Form(None, ge=0, le=1),
+                db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
+    from autoposter.services import comfyui
+    from autoposter.crypto import encrypt
+    if not await db.get(MediaAsset, asset_id):
+        raise HTTPException(404, "Bild nicht gefunden")
+    detail = operation if operation in comfyui.detailers.DEFAULT_DENOISE else None
+    limit = (20 if detail or operation in ("full", "krea") else 5) * 1024 * 1024
+    if not detail and operation != "full" and mask is None:
+        raise HTTPException(422, "Für dieses Werkzeug wird eine Maske benötigt.")
+    photo = await image.read(limit + 1)
+    matte = await mask.read(limit + 1) if mask and not detail and operation != "full" else None
+    if max(len(photo), len(matte or b"")) > limit:
+        raise HTTPException(413, "Bildausschnitt zu groß")
+    instruction = prompt.strip()
+    if operation in ("inpaint", "full", "krea") and not instruction:
+        raise HTTPException(422, "Bitte beschreibe die gewünschte Änderung.")
+    if operation == "outpaint":
+        instruction = comfyui.OUTPAINT_PROMPT + " " + instruction
+    job = await comfyui.submit(photo, matte, instruction if operation != "erase" else None, remove=operation == "remove", krea=operation == "krea",
+                               detail=detail, steps=steps, denoise=denoise)
+    return {"job": encrypt(f"{asset_id}/{job}")}
+
+
+@router.get("/{asset_id}/erase/{token}")
+async def erase_result(asset_id: uuid.UUID, token: str, db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
+    from autoposter.crypto import decrypt
+    from autoposter.services import comfyui
+    try:
+        owner, job = decrypt(token).split("/")
+        if owner != str(asset_id) or not await db.get(MediaAsset, asset_id):
+            raise ValueError
+    except (ValueError, RuntimeError):
+        raise HTTPException(404, "Auftrag nicht gefunden")
+    return await comfyui.result(job)
+
+
 @router.put("/{asset_id}/crop", response_model=MediaDetail)
 async def save_crop(asset_id: uuid.UUID, payload: ImageCropSave, db: AsyncSession = Depends(get_db), _: User = Depends(require_editor)):
     from autoposter.services import image_edits

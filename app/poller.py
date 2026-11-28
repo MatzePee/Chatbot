@@ -720,6 +720,13 @@ def send_due_cycle() -> None:
         time.sleep(0.5)
 
 
+def _attempts_for_message(draft: Any, message: dict) -> int:
+    anchor = draft["regen_inbound_uuid"] or draft["inbound_uuid"]
+    if message.get("uuid") and message["uuid"] != anchor:
+        return 0
+    return draft["regen_count"] or 0
+
+
 def _check_stale_before_send(draft: Any) -> str | None:
     """Direkt vor dem Senden pruefen, ob der Fan zwischenzeitlich geschrieben hat.
 
@@ -731,7 +738,7 @@ def _check_stale_before_send(draft: Any) -> str | None:
     try:
         messages_chrono = _fetch_history(draft["user_uuid"])
     except Exception:  # noqa: BLE001
-        return None
+        return draft["stale_note"]  # Eine bekannte veraltete Antwort bleibt gesperrt.
     newer = _newer_fan_messages(draft, messages_chrono, _me_uuid())
     if not newer:
         db.update_draft(draft_id, last_check_at=time.time(), stale_note=None)
@@ -741,14 +748,14 @@ def _check_stale_before_send(draft: Any) -> str | None:
     stale = (f"Veraltet beim Senden: {len(newer)} neue Fan-Nachricht"
              f"{'en' if len(newer) != 1 else ''} eingegangen")
     max_regen = int(db.get_setting("draft_max_regen", 10))
-    count = draft["regen_count"] or 0
+    count = _attempts_for_message(draft, newer[-1])
     edited = _draft_is_edited(draft)
 
     # Senden stoppen; wenn erlaubt, sofort mit dem neuen Verlauf neu generieren.
     db.update_draft(draft_id, scheduled_send_at=None, stale_note=stale)
     if db.get_setting("draft_regen_on_stale", True) and not edited and count < max_regen:
-        regenerate_draft(draft_id, reason=stale)
-        db.log("info", "send", f"Senden gestoppt, Draft #{draft_id} neu generiert ({handle})", stale)
+        _regenerate_from_history(draft, messages_chrono, stale)
+        db.log("info", "send", f"Senden gestoppt, Neuversuch für Draft #{draft_id} ({handle})", stale)
     else:
         why = ("manuell bearbeitet" if edited else
                f"Limit von {max_regen} Neuversuchen erreicht" if count >= max_regen
@@ -874,9 +881,9 @@ def _send_draft(draft_id: int) -> bool:
         return False
 
 
-def send_draft_now(draft_id: int, edited_text: str = "") -> bool:
+def send_draft_now(draft_id: int, edited_text: str = "", expected_inbound: str = "") -> bool:
     """From the GUI: atomically claim the edit and send only once."""
-    if not db.claim_manual_draft(draft_id, edited_text):
+    if not db.claim_manual_draft(draft_id, edited_text, expected_inbound):
         return False
     try:
         return _send_draft(draft_id)
@@ -1419,23 +1426,16 @@ def _newer_fan_messages(draft: Any, messages_chrono: list, me_uuid: str) -> list
         anchor = None
 
     if anchor:
-        idx = next((i for i, m in enumerate(messages_chrono)
-                    if m.get("uuid") == anchor), None)
-        if idx is None:
-            return []  # Anker nicht im geladenen Fenster -> keine Aussage moeglich
-        tail = messages_chrono[idx + 1:]
+        idx = next((i for i, m in enumerate(messages_chrono) if m.get("uuid") == anchor), None)
     else:
-        # Fallback: letzte Fan-Nachricht mit incoming_text vergleichen
         old = (draft["incoming_text"] or "").strip()
-        fan_msgs = [m for m in messages_chrono
-                    if (m.get("sender") or {}).get("uuid", "") != me_uuid]
-        if not fan_msgs or not old:
-            return []
         idx = next((i for i, m in enumerate(messages_chrono)
-                    if (m.get("text") or "").strip() == old
+                    if old and (m.get("text") or "").strip() == old
                     and (m.get("sender") or {}).get("uuid", "") != me_uuid), None)
-        if idx is None:
-            return []
+    if idx is None:
+        # Older drafts or a long conversation can put the anchor outside the window.
+        tail = [m for m in messages_chrono if (memory._msg_epoch(m) or 0) > draft["created_at"]]
+    else:
         tail = messages_chrono[idx + 1:]
 
     return [m for m in tail if (m.get("sender") or {}).get("uuid", "") != me_uuid]
@@ -1456,15 +1456,21 @@ def regenerate_draft(draft_id: int, reason: str = "", interactive: bool = False)
 
     user_uuid = draft["user_uuid"]
     handle = draft["handle"] or user_uuid
-    me_uuid = _me_uuid()
-    now = time.time()
-
     try:
         messages_chrono = _fetch_history(user_uuid)
     except fanvue.FanvueError as exc:
         db.log("error", "generate", f"Regenerate: Verlauf nicht ladbar ({handle})", str(exc))
-        db.update_draft(draft_id, last_check_at=now)
+        db.update_draft(draft_id, last_check_at=time.time())
         return False
+    return _regenerate_from_history(draft, messages_chrono, reason, interactive)
+
+
+def _regenerate_from_history(draft, messages_chrono, reason, interactive=False):
+    draft_id = draft["id"]
+    user_uuid = draft["user_uuid"]
+    handle = draft["handle"] or user_uuid
+    me_uuid = _me_uuid()
+    now = time.time()
     if not messages_chrono:
         db.update_draft(draft_id, last_check_at=now)
         return False
@@ -1496,30 +1502,45 @@ def regenerate_draft(draft_id: int, reason: str = "", interactive: bool = False)
                          "Preisangabe, keine Platzhalter, keine Regieanweisungen.")
 
     # Letzte Fan-Nachricht als neuer Bezugspunkt
-    last_msg = messages_chrono[-1]
     last_fan = next((m for m in reversed(messages_chrono)
                      if (m.get("sender") or {}).get("uuid", "") != me_uuid), None)
 
+    count = _attempts_for_message(draft, last_fan or {}) + 1
+    attempt_uuid = last_fan.get("uuid") if last_fan else draft["inbound_uuid"]
     try:
         generated = _generate(system_prompt, messages_chrono, me_uuid, fan_notes, banned,
                               task=task, retry_delay=0 if interactive else None,
                               fan_memory=_fan_memory(user_uuid))
     except Exception as exc:  # noqa: BLE001 - nie den Zyklus abbrechen
         db.log("error", "generate", f"Regenerate fehlgeschlagen ({handle})", str(exc))
-        db.update_draft(draft_id, last_check_at=now, last_regen_at=now,
-                        regen_count=(draft["regen_count"] or 0) + 1)
+        db.save_regeneration(draft, dict(last_check_at=now, last_regen_at=now,
+                                         regen_count=count, regen_inbound_uuid=attempt_uuid))
         return False
 
     if is_ppv:
         generated = re.sub(r"(?i)\bsets?\b", "PPV", generated)
-    clean_text, note = guardrails.check_outgoing(generated, has_media=is_ppv)
-    count = (draft["regen_count"] or 0) + 1
+    has_media = is_ppv or bool(json.loads(draft["ppv_media_uuids"] or "[]"))
+    clean_text, note = guardrails.check_outgoing(generated, has_media=has_media)
+    # Eine Eskalation bleibt auch bei späteren Neuversuchen freigabepflichtig.
+    escalation_notes = [part for part in (draft["guardrail_note"] or "").split(" | ")
+                        if "eskalations-stichwort" in part.lower()]
+    newer = _newer_fan_messages(draft, messages_chrono, me_uuid)
+    for message in newer:
+        keyword = guardrails.incoming_needs_escalation(message.get("text") or "")
+        if keyword:
+            escalation_notes.append(f"Eskalations-Stichwort '{keyword}' -> bitte manuell pruefen")
+            break
+    if escalation_notes:
+        note = " | ".join(dict.fromkeys(filter(None, [note, *escalation_notes])))
     ok = bool((generated or "").strip()) and not note
 
     fields: dict[str, Any] = {
         "generated_text": generated,
         "guardrail_note": note,
         "regen_count": count,
+        "regen_inbound_uuid": attempt_uuid,
+        "scheduled_send_at": None,
+        "auto_send": -1 if draft["auto_send"] == -1 else 0,
         "last_regen_at": now,
         "last_check_at": now,
         "stale_note": None,
@@ -1527,12 +1548,12 @@ def regenerate_draft(draft_id: int, reason: str = "", interactive: bool = False)
     }
     # Wieder brauchbar? Dann die Melde-Sperre loesen, damit ein spaeterer
     # erneuter Blocker wieder auf dem Handy landet.
-    if ok:
+    if ok or attempt_uuid != draft["inbound_uuid"]:
         fields["notified_at"] = None
     # Bezugspunkt mitziehen, damit der Draft nicht sofort wieder als veraltet gilt
     if last_fan is not None:
         fields["incoming_text"] = (last_fan.get("text") or "").strip()
-    fields["inbound_uuid"] = last_msg.get("uuid")
+    fields["inbound_uuid"] = attempt_uuid if newer else draft["inbound_uuid"]
     # Bearbeiteten Text NIE ueberschreiben (Nutzerentscheidung)
     if not _draft_is_edited(draft):
         fields["edited_text"] = clean_text
@@ -1553,21 +1574,16 @@ def regenerate_draft(draft_id: int, reason: str = "", interactive: bool = False)
     #   - Manuell angestossen: wer in der Queue auf "Neu generieren" klickt,
     #     sitzt gerade davor und will den Text ansehen, nicht 30 Sekunden
     #     spaeter ueberrascht werden.
-    escalated = any(k in (draft["guardrail_note"] or "").lower()
-                    for k in _HUMAN_ONLY_NOTES)
-    if draft["auto_send"] == -1:
-        # A deliberate per-message pause survives background regeneration.
-        fields["auto_send"] = -1
-        fields["scheduled_send_at"] = None
-    elif (ok and not interactive and _effective_mode(chat) == "auto"
-          and not escalated and not _draft_is_edited(draft)):
+    if (draft["auto_send"] != -1 and ok and not interactive and _effective_mode(chat) == "auto"
+            and not _draft_is_edited(draft)):
         delay_min = int(db.get_setting("send_delay_min_seconds", 20))
         delay_max = int(db.get_setting("send_delay_max_seconds", 90))
         fields["auto_send"] = 1
         fields["scheduled_send_at"] = now + random.randint(
             min(delay_min, delay_max), max(delay_min, delay_max))
 
-    db.update_draft(draft_id, **fields)
+    if not db.save_regeneration(draft, fields):
+        return False
     db.log("info" if ok else "warn", "generate",
            f"Draft #{draft_id} neu generiert (Versuch {count}) für {handle}"
            + ("" if ok else f" – weiterhin blockiert: {note}"),
@@ -1608,6 +1624,7 @@ def recheck_pending_cycle() -> None:
 
         # --- Fall 1: veraltet (Fan hat weitergeschrieben) ---
         if newer:
+            count = _attempts_for_message(draft, newer[-1])
             preview = " | ".join((m.get("text") or "").strip()[:80]
                                  for m in newer if (m.get("text") or "").strip())
             stale = (f"Veraltet: {len(newer)} neue Fan-Nachricht"
@@ -1617,7 +1634,7 @@ def recheck_pending_cycle() -> None:
             if regen_on_stale and not edited and count < max_regen:
                 # Auto-Send stoppen, solange neu generiert wird
                 db.update_draft(draft_id, scheduled_send_at=None, stale_note=stale)
-                regenerate_draft(draft_id, reason=stale)
+                _regenerate_from_history(draft, messages_chrono, stale)
             else:
                 why = ("manuell bearbeitet – bitte selbst entscheiden" if edited else
                        f"Limit von {max_regen} Neuversuchen erreicht" if count >= max_regen
@@ -1632,8 +1649,9 @@ def recheck_pending_cycle() -> None:
         # --- Fall 2: reparierbar kaputt -> neuen Versuch starten ---
         # Das Limit haengt am Grund: eckige Klammern bekommen nur 3 Versuche.
         limit = _max_regen_for(draft)
-        if broken and count < limit:
-            regenerate_draft(draft_id, reason=f"Auto-Retry: {draft['guardrail_note'] or 'leerer Text'}")
+        if broken and not _draft_is_edited(draft) and count < limit:
+            _regenerate_from_history(draft, messages_chrono,
+                                     f"Auto-Retry: {draft['guardrail_note'] or 'leerer Text'}")
             time.sleep(0.4)
             continue
 

@@ -5,7 +5,7 @@
  ('Für ' ~ (request.state.character_name | default('diesen Charakter')), [
   ('profile','autochat','Profil & Persönlichkeit'),('accounts','channels','Konten & Kanäle'),
   ('autochat','autochat','AutoChat'),('autopost','autopost','AutoPost'),('notifications','autochat','Benachrichtigungen')]),
- ('Studio', [('characters','shared','Charakterverwaltung'),('ai','shared','KI & Kosten'),('telegram','shared','Telegram-Zentrale')]),
+ ('Studio', [('characters','shared','Charakterverwaltung'),('ai','shared','KI & Kosten'),('comfyui','shared','ComfyUI'),('telegram','shared','Telegram-Zentrale')]),
  ('System', [('system','shared','Status & Wartung'),('updates','shared','Updates & Veröffentlichung')]) ] %}
 <span class="workspace-nav-heading">{{ group }}</span>
 {% for key, section, label in entries %}

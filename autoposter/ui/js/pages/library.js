@@ -455,9 +455,11 @@ export default async function renderLibrary({ query }) {
           }))
         : h('p', { class: 'hint' }, d.assigned_channel_ids.length ? 'Auf allen zugeordneten Kanälen gelaufen.' : 'Keinem Kanal zugeordnet.')
 
-      const addChips = h('div', { class: 'row' }, ...channels
-        .filter((c) => !d.assigned_channel_ids.includes(c.id))
-        .map((c) => h('button', {
+      const platformRows = new Map(['instagram', 'x', 'telegram', 'fanvue'].map(p => [p, null]))
+      for (const c of channels) {
+        if (d.assigned_channel_ids.includes(c.id)) continue
+        if (!platformRows.get(c.platform)) platformRows.set(c.platform, h('div', { class: 'row' }))
+        platformRows.get(c.platform).append(h('button', {
           type: 'button', class: 'chip', 'aria-label': '+ ' + c.display_name,
           onClick: guard(async () => {
             await changeAsset(async () => {
@@ -466,7 +468,10 @@ export default async function renderLibrary({ query }) {
               assignmentMessage = '✓ Zu ' + c.display_name + ' zugeordnet'
             })
           }),
-        }, platformIcon(c.platform), '+ ' + c.display_name)))
+        }, platformIcon(c.platform), '+ ' + c.display_name))
+      }
+      const addChips = h('div', { style: { display: 'grid', gap: '1em' } },
+        ...Array.from(platformRows.values()).filter(Boolean))
 
       const index = ids.indexOf(d.id)
       return h('div', { class: 'library-detail' },
@@ -502,10 +507,23 @@ export default async function renderLibrary({ query }) {
                     deleteBtn.textContent = 'Lösche …'
                     try {
                       await saveNow()
+                      const index=ids.indexOf(d.id)
+                      if(index===ids.length-1 && state.cursor){
+                        await load(true)
+                        for(const asset of state.items)if(!ids.includes(asset.id))ids.push(asset.id)
+                      }
+                      const nextId=ids[index+1] || ids[index-1]
+                      const nextDetail=nextId?await api.mediaDetail(nextId):null
                       await api.deleteMedia(d.id)
                       removed = true
                       state.selected.delete(d.id)
-                      closeConfirm(); close()
+                      if(index>=0)ids.splice(index,1)
+                      closeConfirm()
+                      if(nextDetail){
+                        d=nextDetail;removed=false;assignmentMessage=''
+                        renderCurrent();dialog.body.scrollTop=0
+                        dialog.body.closest('.modal-bg').scrollTop=0
+                      }else close()
                       toast.ok('Bild gelöscht')
                       await load()
                       await Promise.all([refreshCounts(), refreshSets()])

@@ -497,7 +497,7 @@ def check_outgoing(text: str, has_media: bool = False) -> tuple[str, str | None]
 
     # Ankuendigung ohne Anhang: "soll ich es dir schicken?" bei einer Nachricht,
     # an der nichts haengt, ist ein Versprechen ins Leere.
-    if not has_media:
+    if not has_media and db.get_setting("send_promise_guard_enabled", True):
         zusage = finds_unbacked_promise(text)
         if zusage:
             return text, (f"Kündigt „{zusage}“ an, es hängt aber kein Content an der "

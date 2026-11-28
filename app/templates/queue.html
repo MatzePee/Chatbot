@@ -48,6 +48,7 @@ werden bis zu {{ max_regen }}× automatisch neu erzeugt.</p>
   </div>
 
   <form method="post" action="/queue/{{ d['id'] }}/approve">
+    <input type="hidden" name="expected_inbound" value="{{ d['inbound_uuid'] or '-' }}">
     <textarea name="edited_text" rows="7">{{ d['edited_text'] or d['generated_text'] }}</textarea>
     {% if d['auto_send'] == 1 and d['scheduled_send_at'] %}
     <div class="send-countdown" data-send-at="{{ d['scheduled_send_at'] }}" role="status" aria-live="off">

@@ -40,8 +40,6 @@
         {% if s['time_context_enabled'] %}checked{% endif %}> Zeitkontext in den Prompt</label>
       <label class="chk"><input type="checkbox" name="timestamps_in_history"
         {% if s['timestamps_in_history'] %}checked{% endif %}> Zeitmarken im Verlauf</label>
-      <label class="chk"><input type="checkbox" name="time_guard_enabled"
-        {% if s['time_guard_enabled'] %}checked{% endif %}> Guardrail: Zeit-Widersprüche</label>
       <label>Zeitzone der Persona
         <input name="persona_timezone" value="{{ s['persona_timezone'] }}"
           placeholder="z.B. Europe/Berlin, America/Los_Angeles"></label>
@@ -223,7 +221,7 @@
       <label>Prüfabstand (s)
         <input name="draft_recheck_interval_seconds" type="number" min="30"
           value="{{ s['draft_recheck_interval_seconds'] }}"></label>
-      <label>Max. Neuversuche
+      <label>Max. Neuversuche pro Fan-Nachricht
         <input name="draft_max_regen" type="number" min="0" max="50"
           value="{{ s['draft_max_regen'] }}"></label>
       <label>davon bei eckigen Klammern <span class="info" tabindex="0" data-tip="Enthält die Antwort [ oder ], stecken dort Regieanweisungen, Platzhalter oder Notizen des Modells. Nach so vielen erfolglosen Neuversuchen landet der Entwurf in der Freigabe.">ⓘ</span>
@@ -398,6 +396,10 @@
   <p class="muted grp-desc">Was den Bot bremst, bevor etwas Falsches rausgeht.</p>
   <details class="card sect">
     <summary>Guardrails</summary>
+    <label class="chk"><input type="checkbox" name="time_guard_enabled"
+      {% if s['time_guard_enabled'] %}checked{% endif %}> Antworten mit unpassender Zeitangabe zurückhalten (z. B. „Guten Morgen“ am Abend)</label>
+    <label class="chk"><input type="checkbox" name="send_promise_guard_enabled"
+      {% if s['send_promise_guard_enabled'] %}checked{% endif %}> Versandzusagen ohne Anhang zurückhalten (z. B. „I will send you …“)</label>
     <label>Max. Zeichen pro Antwort <input name="max_reply_chars" type="number" value="{{ s['max_reply_chars'] }}"></label>
     <label>Verbotene Wörter (kommagetrennt, blockt Auto-Send)
       <input name="banned_words" value="{{ s['banned_words'] }}"></label>

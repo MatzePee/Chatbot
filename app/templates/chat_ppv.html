@@ -84,7 +84,7 @@
         <td>
           <form method="post" action="/chats/{{ user_uuid }}/ppv/status" class="inline">
             <input type="hidden" name="folder_name" value="{{ t['name'] }}">
-            <select name="status" onchange="this.form.submit()">
+            <select name="status" onchange="this.form.requestSubmit()">
               <option value="not_offered" {% if t['status_value']=='not_offered' %}selected{% endif %}>nicht angeboten (zurücksetzen)</option>
               <option value="offered" {% if t['status_value']=='offered' %}selected{% endif %}>angeboten</option>
               <option value="bought" {% if t['status_value']=='bought' %}selected{% endif %}>gekauft</option>

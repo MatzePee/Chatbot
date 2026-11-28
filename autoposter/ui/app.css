@@ -122,6 +122,26 @@ input:focus, select:focus, textarea:focus {
 }
 textarea { resize: vertical; min-height: 70px; }
 input[type=color] { padding: 2px; height: 34px; }
+
+/* iOS date/time controls have intrinsic content widths; allow their host and
+   internal value to shrink to the available field without losing the picker. */
+input[type=date], input[type=time], input[type=datetime-local] {
+  display: block;
+  width: 100%; max-width: 100%; min-width: 0;
+  inline-size: 100%; max-inline-size: 100%; min-inline-size: 0;
+  box-sizing: border-box;
+  -webkit-appearance: none; appearance: none;
+}
+input[type=date]::-webkit-date-and-time-value,
+input[type=time]::-webkit-date-and-time-value,
+input[type=datetime-local]::-webkit-date-and-time-value {
+  min-width: 0; text-align: left;
+}
+input[type=date]::-webkit-datetime-edit,
+input[type=time]::-webkit-datetime-edit,
+input[type=datetime-local]::-webkit-datetime-edit { min-width: 0; padding: 0; }
+.field { min-width: 0; max-width: 100%; }
+
 label.lbl { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
 .field { margin-bottom: 12px; }
 .inline { display: flex; align-items: center; gap: 8px; font-size: 13px; }

@@ -12,7 +12,7 @@ GLOBAL_TECHNICAL_KEYS = frozenset({
     'openrouter_api_key', 'vision_api_key',
     'openrouter_model_caption', 'openrouter_model_text', 'openrouter_model_vision',
     'openrouter_model_fallback', 'openrouter_monthly_budget_usd',
-    'public_base_url',
+    'public_base_url', 'comfy_url', 'comfy_model', 'comfy_qwen_model',
     'git_remote_url', 'git_branch', 'git_user_name', 'git_user_email',
     'github_token', 'git_commit_default',
     'update_check_enabled', 'update_check_interval_hours', 'update_notify_telegram',

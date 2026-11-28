@@ -4736,6 +4736,11 @@
         },
         {
           "tag": "button"
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "name": "send_promise_guard_enabled"
         }
       ],
       "select_options": [
@@ -4891,7 +4896,8 @@
         "tip_thanks_prompt": "character",
         "vision_api_key": "installation",
         "vision_model": "installation",
-        "vision_prompt": "character"
+        "vision_prompt": "character",
+        "send_promise_guard_enabled": "character"
       }
     },
     "updates": {
@@ -7357,6 +7363,11 @@
       },
       {
         "tag": "button"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "name": "send_promise_guard_enabled"
       }
     ],
     "app/templates/_fanvue_settings.html": [

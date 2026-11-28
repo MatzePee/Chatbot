@@ -866,6 +866,12 @@
         "destination": "characters/<immutable-id>/bot.db/settings",
         "secret": false,
         "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
+      },
+      "send_promise_guard_enabled": {
+        "scope": "character",
+        "destination": "characters/<immutable-id>/bot.db/settings",
+        "secret": false,
+        "migration": "preserve only for operator-assigned existing owner; no fallback for new owners"
       }
     },
     "autopost_integrations": {
@@ -1933,6 +1939,9 @@
     ],
     "update_check_enabled": [
       "app/updater.py:184"
+    ],
+    "send_promise_guard_enabled": [
+      "app/guardrails.py:500"
     ]
   },
   "dynamic_calls_requiring_route_review": [

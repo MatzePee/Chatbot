@@ -5,6 +5,32 @@
 {% include "_character_management.html" %}
 {% endif %}
 
+{% if settings_view == 'comfyui' %}
+<section class="card"><h2>ComfyUI-Verbindung und Modelle</h2>
+<form method="post" action="/settings/shared/comfyui">
+<label>ComfyUI-Adresse im Netzwerk<input type="url" required name="comfy_url" value="{{ s.get('comfy_url', 'http://MatzesPC:8188') }}"></label>
+<p class="muted">AutoPost verbindet sich mit diesem Rechner. ComfyUI muss auf seiner LAN-Adresse lauschen (Startoption <code>--listen</code>). Falls der Rechnername nicht aufgelöst wird, verwende die LAN-IP.</p>
+<label>Inpainting-Checkpoint<input required maxlength="300" name="comfy_model" value="{{ s.get('comfy_model', 'juggernautXL_versionXInpaint.safetensors') }}"></label>
+<p class="muted">Verwende den Dateinamen aus dem Checkpoint-Loader in ComfyUI.</p>
+<label>Qwen-2.1-Diffusionsmodell für Inpainting und Outpainting<input required maxlength="300" name="comfy_qwen_model" value="{{ s.get('comfy_qwen_model', 'qwen_image_2.1_int8_convrot.safetensors') }}"></label>
+<button class="btn-primary">ComfyUI-Einstellungen speichern</button>
+</form>
+<h3>Charakter-LoRA · {{ request.state.character_name | default('Aktueller Charakter') }}</h3>
+<form method="post" action="/settings/shared/comfyui/lora">
+<label>LoRA-Datei<input name="comfy_character_lora" list="comfy-loras" maxlength="500" value="{{ s.get('comfy_character_lora','') }}" placeholder="Dateiname oder Unterordner/Dateiname.safetensors"></label>
+<datalist id="comfy-loras"></datalist>
+<p class="muted">Der Gesichtsdetailer verwendet die LoRA dieses Charakters mit Stärke 1. Ohne Auswahl verwendet er das Basismodell. Zum Entfernen das Feld leeren und speichern.</p>
+<button>Charakter-LoRA speichern</button></form>
+<h3>Komponentenprüfung</h3>
+<p class="muted">Geprüft wird die oben eingetragene ComfyUI-Instanz. Die Standardpfade beziehen sich auf ihren Installationsordner. Zusätzlich konfigurierte Modellordner werden von ComfyUI mit durchsucht.</p>
+<button type="button" data-comfy-check>Verbindung und Komponenten prüfen</button>
+<p role="status" data-comfy-status></p><div data-comfy-inventory></div>
+<h3>Workflows herunterladen</h3>
+<p>Die JSON-Datei in ComfyUI öffnen und das eigene Bild laden. Für Radierer und Inpainting zusätzlich eine gleich große Maske wählen (weiß = bearbeiten). Für Krea die Auswahl im MaskEditor des Bildknotens zeichnen. Beim Outpainting die Ränder im Padding-Knoten einstellen. Die Workflows verwenden die gespeicherten Modellnamen. Die Modelldateien müssen in der jeweiligen ComfyUI-Installation vorhanden sein.</p>
+{% for tool, label in [('face','Gesicht detaillieren'),('hands','Hände detaillieren'),('feet','Füße detaillieren'),('erase','KI Radierer'),('inpaint','Inpainting'),('krea','Inpainting (Krea3 BigLove Edit3)'),('remove','Objekt entfernen'),('full','Qwen ohne Maske'),('outpaint','Outpainting')] %}
+<a class="btn" download href="/settings/shared/comfyui/workflows/{{ tool }}?character_id={{ request.query_params.get('character_id','') | urlencode }}">{{ label }} (.json)</a>
+{% endfor %}</section>
+{% endif %}
 {% if settings_view == 'ai' %}
 <section class="card" id="ai"><h2>Modelle & Generierung</h2><p>Gilt für alle Charaktere. Chat-Bildanalyse und Post-Bildbeschreibung bleiben getrennte Aufgaben. Exakte Modell-IDs; keine automatische Anbieterabfrage.</p><form method="post" action="/settings/shared/ai">
 <label>API-Key <input name="openrouter_api_key" type="password" value="{{ '********' if s['openrouter_api_key'] else '' }}"></label>
